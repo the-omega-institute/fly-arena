@@ -7,6 +7,7 @@ import mujoco as mj
 import numpy as np
 
 from flygym.compose.world import FlatGroundWorld
+from flygym.anatomy import BodySegment
 from flygym.simulation import Simulation
 from flygym.utils.math import Rotation3D
 from flygym_demo.complex_terrain.common import make_locomotion_fly, apply_locomotion_action
@@ -25,10 +26,18 @@ class Bodies:
             world.mjcf_root.worldbody.add_geom(name=f"obstacle-{index}", type=mj.mjtGeom.mjGEOM_BOX,
                 pos=obstacle["position"], size=np.array(obstacle["size"]) / 2,
                 contype=4, conaffinity=3, friction=[1, .02, .0001])
+        contact_sensors = {}
         for index, name in enumerate(self.names):
             fly = make_locomotion_fly(name)
+            fly.bodyseg_to_mjcfbody[BodySegment("c_head")].add_site(name="head_origin", pos=(0, 0, 0), size=(.01,))
             x, y, yaw = scene["spawns"][index]
             world.add_fly(fly, (x, y, .25), Rotation3D("quat", (np.cos(yaw / 2), 0, 0, np.sin(yaw / 2))))
+            # FlyGym 2.1 creates these sensors on the world root with unscoped
+            # names. Namespace each actual sensor before attaching another fly.
+            for sensor in world.legpos_to_groundcontactsensors_by_fly[name].values():
+                sensor.name = f"{name}/{sensor.name}"
+            contact_sensors[name] = world.legpos_to_groundcontactsensors_by_fly[name]
+        world.legpos_to_groundcontactsensors_by_fly = contact_sensors
         self.sim = Simulation(world, timestep=RULES["physics_dt"])
         self.model, self.data = self.sim.mj_model, self.sim.mj_data
         self.controllers = []
@@ -39,7 +48,7 @@ class Bodies:
             c.reset(seed=seed)
             self.controllers.append(c)
             self.body_ids.append(mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, f"{name}/c_thorax"))
-            self.head_ids.append(mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_BODY, f"{name}/c_head"))
+            self.head_ids.append(mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_SITE, f"{name}/head_origin"))
         for i in range(self.model.ngeom):
             name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_GEOM, i) or ""
             for slot, fly_name in enumerate(self.names):
@@ -60,12 +69,12 @@ class Bodies:
     def mouth(self, slot: int) -> np.ndarray:
         # Frozen engineered mouth point in the anatomically registered head frame.
         head = self.head_ids[slot]
-        return self.data.xpos[head] + self.data.xmat[head].reshape(3, 3) @ np.array([.35, 0, -.2])
+        return self.data.site_xpos[head] + self.data.site_xmat[head].reshape(3, 3) @ np.array([.35, 0, -.2])
 
     def antennae(self, slot: int) -> tuple[np.ndarray, np.ndarray]:
         head = self.head_ids[slot]
-        rot = self.data.xmat[head].reshape(3, 3)
-        pos = self.data.xpos[head]
+        rot = self.data.site_xmat[head].reshape(3, 3)
+        pos = self.data.site_xpos[head]
         return pos + rot @ np.array([.45, .45, 0]), pos + rot @ np.array([.45, -.45, 0])
 
     def step(self, drives: np.ndarray):

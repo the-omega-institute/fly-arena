@@ -25,7 +25,7 @@ MAPS = {
     "ring": {
         "id": "ring", "name": "微观擂台", "english": "Micro Sumo",
         "description": "共同物理世界中的接触推挤；胸部越过圆环边界即离台。", "size": 24,
-        "color": "#8fcdba", "spawns": [[-5, 0, 0], [5, 0, 3.141592653589793]],
+        "color": "#8fcdba", "spawns": [[-5, .6, 0], [5, -.6, 3.141592653589793]],
         "obstacles": [], "food": [[0, 0]], "ring_radius": 10,
         "modes": ["forage", "contest", "sumo"],
     },

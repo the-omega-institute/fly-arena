@@ -137,8 +137,8 @@ def import_connectome(data: Path = DATA) -> dict:
         "source_url": "https://male-cns.janelia.org/", "circuits": catalog,
         "sources": [{"file": local, "url": BASE_URL + remote, "sha256": file_sha(raw / local)}
                     for local, remote in SOURCES.items()],
-        "files": {p.name: file_sha(p) for p in sorted(out.iterdir()) if p.suffix in {".npy", ".npz", ".json"}
-                  and p.name != "manifest.json"},
+        "files": {name: file_sha(out / name) for name in sorted(
+            [f"{k}.npy" for k in arrays] + ["groups.npz", "neurons.json"])},
     }
     manifest["sha256"] = digest(manifest)
     write_json(out / "manifest.json", manifest)

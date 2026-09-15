@@ -1,5 +1,7 @@
 .venv/
 .uv-cache/
+.npm-cache/
+.bootstrap/
 .python/
 __pycache__/
 .pytest_cache/
@@ -10,4 +12,5 @@ var/
 web/node_modules/
 web/dist/
 artifacts/
+*.tsbuildinfo
 .env
