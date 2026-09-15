@@ -1,0 +1,70 @@
+{
+  "match_id": "9b4321f00d1f45a1a3275e15f2772f7c",
+  "status": "verified",
+  "progress": 1.0,
+  "error": null,
+  "verdict": {
+    "final_tick": 20000,
+    "judge": "event-conservation-v1",
+    "outcome": "draw",
+    "receipt_sha256": "ed9085a8b829a1898df175e18f736aa5bec9ed9a0f81a83e0b839a5800dd0079",
+    "scores": [
+      0.0,
+      0.0
+    ],
+    "status": "verified",
+    "winner_slot": null
+  },
+  "runtime": {
+    "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+    "lock_sha256": "3702550af809bc88af6454f6c42a915e3bbf90084469400992b99f7d4a66b425",
+    "machine": "arm64",
+    "model": {
+      "base_weight_mv": 0.275,
+      "delay_ms": 1.8,
+      "dt_ms": 0.1,
+      "id": "malecns-lif-cpu-v1",
+      "integration": "exponential-Euler, delayed current pulses; synaptic current reset on spike",
+      "refractory_ms": 2.2,
+      "reset_mv": -52.0,
+      "rest_mv": -52.0,
+      "scope": "Full retained MaleCNS graph; simplified current-based LIF, engineered sensory/motor bridge",
+      "tau_mem_ms": 20.0,
+      "tau_syn_ms": 5.0,
+      "threshold_mv": -45.0
+    },
+    "mujoco": "3.9.0",
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "python": "3.12.14",
+    "readout_weights_sha256": "500c404ff2624f977167e1cf2b585585b04904dfb47eb41945f7dbd513c6114d",
+    "rules": {
+      "energy": "game reserve: starts 100, drive costs 2 units/s, feeding adds intake units; zero reserve closes motor output",
+      "food_initial_units": 10.0,
+      "food_intake_per_second": 8.0,
+      "id": "arena-ground-v1",
+      "mouth_radius_mm": 1.1,
+      "neural_dt_ms": 0.1,
+      "odor_policy": "analytic Gaussian, penetrates walls",
+      "odor_sigma_mm": 5.0,
+      "physics_dt": 0.0001,
+      "resource_tie": "equal division among eligible mouths each integer physics tick",
+      "sense_ticks": 100,
+      "snapshot_ticks": 500,
+      "sumo": "simultaneous thorax boundary exits are draw; no exit at time limit is draw"
+    },
+    "sources": {
+      "body.py": "020d689b9936f0ed441f7633dfb584cdb456364d843055b240313ce990a176d5",
+      "compiler.py": "eea46806f0e2435ef31a1fbd1c958783dacc2620443607104a4cdea34de3cbc3",
+      "contracts.py": "92f97dddbb3b0d5a6f3ed24659e7bd877307842f39a6310e4962798f6b014e1a",
+      "judge.py": "9d6eb9c433354bb30363cf760a4f4adf058bdbe153e774c461c8b607993c596f",
+      "neural.py": "3d5f08551e34a4429d8a2c542b6d1becb6e58e0de5b0922e1d9d5c78c9e46e7d",
+      "runner.py": "20edd771f74fcbdeaf2205dba717b239e2011cc0ae6e4f839e2078b22e390f44",
+      "scenarios.py": "0c4b6beb0a5e4eea3ce35fc439aca6fbe2131ecad202b124a8dae2bd58d3cbf0"
+    }
+  },
+  "timing": {
+    "simulated_seconds": 2.0,
+    "simulation_wall_seconds": 42.71850537499995,
+    "wall_seconds": 43.64848504200927
+  }
+}
