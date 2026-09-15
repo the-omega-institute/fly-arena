@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "runtime_execution": "NOT_RUN",
+  "reason": "This PR supplies design and scheduling checks only. No FlyGym, GPU, browser, network, or deployment was executed.",
+  "experiments": {
+    "E00": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E01": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E02": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E03": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E04": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E05": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E06": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E07": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E08": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E09": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E10": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    },
+    "E11": {
+      "status": "NOT_RUN",
+      "metrics": null,
+      "evidence": []
+    }
+  }
+}
