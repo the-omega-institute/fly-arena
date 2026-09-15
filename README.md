@@ -35,7 +35,7 @@ Open http://127.0.0.1:8080. `prepare` downloads the official public MaleCNS file
 uv run python scripts/ai_designer.py
 ```
 
-The MVP workspace publishes all designs and verified replays. Writes require a bearer token. Optional registration gating uses `ARENA_INVITE_CODE`. There is a 100-design and 12-pending-match quota per designer. These are beta controls, not a production identity or anti-abuse system.
+The MVP workspace publishes all designs and verified replays. Default local mode uses a designer bearer token; optional NyxID mode uses browser sessions or separate Arena agent tokens. Optional local registration gating uses `ARENA_INVITE_CODE`. There is a 100-design and 12-pending-match quota per designer. These are beta controls, not a complete production anti-abuse system.
 
 ## Architecture and engineering decisions
 
@@ -49,6 +49,7 @@ Python orchestrates the system; Numba compiles the sparse neural loop to native 
 - [NyxID login interface and later integration](docs/NYXID_LOGIN.md) — optional OIDC + server-side sessions, disabled until configured.
 - [Operations and deployment](docs/OPERATIONS.md)
 - [Validation evidence and limitations](docs/VALIDATION.md)
+- [MVP delivery audit](docs/MVP_ACCEPTANCE.md)
 - [Data and software attribution](docs/ATTRIBUTION.md)
 
 ```sh

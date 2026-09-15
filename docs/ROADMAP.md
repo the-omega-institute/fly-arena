@@ -75,7 +75,7 @@ G2 定义神经 buffer/状态契约，G3 定义完整 step loop 和 checkpoint �
 
 ## 6. Heca / NyxID / Ornn 的接入次序
 
-- 当前：NyxID 只读节点发现已完成；Mac Studio/Heca 已核实；4060 SSH 绑定待修复或提供桥接状态 API。
+- 当前：NyxID 节点发现已完成；Mac Studio/Heca 已核实，Mac Studio 已运行私有 MVP；4060 SSH 已恢复并确认 RTX 4060 Laptop 8 GB，GPU 仿真后端待后续评测。运行证据见 VALIDATION.md。
 - G0–G3：Heca 可用于开发与诊断，Arena worker 独立运行；不把计算任务寄托在某个聊天 agent 会话存活上。
 - G4：NyxID 接用户/agent 身份，Arena 实现领域权限与 quota；SDK 可直接访问 API。
 - G4–G5：提供 Ornn 可分发的 `fruit-fly-designer` skill，规定训练/验证 API、预算与 lineage；Ornn 接入不阻塞 SDK 用户。

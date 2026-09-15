@@ -1,0 +1,124 @@
+{
+  "auth_config": {
+    "mode": "local",
+    "nyxid_enabled": false,
+    "login_url": null,
+    "local_registration_enabled": true
+  },
+  "web_sha256": {
+    "/": "e7283715f235fc20a5b0e1aa42a232bdcda472698140ae924a777472dfb3819d",
+    "/assets/index-h5X_aAGt.js": "3e79154597afc7c8479f624c22ee6f923e1bf8ffabfa3d53721d6bb124ba51f9",
+    "/assets/index-Da5ojQor.css": "93e2591cc89179598fd9a65bdfc89abc356c4ed616b3b41fa69ca508d3927d7d"
+  },
+  "match_id": "bb34ecf57c634140a9d1707bab42570c",
+  "status": "verified",
+  "source_commit": "1fb68581fef9614fe290ce20a037279ad955781f",
+  "remote_tests": {
+    "passed": 30,
+    "seconds": 5.77
+  },
+  "error": null,
+  "verdict": {
+    "final_tick": 20000,
+    "judge": "event-conservation-v1",
+    "outcome": "solo",
+    "receipt_sha256": "f0c9f5ef87193609c811ec4ab804e1f66ee028f242291aae1a7b2fef91c379bc",
+    "scores": [
+      0.4032
+    ],
+    "status": "verified",
+    "winner_slot": null
+  },
+  "receipt": {
+    "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+    "edge_count": 25563197,
+    "files": {
+      "brain-0.npz": "9dcc0439054c3268963def6934cf79547e090def4265eb737b84e264229aed86",
+      "events.json": "f7d95948960b0fd9d6ba22f40fb6461080e636d29a5bdc77bf37035828622d24",
+      "frames.json": "aa08196e0c77a9642144ad7ae4ae31f00aeb7bd25130ba60d323e0fcae0c39bc",
+      "physics.npz": "fce0d77b9746fe8f4e02c806c2fe0bd013d0fecf19834fcaa0853b7d8b2267ca",
+      "result.json": "953e586197b7786d828bc732874a34f4066313141bc4af15c523d37397bb6ccb",
+      "scene.json": "d580134c3e55101e79c6baf021b43b072bf122c8b35ba06bcade65cc85c89720"
+    },
+    "final_tick": 20000,
+    "flies": [
+      {
+        "artifact_id": "aaf1fb32e763e7bda8b34bea1519e1041e9b73b07bed6b5dc1c4552840785bd7",
+        "color": "mint",
+        "id": "8d5c54c75af64954ac667fbbd2724de3",
+        "name": "Wild Type / 原型"
+      }
+    ],
+    "neuron_count": 165122,
+    "readout_sha256": "9a0f71fa6c0afd884fdf683616ce6aa0820317294aa60f905445273623c179cf",
+    "request": {
+      "duration_seconds": 2,
+      "fly_ids": [
+        "8d5c54c75af64954ac667fbbd2724de3"
+      ],
+      "map_id": "orchard",
+      "mode": "forage",
+      "seed": 42
+    },
+    "runtime": {
+      "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+      "lock_sha256": "94cea79edf6cc5a1bd8d1ddd16bd640b45db4be91944d2910b1f6ca8e8951ede",
+      "machine": "arm64",
+      "model": {
+        "base_weight_mv": 0.275,
+        "delay_ms": 1.8,
+        "dt_ms": 0.1,
+        "id": "malecns-lif-cpu-v1",
+        "integration": "exponential-Euler, delayed current pulses; synaptic current reset on spike",
+        "refractory_ms": 2.2,
+        "reset_mv": -52.0,
+        "rest_mv": -52.0,
+        "scope": "Full retained MaleCNS graph; simplified current-based LIF, engineered sensory/motor bridge",
+        "tau_mem_ms": 20.0,
+        "tau_syn_ms": 5.0,
+        "threshold_mv": -45.0
+      },
+      "mujoco": "3.9.0",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "python": "3.12.14",
+      "readout_weights_sha256": "500c404ff2624f977167e1cf2b585585b04904dfb47eb41945f7dbd513c6114d",
+      "rules": {
+        "energy": "game reserve: starts 100, drive costs 2 units/s, feeding adds intake units; zero reserve closes motor output",
+        "food_initial_units": 10.0,
+        "food_intake_per_second": 8.0,
+        "id": "arena-ground-v1",
+        "mouth_radius_mm": 1.1,
+        "neural_dt_ms": 0.1,
+        "odor_policy": "analytic Gaussian, penetrates walls",
+        "odor_sigma_mm": 5.0,
+        "physics_dt": 0.0001,
+        "resource_tie": "equal division among eligible mouths each integer physics tick",
+        "sense_ticks": 100,
+        "snapshot_ticks": 500,
+        "sumo": "simultaneous thorax boundary exits are draw; no exit at time limit is draw"
+      },
+      "sources": {
+        "body.py": "020d689b9936f0ed441f7633dfb584cdb456364d843055b240313ce990a176d5",
+        "compiler.py": "eea46806f0e2435ef31a1fbd1c958783dacc2620443607104a4cdea34de3cbc3",
+        "contracts.py": "92f97dddbb3b0d5a6f3ed24659e7bd877307842f39a6310e4962798f6b014e1a",
+        "judge.py": "9d6eb9c433354bb30363cf760a4f4adf058bdbe153e774c461c8b607993c596f",
+        "neural.py": "3d5f08551e34a4429d8a2c542b6d1becb6e58e0de5b0922e1d9d5c78c9e46e7d",
+        "runner.py": "20edd771f74fcbdeaf2205dba717b239e2011cc0ae6e4f839e2078b22e390f44",
+        "scenarios.py": "0c4b6beb0a5e4eea3ce35fc439aca6fbe2131ecad202b124a8dae2bd58d3cbf0"
+      }
+    },
+    "schema": "run-receipt/v1",
+    "sha256": "f0c9f5ef87193609c811ec4ab804e1f66ee028f242291aae1a7b2fef91c379bc",
+    "silence_output": false,
+    "timing": {
+      "simulated_seconds": 2.0,
+      "simulation_wall_seconds": 23.304617417001282,
+      "wall_seconds": 23.91101495800831
+    },
+    "total_spikes": [
+      3469178
+    ]
+  },
+  "frame_count": 41,
+  "scene_fly_count": 1
+}

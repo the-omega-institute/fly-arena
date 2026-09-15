@@ -41,6 +41,12 @@ The final source version passed the same 12 tests on Mac Studio (3.87 seconds). 
 
 The subsequent authentication change passed all 30 local tests (5.98 seconds), including 18 offline OIDC/session cases and the existing 12 simulation/platform tests. The provider fixture uses real RSA signatures and mocked HTTP discovery, token exchange and JWKS; it verifies PKCE, nonce, issuer/audience, signature, expiry, browser binding, single-use callbacks, persistent sessions, CSRF, agent-token expiry/revocation and ownership isolation. The web TypeScript and production build passed; the existing bundle-size warning remains.
 
-NyxID remains disabled by default. No real OAuth client was registered and no production NyxID login was attempted. Its configuration, callback contract and later integration checks are documented in [NYXID_LOGIN.md](NYXID_LOGIN.md). This authentication source update does not supersede the Mac Studio simulation release receipt above; live NyxID configuration is explicitly deferred to the user.
+NyxID remains disabled by default. No real OAuth client was registered and no production NyxID login was attempted. Its configuration, callback contract and later integration checks are documented in [NYXID_LOGIN.md](NYXID_LOGIN.md). Live NyxID configuration is explicitly deferred to the user.
 
 The restarted local server returns HTTP 200 for the built workbench, disabled NyxID config and anonymous session contract. A fresh visual auth check through Computer Use was unavailable (`cgWindowNotFound`); the earlier Safari simulation workflow evidence applies to the baseline, not a live NyxID flow.
+
+## Mac Studio authentication-interface release
+
+Application source commit `1fb68581fef9614fe290ce20a037279ad955781f` was synchronized after confirming an empty queue and stopping the app. Locked dependencies installed successfully, all 30 tests passed on Mac Studio in 5.77 seconds, and the app-only launchd service restarted in local authentication mode. Served HTML, JS and CSS SHA256 values match the local production build.
+
+An actual API identity submitted solo orchard match `bb34ecf57c634140a9d1707bab42570c`, seed 42, duration 2 seconds. It independently verified with food score 0.4032, 41 replay frames, 3,469,178 neural spikes and wall time 23.91 seconds. All seven recorded simulation source hashes and the dependency lock match local files. The graph and frozen readout weights match the baseline release. Full receipt, web hashes and test result: [auth-release-check.json](evidence/auth-release-check.json). This is the latest private runtime release; NyxID is not activated and no public tunnel is running.
