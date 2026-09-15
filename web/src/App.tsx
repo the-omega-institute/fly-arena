@@ -70,7 +70,7 @@ export default function App(){
   },[])
   useEffect(()=>{
     Promise.all([api<Season>('/season'),api<Fly[]>('/flies'),api<ArenaMap[]>('/maps'),api<Match[]>('/matches')]).then(([s,f,m,ms])=>{
-      setSeason(s);setFlies(f);setMaps(m);setMatches(ms)
+      setSeason(s);setFlies(f);setMaps(m);setMatches(ms);setFocused(ms.find(x=>x.status==='verified')?.id||'')
       if(f.length){setSelected(f[f.length-1].id);setOpponent(f.length>1?f[1].id:f[0].id)}
     }).catch(e=>setError(e.message))
     api<Preview>('/preview').then(setPreview).catch(e=>setError('身体模型加载失败：'+e.message))
@@ -162,9 +162,9 @@ export default function App(){
 
       {tab==='arena'&&<div className="arena-layout"><div className="arena-main"><div className="arena-stage">
         <div className="stage-heading"><span><span className="live-dot"/>{scene?'VERIFIED REPLAY':'ARENA / '+(chosenMap?.english.toUpperCase()||'ORCHARD')}</span><span>{current?current.id.slice(0,8):'GENESIS ALPHA'}</span></div>
-        <div className="arena-canvas">{scene&&frame?<ArenaCanvas scene={scene} frame={frame} next={next} alpha={alpha}/>:preview?<ArenaCanvas preview={preview} color={selectedFly?.color||'mint'} design/>:<div className="canvas-loading"><Loader2 className="spin"/></div>}</div>
+        <div className="arena-canvas">{scene&&frame?<ArenaCanvas key={focused} scene={scene} frame={frame} next={next} alpha={alpha}/>:preview?<ArenaCanvas key="arena-preview" preview={preview} color={selectedFly?.color||'mint'} design/>:<div className="canvas-loading"><Loader2 className="spin"/></div>}</div>
         {!scene&&<div className="stage-message">{current?.status==='running'||current?.status==='queued'?<><span className="running-orb"><Dna size={27}/></span><h3>{current.status==='queued'?'正在等待运行节点':'神经网络正在驱动身体'}</h3><p>真实全图仿真需要一些时间，完成后将自动载入回放。</p><div className="run-track"><span style={{width:current.progress*100+'%'}}/></div><strong>{Math.round(current.progress*100)}%</strong></>:current?.status==='failed'?<><h3>这次实验未完成</h3><p>{current.error}</p></>:<><h3>一个世界，两种本能。</h3><p>选择你的果蝇与对手，开始第一场比赛。</p></>}</div>}
-        {scene&&frame&&<div className="score-overlay">{scene.flies.map((f,i)=><div key={i}><i style={{background:colors[f.color]}}/><span>{f.name.split(' / ')[0]}</span><strong>{frame.scores?.[i]?.toFixed(2)||'0.00'}</strong></div>)}</div>}
+        {scene&&frame&&<div className="score-overlay">{current?.result&&<div><ShieldCheck size={12}/><span>{current.result.outcome==='solo'?'单蝇实验完成':current.result.winner_slot===null?'本局平局':'胜者：'+scene.flies[current.result.winner_slot]?.name.split(' / ')[0]}</span></div>}{scene.flies.map((f,i)=><div key={i}><i style={{background:colors[f.color]}}/><span>{f.name.split(' / ')[0]}</span><strong>{frame.scores?.[i]?.toFixed(2)||'0.00'}</strong></div>)}</div>}
         <div className="playback"><button className="icon-button" aria-label={play?'暂停回放':'播放回放'} disabled={!frames.length} onClick={()=>{if(playtime>=frames[frames.length-1].time)setPlaytime(0);setPlay(!play)}}>{play?<Pause size={17}/>:<Play size={17}/>}</button><span>{playtime.toFixed(2)}s</span><input aria-label="回放进度" type="range" min="0" max={frames[frames.length-1]?.time||1} step=".01" value={playtime} disabled={!frames.length} onChange={e=>{setPlay(false);setPlaytime(+e.target.value)}}/><span>{frames[frames.length-1]?.time.toFixed(2)||'0.00'}s</span><button className="speed" onClick={()=>setPlaybackSpeed(s=>s===1?.5:s===.5?2:1)}>{playbackSpeed}×</button></div>
       </div>
       {frames.length>0&&<div className="trace-panel panel"><div className="panel-heading"><span><AudioLines size={16}/> 回路活动</span><small>实际神经发放率 · Hz</small></div><div className="trace-circuits">{season?.connectome.circuits.slice(0,6).map(c=><div key={c.id}><span style={{color:c.color}}>{c.label}</span><strong>{frame?.traces?.[0]?.[c.id]?.toFixed(1)||'0.0'}</strong><svg viewBox="0 0 120 30"><polyline fill="none" stroke={c.color} strokeWidth="1.6" points={frames.map((f,i)=>`${i/(frames.length-1)*120},${28-Math.min(26,(f.traces?.[0]?.[c.id]||0)/300*26)}`).join(' ')}/></svg></div>)}</div></div>}

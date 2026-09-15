@@ -1,0 +1,146 @@
+[
+  {
+    "match_id": "203662494e034a2c989831a60c4b07cd",
+    "mode": "contest",
+    "map": "orchard",
+    "timing": {
+      "simulated_seconds": 2.0,
+      "simulation_wall_seconds": 50.771473290995345,
+      "wall_seconds": 51.93657770799473
+    },
+    "receipt_sha256": "11930a16c7dfbbc49d3c6c4aa48229ef2994db323ef9c5012a3efb96e112e46c",
+    "result": {
+      "contact_ticks": 2041,
+      "exit_ticks": [
+        18866,
+        18570
+      ],
+      "final_tick": 20000,
+      "food_remaining": [
+        8.584800000000156,
+        10.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "scores": [
+        1.2707999999999884,
+        0.14440000000000003
+      ]
+    }
+  },
+  {
+    "match_id": "35c36aea32fc4ed495eb902f07af34bd",
+    "mode": "contest",
+    "map": "orchard",
+    "timing": {
+      "simulated_seconds": 2.0,
+      "simulation_wall_seconds": 43.31939245799731,
+      "wall_seconds": 44.24211820900382
+    },
+    "receipt_sha256": "194dbb3fa5aef1510a4a98cdd4580dabf8bb671ff9618bf888a3f69a3ebc7dff",
+    "result": {
+      "contact_ticks": 2277,
+      "exit_ticks": [
+        18755,
+        18541
+      ],
+      "final_tick": 20000,
+      "food_remaining": [
+        8.484000000000167,
+        10.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "scores": [
+        0.20480000000000176,
+        1.311199999999968
+      ]
+    }
+  },
+  {
+    "match_id": "b6451659d61e4596a3516b418bebb6fc",
+    "mode": "sumo",
+    "map": "ring",
+    "timing": {
+      "simulated_seconds": 1.3800000000000001,
+      "simulation_wall_seconds": 46.76868612499675,
+      "wall_seconds": 48.12892070900125
+    },
+    "receipt_sha256": "7701f6ced04b2296d63880972e68e3dad63fb6622c3735947bcac163f39b0b79",
+    "result": {
+      "contact_ticks": 2056,
+      "exit_ticks": [
+        null,
+        13751
+      ],
+      "final_tick": 13800,
+      "food_remaining": [
+        10.0
+      ],
+      "scores": [
+        0.0,
+        0.0
+      ]
+    }
+  },
+  {
+    "match_id": "43a11f87a09e45c6916e1bb5fd1d2c4d",
+    "mode": "contest",
+    "map": "maze",
+    "timing": {
+      "simulated_seconds": 2.0,
+      "simulation_wall_seconds": 54.10566479199042,
+      "wall_seconds": 54.97099016599532
+    },
+    "receipt_sha256": "213719ab30e9b64bfe7e1aa9356b0800ee558492aab94001976c4a288333f167",
+    "result": {
+      "contact_ticks": 0,
+      "exit_ticks": [
+        null,
+        null
+      ],
+      "final_tick": 20000,
+      "food_remaining": [
+        10.0,
+        10.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "scores": [
+        0.0,
+        0.0
+      ]
+    }
+  },
+  {
+    "match_id": "843bc34d90114579b023bc33620b8e62",
+    "mode": "forage",
+    "map": "orchard",
+    "timing": {
+      "simulated_seconds": 2.0,
+      "simulation_wall_seconds": 21.36715183299384,
+      "wall_seconds": 21.921186541992938
+    },
+    "receipt_sha256": "621a44bbab0984b834f3668eb1506b9a541f1eeb4d19b0ff0848337a00efd480",
+    "result": {
+      "contact_ticks": 0,
+      "exit_ticks": [
+        18583
+      ],
+      "final_tick": 20000,
+      "food_remaining": [
+        9.596800000000044,
+        10.0,
+        10.0,
+        10.0,
+        10.0
+      ],
+      "scores": [
+        0.40320000000000333
+      ]
+    }
+  }
+]

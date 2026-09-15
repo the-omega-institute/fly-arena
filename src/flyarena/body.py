@@ -29,6 +29,12 @@ class Bodies:
         contact_sensors = {}
         for index, name in enumerate(self.names):
             fly = make_locomotion_fly(name)
+            # Set masks before compilation so MuJoCo builds matching body/BVH
+            # broadphase masks. Different flies and obstacles collide; self does not.
+            for geoms in fly.bodyseg_to_mjcfgeom.values():
+                for geom in geoms:
+                    geom.contype = 1 << index
+                    geom.conaffinity = (3 ^ (1 << index)) | 4
             fly.bodyseg_to_mjcfbody[BodySegment("c_head")].add_site(name="head_origin", pos=(0, 0, 0), size=(.01,))
             x, y, yaw = scene["spawns"][index]
             world.add_fly(fly, (x, y, .25), Rotation3D("quat", (np.cos(yaw / 2), 0, 0, np.sin(yaw / 2))))
@@ -54,8 +60,6 @@ class Bodies:
             for slot, fly_name in enumerate(self.names):
                 if name.startswith(fly_name + "/"):
                     self.geom_slots[i] = slot
-                    self.model.geom_contype[i] = 1 << slot
-                    self.model.geom_conaffinity[i] = (3 ^ (1 << slot)) | 4
         if min(self.body_ids + self.head_ids) < 0:
             raise ValueError("Body manifest does not match expected thorax/head segments")
         mj.mj_forward(self.model, self.data)

@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import shlex
 import subprocess
+import sys
 import tarfile
 import uuid
 
@@ -29,7 +30,7 @@ def remote(command):
 def main():
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode="w:gz") as tar:
-        for item in ["src", "scripts", "docs", "web/dist", "deploy", "README.md", "pyproject.toml", "uv.lock"]:
+        for item in (sys.argv[1:] or ["src", "scripts", "docs", "web/dist", "deploy", "README.md", "pyproject.toml", "uv.lock"]):
             path = ROOT / item
             if not path.exists():
                 continue

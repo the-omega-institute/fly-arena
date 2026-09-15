@@ -1,0 +1,166 @@
+{
+  "matches": [
+    {
+      "id": "203662494e034a2c989831a60c4b07cd",
+      "request": {
+        "duration_seconds": 2,
+        "fly_ids": [
+          "c38f62c6cab74ef0a2ddec834c72128b",
+          "8d5c54c75af64954ac667fbbd2724de3"
+        ],
+        "map_id": "orchard",
+        "mode": "contest",
+        "seed": 42
+      },
+      "status": "verified",
+      "progress": 1.0,
+      "result": {
+        "final_tick": 20000,
+        "judge": "event-conservation-v1",
+        "outcome": "win",
+        "receipt_sha256": "11930a16c7dfbbc49d3c6c4aa48229ef2994db323ef9c5012a3efb96e112e46c",
+        "scores": [
+          1.2708,
+          0.1444
+        ],
+        "status": "verified",
+        "winner_slot": 0
+      },
+      "error": null
+    },
+    {
+      "id": "35c36aea32fc4ed495eb902f07af34bd",
+      "request": {
+        "duration_seconds": 2,
+        "fly_ids": [
+          "8d5c54c75af64954ac667fbbd2724de3",
+          "c38f62c6cab74ef0a2ddec834c72128b"
+        ],
+        "map_id": "orchard",
+        "mode": "contest",
+        "seed": 42
+      },
+      "status": "verified",
+      "progress": 1.0,
+      "result": {
+        "final_tick": 20000,
+        "judge": "event-conservation-v1",
+        "outcome": "win",
+        "receipt_sha256": "194dbb3fa5aef1510a4a98cdd4580dabf8bb671ff9618bf888a3f69a3ebc7dff",
+        "scores": [
+          0.2048,
+          1.3112
+        ],
+        "status": "verified",
+        "winner_slot": 1
+      },
+      "error": null
+    },
+    {
+      "id": "b6451659d61e4596a3516b418bebb6fc",
+      "request": {
+        "duration_seconds": 2,
+        "fly_ids": [
+          "8d5c54c75af64954ac667fbbd2724de3",
+          "a564eb93e10e4385926203fe4764e206"
+        ],
+        "map_id": "ring",
+        "mode": "sumo",
+        "seed": 42
+      },
+      "status": "verified",
+      "progress": 1.0,
+      "result": {
+        "final_tick": 13800,
+        "judge": "event-conservation-v1",
+        "outcome": "win",
+        "receipt_sha256": "7701f6ced04b2296d63880972e68e3dad63fb6622c3735947bcac163f39b0b79",
+        "scores": [
+          0.0,
+          0.0
+        ],
+        "status": "verified",
+        "winner_slot": 0
+      },
+      "error": null
+    },
+    {
+      "id": "43a11f87a09e45c6916e1bb5fd1d2c4d",
+      "request": {
+        "duration_seconds": 2,
+        "fly_ids": [
+          "8d5c54c75af64954ac667fbbd2724de3",
+          "a564eb93e10e4385926203fe4764e206"
+        ],
+        "map_id": "maze",
+        "mode": "contest",
+        "seed": 42
+      },
+      "status": "verified",
+      "progress": 1.0,
+      "result": {
+        "final_tick": 20000,
+        "judge": "event-conservation-v1",
+        "outcome": "draw",
+        "receipt_sha256": "213719ab30e9b64bfe7e1aa9356b0800ee558492aab94001976c4a288333f167",
+        "scores": [
+          0.0,
+          0.0
+        ],
+        "status": "verified",
+        "winner_slot": null
+      },
+      "error": null
+    },
+    {
+      "id": "843bc34d90114579b023bc33620b8e62",
+      "request": {
+        "duration_seconds": 2,
+        "fly_ids": [
+          "8d5c54c75af64954ac667fbbd2724de3"
+        ],
+        "map_id": "orchard",
+        "mode": "forage",
+        "seed": 42
+      },
+      "status": "verified",
+      "progress": 1.0,
+      "result": {
+        "final_tick": 20000,
+        "judge": "event-conservation-v1",
+        "outcome": "solo",
+        "receipt_sha256": "621a44bbab0984b834f3668eb1506b9a541f1eeb4d19b0ff0848337a00efd480",
+        "scores": [
+          0.4032
+        ],
+        "status": "verified",
+        "winner_slot": null
+      },
+      "error": null
+    }
+  ],
+  "series": [
+    {
+      "id": "836ddf7654554deaa413a400fef74d90",
+      "status": "complete",
+      "standings": [
+        {
+          "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+          "points": 6,
+          "played": 2,
+          "wins": 2,
+          "draws": 0,
+          "losses": 0
+        },
+        {
+          "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+          "points": 0,
+          "played": 2,
+          "wins": 0,
+          "draws": 0,
+          "losses": 2
+        }
+      ]
+    }
+  ]
+}

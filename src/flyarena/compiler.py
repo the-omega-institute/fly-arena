@@ -80,6 +80,8 @@ class Compiler:
             raise ValueError("Artifact identity mismatch")
         if manifest["phenotype"]["connectome_sha256"] != self.graph.manifest["sha256"]:
             raise ValueError("Artifact belongs to a different connectome")
+        if manifest["phenotype"]["model"] != PROFILE or manifest["phenotype"]["budget"] != BUDGET:
+            raise ValueError("Artifact belongs to a different neural model or budget profile")
         if file_sha(folder / "mutations.npz") != manifest["mutation_sha256"]:
             raise ValueError("Mutation artifact hash mismatch")
         with np.load(folder / "mutations.npz", allow_pickle=False) as a:

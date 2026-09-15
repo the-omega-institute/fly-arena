@@ -13,3 +13,11 @@ The server contains one queue coordinator and launches one match child process a
 Browser viewing renders actual compiled mesh geometry with recorded MuJoCo poses. It does not need server-side OpenGL or the RTX 4060. The Mac Studio runs the full graph on CPU. The RTX 4060 Laptop GPU (8 GB) is available for subsequent GPU profiling; no CUDA backend is claimed in this release.
 
 Public hosting should terminate HTTPS in front of the loopback API. A temporary Cloudflare tunnel is suitable for this private beta demonstration, but its random URL is not a production domain or uptime guarantee. Use a configured named tunnel/domain, persistent identity, external quotas and a front-end service before broad launch. Never expose a node SSH service or local credential manager through the app tunnel.
+
+## Running deployment
+
+The app-only service `institute.omega.fly-arena-alpha` has been installed with `python deploy/install_services.py`. Its definition lives inside the project `deploy/` directory, with logs under `var/log/`. The script defaults to **no public tunnel**. It can be inspected with `launchctl print gui/$(id -u)/institute.omega.fly-arena-alpha`. The GUI login session must remain active; full machine reboot/login persistence has not been tested.
+
+The optional `--public-tunnel` flag is staged only. Automatic approval review rejected public exposure; do not enable it until the user explicitly approves making the web app, published designs/replays and beta registration API reachable to anyone with the URL. The tunnel does not expose SSH, raw local folders or a credential manager.
+
+Remote smoke examples are created by `scripts/remote_smoke.py`; the token stays inside the script’s environment. All five initial API runs and its AI paired series completed successfully. A copy of their receipts/results/timings is under `docs/evidence/`.

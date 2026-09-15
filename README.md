@@ -6,6 +6,8 @@ Implemented research MVP: React/Three.js design workbench, immutable FlySpec com
 
 The current graph retains **165,122 Traced neurons, 25,563,197 directed neuron-pair connections, and 124,025,046 synaptic contacts** from MaleCNS v1.0. Anatomical connectivity is real; weights/signs and neural dynamics follow a declared simplified model. Inputs are bilateral odor currents. The shared descending-neuron readout and locomotion controller are engineered and fixed across contestants. Vision, online plasticity, natural aggression, and a GPU neural backend are not implemented.
 
+![Design workbench](docs/screenshots/design.png)
+
 ## Run locally
 
 Requires Python 3.12, Node 22+ and at least 8 GB free memory for preparation and two-fly experiments; allow several GB of disk. Mac Studio is the primary deployment target. Linux CPU also supports the simulation; browser rendering uses the viewer's GPU.

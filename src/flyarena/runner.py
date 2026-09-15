@@ -23,6 +23,8 @@ def runtime_manifest() -> dict:
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "rules": RULES,
+            "connectome_sha256": json.loads((DATA / "connectome/manifest.json").read_text())["sha256"],
+            "readout_weights_sha256": file_sha(DATA / "connectome/readout.npz"),
             "mujoco": mujoco.__version__, "python": platform.python_version(),
             "platform": platform.platform(), "machine": platform.machine()}
 

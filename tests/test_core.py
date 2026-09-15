@@ -88,3 +88,26 @@ def test_two_flies_have_independent_contact_sensors():
     assert len(ids)==2 and not set(ids['fly-0'])&set(ids['fly-1'])
     for _ in range(100): b.step(np.zeros((2,2)))
     assert np.isfinite(b.data.qpos).all()
+
+
+def test_actual_cross_fly_contact_is_not_filtered():
+    from flyarena.body import Bodies
+    from flyarena.scenarios import scenario
+    scene=scenario('ring',42)
+    scene['spawns']=[[-1,0,0],[1,0,np.pi]]
+    b=Bodies(scene,2,42)
+    assert b.contact_between_flies()
+    assert b.model.body_contype.any()
+    assert all(b.geom_slots.get(int(c.geom1))!=b.geom_slots.get(int(c.geom2)) for c in b.data.contact if int(c.geom1) in b.geom_slots and int(c.geom2) in b.geom_slots)
+
+
+def test_old_neural_profile_artifact_is_rejected(tmp_path):
+    import json
+    from flyarena.common import digest,write_json
+    c=Compiler(graph());report=c.compile(FlySpec(name='base',connectome_sha256='a'*64),publish=True,root=tmp_path)
+    folder=tmp_path/'artifacts'/report['artifact_id']
+    manifest=json.loads((folder/'manifest.json').read_text())
+    manifest['phenotype']['model']['threshold_mv']=-40
+    new_id=digest(manifest['phenotype'])
+    write_json(folder/'manifest.json',manifest);folder.rename(folder.parent/new_id)
+    with pytest.raises(ValueError,match='neural model'):c.load_weights(new_id,tmp_path)
