@@ -32,7 +32,7 @@ def main():
     elif args.command == "serve":
         import uvicorn
         from .api import create_app
-        uvicorn.run(create_app(with_worker=not args.no_worker), host=args.host, port=args.port)
+        uvicorn.run(create_app(with_worker=not args.no_worker), host=args.host, port=args.port, access_log=False)
     elif args.command == "seed":
         from .connectome import Connectome
         from .compiler import Compiler

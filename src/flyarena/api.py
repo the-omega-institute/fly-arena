@@ -9,10 +9,13 @@ import threading
 import time
 
 import numpy as np
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.security import HTTPBearer
+
+from .auth import AuthBoundary, AuthConfig, NyxIDClient
 
 from .common import DATA, ROOT, VAR, digest, write_json
 from .compiler import BUDGET, Compiler
@@ -25,8 +28,9 @@ from .store import Store
 from .worker import Worker
 
 
-def create_app(*, with_worker: bool = True) -> FastAPI:
-    store = Store()
+def create_app(*, with_worker: bool = True, store: Store | None = None, auth_config: AuthConfig | None = None, oidc_client: NyxIDClient | None = None) -> FastAPI:
+    store = store or Store()
+    auth = AuthBoundary(store, auth_config or AuthConfig.from_env(), oidc_client)
     compile_lock = threading.Lock()
     registrations: dict[str, list[float]] = {}
 
@@ -39,13 +43,17 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
         worker = Worker(store) if with_worker else None
         if worker:
             worker.start()
-        yield
-        if worker:
-            worker.stop()
+        try:
+            yield
+        finally:
+            if worker:
+                worker.stop()
+            auth.provider.http.close()
 
     app = FastAPI(title="Fly Arena API", version="0.1.0", lifespan=lifespan,
                   description="Published connectome designs and trusted embodied matches. All submitted flies and match replays are public in this MVP workspace.")
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.include_router(auth.router())
 
     @app.middleware("http")
     async def limits(request: Request, call_next):
@@ -57,20 +65,19 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
             if len(body) > 8_000_000:
                 return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
         response = await call_next(request)
+        if request.url.path.startswith("/api/v1/auth") or request.url.path == "/api/v1/me":
+            response.headers["Cache-Control"] = "no-store"
+            response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers.setdefault("Referrer-Policy", "same-origin")
         return response
 
     @app.exception_handler(ValueError)
     async def invalid(request, error):
         return JSONResponse({"detail": str(error)}, status_code=422)
 
-    def identity(authorization: str | None):
-        token = authorization[7:] if authorization and authorization.startswith("Bearer ") else ""
-        result = store.authenticate(token)
-        if result is None:
-            raise HTTPException(401, "Create a designer identity or provide a valid Bearer token")
-        return result
+    def identity(request: Request, bearer=Depends(HTTPBearer(auto_error=False))):
+        return auth.identity(request)
 
     @app.get("/api/v1/health")
     def health():
@@ -89,6 +96,8 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
 
     @app.post("/api/v1/identities", status_code=201)
     def register(body: CreateIdentity, request: Request, x_invite_code: str = Header(default="")):
+        if auth.config.mode != "local":
+            raise HTTPException(403, "Use NyxID to sign in")
         required = os.environ.get("ARENA_INVITE_CODE", "")
         if required and not secrets.compare_digest(required, x_invite_code):
             raise HTTPException(403, "A valid beta invite code is required")
@@ -101,8 +110,8 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
         return store.identity(body.name)
 
     @app.get("/api/v1/me")
-    def me(authorization: str | None = Header(default=None)):
-        return identity(authorization)
+    def me(owner: dict = Depends(identity)):
+        return owner
 
     @app.get("/api/v1/maps")
     def maps():
@@ -120,14 +129,12 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
         return result
 
     @app.post("/api/v1/flies/validate")
-    def validate(spec: FlySpec, authorization: str | None = Header(default=None)):
-        identity(authorization)
+    def validate(spec: FlySpec, owner: dict = Depends(identity)):
         with compile_lock:
             return compiler().compile(spec)
 
     @app.post("/api/v1/flies", status_code=201)
-    def publish(spec: FlySpec, authorization: str | None = Header(default=None)):
-        owner = identity(authorization)
+    def publish(spec: FlySpec, owner: dict = Depends(identity)):
         with compile_lock:
             report = compiler().compile(spec, publish=True)
         return store.add_fly(owner["id"], spec.model_dump(), report)
@@ -137,9 +144,8 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
         return store.matches()
 
     @app.post("/api/v1/matches", status_code=202)
-    def match_create(body: MatchRequest, authorization: str | None = Header(default=None),
+    def match_create(body: MatchRequest, owner: dict = Depends(identity),
                      idempotency_key: str | None = Header(default=None)):
-        owner = identity(authorization)
         if idempotency_key and len(idempotency_key) > 128:
             raise ValueError("Idempotency key too long")
         return store.add_match(owner["id"], body.model_dump(), digest(runtime_manifest()), key=idempotency_key)
@@ -163,9 +169,8 @@ def create_app(*, with_worker: bool = True) -> FastAPI:
         return FileResponse(store.result_folder(match) / f"{artifact}.json", media_type="application/json")
 
     @app.post("/api/v1/tournaments", status_code=202)
-    def tournament_create(body: TournamentRequest, authorization: str | None = Header(default=None),
+    def tournament_create(body: TournamentRequest, owner: dict = Depends(identity),
                           idempotency_key: str | None = Header(default=None)):
-        owner = identity(authorization)
         if idempotency_key and len(idempotency_key) > 128:
             raise ValueError("Idempotency key too long")
         return store.add_tournament(owner["id"], body.model_dump(), digest(runtime_manifest()), idempotency_key)

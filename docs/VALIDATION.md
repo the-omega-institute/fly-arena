@@ -36,3 +36,11 @@ Updated 2026-09-16. This is a living implementation report, not certification th
 ## Final deployment check
 
 The final source version passed the same 12 tests on Mac Studio (3.87 seconds). After restarting the private service with graph/readout admission checks, match `9b4321f00d1f45a1a3275e15f2772f7c` completed and verified in 43.65 seconds. Its receipt freezes the actual data/readout and source hashes: [release-check.json](evidence/release-check.json). Public activation remains awaiting explicit exposure approval; no public URL is claimed.
+
+## Optional NyxID authentication boundary
+
+The subsequent authentication change passed all 30 local tests (5.98 seconds), including 18 offline OIDC/session cases and the existing 12 simulation/platform tests. The provider fixture uses real RSA signatures and mocked HTTP discovery, token exchange and JWKS; it verifies PKCE, nonce, issuer/audience, signature, expiry, browser binding, single-use callbacks, persistent sessions, CSRF, agent-token expiry/revocation and ownership isolation. The web TypeScript and production build passed; the existing bundle-size warning remains.
+
+NyxID remains disabled by default. No real OAuth client was registered and no production NyxID login was attempted. Its configuration, callback contract and later integration checks are documented in [NYXID_LOGIN.md](NYXID_LOGIN.md). This authentication source update does not supersede the Mac Studio simulation release receipt above; live NyxID configuration is explicitly deferred to the user.
+
+The restarted local server returns HTTP 200 for the built workbench, disabled NyxID config and anonymous session contract. A fresh visual auth check through Computer Use was unavailable (`cgWindowNotFound`); the earlier Safari simulation workflow evidence applies to the baseline, not a live NyxID flow.

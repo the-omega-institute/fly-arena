@@ -13,6 +13,7 @@ dependencies = [
   "httpx>=0.28,<1",
   "flygym==2.1.0",
   "numba>=0.65.1",
+  "pyjwt[crypto]>=2.10,<3",
 ]
 
 [dependency-groups]

@@ -46,6 +46,7 @@ Python orchestrates the system; Numba compiles the sparse neural loop to native 
 - [Architecture and mechanisms](docs/ARCHITECTURE.md)
 - [Research, original sources and prior hardware observations](docs/RESEARCH.md)
 - [Acceptance gates and future work](docs/ROADMAP.md)
+- [NyxID login interface and later integration](docs/NYXID_LOGIN.md) — optional OIDC + server-side sessions, disabled until configured.
 - [Operations and deployment](docs/OPERATIONS.md)
 - [Validation evidence and limitations](docs/VALIDATION.md)
 - [Data and software attribution](docs/ATTRIBUTION.md)

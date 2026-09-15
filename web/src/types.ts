@@ -9,8 +9,10 @@ export type BodyModel = {meshes:Record<string,{vertices:number[];faces:number[]}
 export type Frame = {tick:number;time:number;poses:number[][];positions:number[][];scores?:number[];food?:number[];energy?:number[];drives?:number[][];traces?:Record<string,number>[]}
 export type Scene = {body:BodyModel;size:number;obstacles:{position:number[];size:number[]}[];food:{position:number[];initial:number;id:string}[];flies:{id:string;name:string;color:string}[];ring_radius?:number}
 export type Preview = {body:BodyModel;frame:Frame}
-export type Identity = {id:string;name:string;token:string}
+export type Identity = {id:string;name:string;token?:string}
 
 export const colors:Record<string,string> = {mint:'#91bca5',amber:'#dca85c',violet:'#aaa1cf',rose:'#d69493',blue:'#88aecd'}
 export const modes:Record<string,string> = {forage:'单蝇觅食',contest:'双蝇抢食',sumo:'擂台争夺'}
 export const num = (n:number) => Intl.NumberFormat('en-US').format(n)
+
+export type AuthSettings = {mode:"local"|"nyxid";nyxid_enabled:boolean;login_url:string|null;local_registration_enabled:boolean}

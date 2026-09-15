@@ -1,8 +1,8 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react'
 import {ArrowDownToLine,ArrowRight,ArrowUpRight,AudioLines,Beaker,Bug,Check,ChevronDown,Code2,Copy,Dna,ExternalLink,FlaskConical,GitBranch,Leaf,Loader2,Pause,Play,Plus,RotateCcw,Settings2,ShieldCheck,Sparkles,Swords,Terminal,Trophy,UserRound,X} from 'lucide-react'
-import {api} from './api'
+import {api,setCsrfToken} from './api'
 import {ArenaCanvas} from './ArenaCanvas'
-import type {ArenaMap,Fly,Frame,Identity,Match,Preview,Report,Scene,Season,Spec} from './types'
+import type {ArenaMap,AuthSettings,Fly,Frame,Identity,Match,Preview,Report,Scene,Season,Spec} from './types'
 import {colors,modes,num} from './types'
 
 type Tab='design'|'arena'|'lab'|'code'
@@ -37,7 +37,10 @@ export default function App(){
   const [color,setColor]=useState('mint')
   const [edgeDeltas,setEdgeDeltas]=useState<{edge:number;log_delta:number}[]>([])
   const [report,setReport]=useState<Report|null>(null)
-  const [identity,setIdentity]=useState<Identity|null>(()=>{try{return JSON.parse(localStorage.getItem('flyarena.identity')||'null')}catch{return null}})
+  const [identity,setIdentity]=useState<Identity|null>(null)
+  const [authSettings,setAuthSettings]=useState<AuthSettings|null>(null)
+  const [freshToken,setFreshToken]=useState('')
+  const [agentTokens,setAgentTokens]=useState<{id:string;expires:number}[]>([])
   const [login,setLogin]=useState(false)
   const [identityName,setIdentityName]=useState('')
   const [invite,setInvite]=useState('')
@@ -69,6 +72,32 @@ export default function App(){
     const [fs,ms,rs]=await Promise.all([api<Fly[]>('/flies'),api<Match[]>('/matches'),api<Ranking[]>('/leaderboard')]);setFlies(fs);setMatches(ms);setRankings(rs)
   },[])
   useEffect(()=>{
+    api<AuthSettings>('/auth/config').then(async settings=>{
+      setAuthSettings(settings)
+      if(settings.mode==='nyxid'){
+        setIdentity(null)
+        const session=await api<{authenticated:boolean;user:Identity|null;csrf_token:string|null}>('/auth/session')
+        setCsrfToken(session.csrf_token);setIdentity(session.user)
+      }else{
+        try{setIdentity(JSON.parse(localStorage.getItem('flyarena.identity')||'null'))}catch{setIdentity(null)}
+      }
+    }).catch(e=>setError('登录配置加载失败：'+e.message))
+    const url=new URL(window.location.href)
+    if(url.searchParams.has('auth_error')){setError('NyxID 登录未完成，请重新点击登录。');url.searchParams.delete('auth_error');history.replaceState(null,'',url.pathname+url.search)}
+    const expired=()=>{setIdentity(null);setCsrfToken(null);setToast('登录已过期，请重新登录后继续。')}
+    window.addEventListener('arena:session-expired',expired)
+    return()=>window.removeEventListener('arena:session-expired',expired)
+  },[])
+  useEffect(()=>{
+    if(authSettings?.mode!=='nyxid'||!season)return
+    const pending=sessionStorage.getItem('flyarena.pendingDesign')
+    if(pending){try{loadSpec(JSON.parse(pending));sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
+  },[authSettings?.mode,season])
+  useEffect(()=>{
+    if(showToken&&authSettings?.mode==='nyxid'&&identity&&!identity.token)api<{id:string;expires:number}[]>('/auth/agent-tokens').then(setAgentTokens).catch(e=>setError(e.message))
+    if(!showToken)setFreshToken('')
+  },[showToken,authSettings?.mode,identity?.id])
+  useEffect(()=>{
     Promise.all([api<Season>('/season'),api<Fly[]>('/flies'),api<ArenaMap[]>('/maps'),api<Match[]>('/matches')]).then(([s,f,m,ms])=>{
       setSeason(s);setFlies(f);setMaps(m);setMatches(ms);setFocused(ms.find(x=>x.status==='verified')?.id||'')
       if(f.length){setSelected(f[f.length-1].id);setOpponent(f.length>1?f[1].id:f[0].id)}
@@ -99,6 +128,9 @@ export default function App(){
 
   function clone(fly:Fly){setSelected(fly.id);setName(fly.name.split(' / ')[0]+' 02');setColor(fly.color);const values:Record<string,number>=defaultScales();for(const m of fly.spec.weight_mutations)values[m.selector]*=m.scale;setScales(values);setTau(fly.spec.neuron_parameters.tau_scale);setThreshold(fly.spec.neuron_parameters.threshold_shift_mv);setEdgeDeltas(fly.spec.edge_deltas);setReport(null)}
   async function action(label:string,fn:()=>Promise<void>){setBusy(label);setError('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
+  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify(spec));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
+  async function createAgentToken(){await action('agent-token',async()=>{const key=await api<{token:string}>('/auth/agent-tokens',{method:'POST'});setFreshToken(key.token);setAgentTokens(await api('/auth/agent-tokens'))})}
+  async function logout(){await action('logout',async()=>{if(authSettings?.mode==='nyxid'&&!identity?.token)await api('/auth/logout',{method:'POST'});setIdentity(null);setCsrfToken(null);setFreshToken('');if(authSettings?.mode==='local')localStorage.removeItem('flyarena.identity');setShowToken(false)})}
   async function register(){await action('identity',async()=>{const user=await api<Identity>('/identities',{method:'POST',body:JSON.stringify({name:identityName||'Explorer'}),headers:{'X-Invite-Code':invite}});setIdentity(user);localStorage.setItem('flyarena.identity',JSON.stringify(user));setLogin(false);setToast('设计师身份已创建，现在可以保存与参赛。')})}
   async function validate(){if(!identity){setLogin(true);return}await action('validate',async()=>{const r=await api<Report>('/flies/validate',{method:'POST',body:JSON.stringify(spec)},identity);setReport(r);setToast('权重、图谱版本和变异预算验证通过。')})}
   async function publish(){if(!identity){setLogin(true);return}await action('publish',async()=>{const fly=await api<Fly>('/flies',{method:'POST',body:JSON.stringify(spec)},identity);await refresh();setSelected(fly.id);setReport(fly.report);setToast('果蝇已保存。它的网络版本已冻结，可以参赛了。')})}
@@ -178,8 +210,8 @@ export default function App(){
       <p className="small-print" style={{marginTop:24}}>研究预览：完整保留图采用简化 LIF 动力学；当前输入为双侧气味，运动读出与步态控制器固定。视觉与学习尚未接入。权重变化的行为效果需通过比赛验证。</p><footer><span><Bug size={14}/> FLY ARENA <i>by The Omega Institute</i></span><span>真实图谱 · 可变神经网络 · 开放竞技</span><a href="https://male-cns.janelia.org/" target="_blank" rel="noreferrer">MaleCNS 数据来源 <ArrowUpRight size={12}/></a></footer>
     </main>
     {toast&&<div className="toast" role="status"><Check size={17}/>{toast}</div>}
-    {login&&<div className="modal-backdrop"><section className="modal"><button className="modal-close icon-button" onClick={()=>setLogin(false)} aria-label="关闭"><X size={19}/></button><span className="modal-icon"><Leaf size={26}/></span><div className="eyebrow">WELCOME TO THE PLAYGROUND</div><h2>为你的设计署名。</h2><p>创建一个设计师身份，保存果蝇、运行比赛，并让你的 AI 使用同一身份参与。</p>{error&&<p role="alert" className="error-banner">{error}</p>}<label className="field-label">设计师名称</label><input autoFocus value={identityName} onChange={e=>setIdentityName(e.target.value)} placeholder="例如：Lexa / My Research Agent" maxLength={48}/>{season?.invite_required&&<><label className="field-label">内测邀请码</label><input value={invite} onChange={e=>setInvite(e.target.value)} placeholder="输入邀请码"/></>}<button className="primary wide" disabled={!!busy} onClick={register}>{busy==='identity'?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}创建身份</button><small>当前工作区中，已发布果蝇与比赛回放公开可见。</small><details><summary>已有 API token？</summary><input aria-label="已有 API token" type="password" placeholder="粘贴你自己的 token" onKeyDown={async e=>{if(e.key==='Enter'){const token=e.currentTarget.value;try{const user=await api<Omit<Identity,'token'>>('/me',{headers:{Authorization:`Bearer ${token}`}});const id={...user,token};setIdentity(id);localStorage.setItem('flyarena.identity',JSON.stringify(id));setLogin(false)}catch(err){setError(String(err))}}}}/><small>按 Enter 连接已有身份</small></details></section></div>}
-    {showToken&&identity&&<div className="modal-backdrop"><section className="modal"><button className="modal-close icon-button" onClick={()=>setShowToken(false)} aria-label="关闭"><X size={19}/></button><Terminal size={28}/><h2>{identity.name}</h2><p>你的 agent 可以用这个 Bearer token 调用 API。请保存在自己的凭据管理器中。</p><input aria-label="API token" type="password" readOnly value={identity.token}/><button className="primary wide" onClick={()=>navigator.clipboard.writeText(identity.token).then(()=>setToast('API token 已复制。'))}><Copy size={15}/>复制 API token</button><button className="text-link" onClick={()=>{setIdentity(null);localStorage.removeItem('flyarena.identity');setShowToken(false)}}>退出当前浏览器身份</button></section></div>}
+    {login&&<div className="modal-backdrop"><section className="modal"><button className="modal-close icon-button" onClick={()=>setLogin(false)} aria-label="关闭"><X size={19}/></button><span className="modal-icon"><Leaf size={26}/></span><div className="eyebrow">WELCOME TO THE PLAYGROUND</div><h2>为你的设计署名。</h2><p>{authSettings?.mode==='nyxid'?'使用已有 NyxID 身份，无需再注册 Arena 账号。':'创建一个设计师身份，保存果蝇、运行比赛，并让你的 AI 使用同一身份参与。'}</p>{error&&<p role="alert" className="error-banner">{error}</p>}{authSettings?.mode==='nyxid'?<><button className="primary wide" onClick={loginNyxID}>通过 NyxID 登录 <ArrowRight size={16}/></button><small>首次确认身份权限，之后在会话有效期内直接进入。当前设计会保留。</small></>:!authSettings?<p>正在加载登录方式…</p>:<><label className="field-label">设计师名称</label><input autoFocus value={identityName} onChange={e=>setIdentityName(e.target.value)} placeholder="例如：Lexa / My Research Agent" maxLength={48}/>{season?.invite_required&&<><label className="field-label">内测邀请码</label><input value={invite} onChange={e=>setInvite(e.target.value)} placeholder="输入邀请码"/></>}<button className="primary wide" disabled={!!busy} onClick={register}>{busy==='identity'?<Loader2 className="spin" size={16}/>:<Plus size={16}/>}创建身份</button><small>当前工作区中，已发布果蝇与比赛回放公开可见。</small><details><summary>已有 API token？</summary><input aria-label="已有 API token" type="password" placeholder="粘贴你自己的 token" onKeyDown={async e=>{if(e.key==='Enter'){const token=e.currentTarget.value;try{const user=await api<Omit<Identity,'token'>>('/me',{headers:{Authorization:`Bearer ${token}`}});const id={...user,token};setIdentity(id);localStorage.setItem('flyarena.identity',JSON.stringify(id));setLogin(false)}catch(err){setError(String(err))}}}}/><small>按 Enter 连接已有身份</small></details></>}</section></div>}
+    {showToken&&identity&&<div className="modal-backdrop"><section className="modal"><button className="modal-close icon-button" onClick={()=>setShowToken(false)} aria-label="关闭"><X size={19}/></button><Terminal size={28}/><h2>{identity.name}</h2><p>{identity.token?'你的 agent 可以用这个 Bearer token 调用 API。请保存在自己的凭据管理器中。':'已通过 NyxID 登录。网页无需 API token；需要 AI 代你提交时，可以单独创建一个 30 天有效的 Arena token。'}</p>{error&&<p role="alert" className="error-banner">{error}</p>}{(identity.token||freshToken)?<><input aria-label="API token" type="password" readOnly value={identity.token||freshToken}/><button className="primary wide" onClick={()=>navigator.clipboard.writeText(identity.token||freshToken).then(()=>setToast('API token 已复制。'))}><Copy size={15}/>复制 API token</button>{freshToken&&<small>仅显示这一次，关闭后不可再次读取。</small>}</>:<button className="primary wide" disabled={!!busy} onClick={createAgentToken}>为 AI 创建 API token</button>}{!identity.token&&agentTokens.map(key=><div className="color-row" key={key.id}><span>{key.id.slice(0,8)} · {new Date(key.expires*1000).toLocaleDateString()} 到期</span><button className="text-link" disabled={!!busy} onClick={()=>action('revoke',async()=>{await api('/auth/agent-tokens/'+key.id,{method:'DELETE'});setFreshToken('');setAgentTokens(await api('/auth/agent-tokens'))})}>撤销</button></div>)}<button className="text-link" disabled={!!busy} onClick={logout}>退出当前浏览器身份</button></section></div>}
     {inspectOpen&&<div className="modal-backdrop"><section className="modal neuron-modal"><button className="modal-close icon-button" onClick={()=>setInspectOpen(false)} aria-label="关闭"><X size={19}/></button><div className="eyebrow">REAL NEURONS · REAL CONNECTIONS</div><h2>走进真实回路。</h2><select aria-label="查看神经回路" value={inspectCircuit} onChange={e=>{setInspectCircuit(e.target.value);api<typeof inspect>('/connectome/neurons?circuit='+e.target.value).then(setInspect).catch(x=>setError(x.message))}}>{season?.connectome.circuits.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select><p>这里展示所选回路的前 80 个真实神经元；仿真运行完整的保留图。</p><div className="neuron-list">{inspect?.neurons.map(n=><div key={n.id}><span className="neuron-dot"/><strong>{n.type||'Unannotated'}</strong><code>{n.id}</code><small>{n.nt||'unknown'}</small></div>)}</div><small>{inspect?.edges.length||0} 条样本内连接 · ID 来自 MaleCNS v1.0</small></section></div>}
   </div>
 }
