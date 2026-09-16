@@ -40,6 +40,11 @@ class ExperimentRepository:
             ids = [r[0] for r in db.execute('SELECT id FROM experiments WHERE (? IS NULL OR owner=?) ORDER BY created DESC LIMIT 100', (owner, owner))]
         return [self.get(i) for i in ids]
 
+    def list_summaries(self, owner=None):
+        with self.store.db() as db:
+            rows = db.execute('SELECT id,owner,spec,status FROM experiments WHERE (? IS NULL OR owner=?) ORDER BY created DESC LIMIT 100', (owner, owner)).fetchall()
+        return [dict(row) | {'spec': json.loads(row['spec'])} for row in rows]
+
     def admit(self, owner, spec, subjects, conditions, key=None):
         spec = ExperimentSpec.model_validate(spec).model_dump()
         if key is not None and (not key or len(key) > 128):
