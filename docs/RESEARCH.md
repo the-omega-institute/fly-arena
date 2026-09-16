@@ -148,3 +148,74 @@ sysctl -n hw.ncpu                       → 28
 已完成：用户指定仓库和 PR 阅读、最新来源定位、核心源码核对、节点发现、Mac Studio 硬件及 Heca 状态只读查询、架构/路线/来源文档编写。
 
 尚未完成：真实 connectome 下载与导入、编译器实现、权重验证器、神经模型运行、身体闭环、双蝇碰撞、网页实现、API/worker 实现、GPU benchmark、自动 agent 设计、部署或上线。任何性能数字、预算范围和排期均是待验证设计，不能引用为运行结果。
+
+### Replay sampling contract (v3)
+
+Receipt `run-receipt/v3` uses `pose-100hz-events-20hz-v1`: the runner records the
+actual MuJoCo geometry after every 100 physics ticks (100 Hz) while intake event
+aggregation and progress callbacks remain at the historical 500 tick (20 Hz)
+clock. The terminal frame is emitted exactly once; residual intake is flushed
+independently of whether that frame was already sampled. This is an observation and transport change; it does not qualify
+sensorimotor behavior, phenotype differences, or biological realism. A 100 Hz
+cadence is therefore not a behavior qualification claim. Historical v1/v2
+receipts remain admitted with their frozen 20 Hz cadence.
+
+The policy is required, with exact field types and values, in the receipt,
+runtime manifest, and scene. `replay.py` is source-bound in both runtime
+manifest paths. Receipt version is independent of bridge version: v3 supports
+the legacy bridge and the research bridge. Historical v1/v2 evidence must have
+no replay policy and compatible frozen rules; verification compares historical
+identities internally without requiring today's source hashes. New replay
+sources invalidate prior scientific qualification; all 15 existing behavior
+gates and their source binding remain required.
+
+At 100 Hz the Nyquist frequency is 50 Hz, above the 12 Hz gait fundamental;
+20 Hz recording aliases that fundamental. This improves observation of actual
+mesh poses, not the controller or biological validity. The viewer brackets
+recorded timestamps and interpolates existing geometry, including partial
+terminal intervals. It adds no procedural leg movement.
+
+Completion validation (2026-09-16) used the original read-only runner and assets
+with the provided Python 3.12 environment. A real 1-second legacy-bridge solo
+pair retained 165,122 neurons and 25,563,197 edges. All 21 common frames matched
+exactly; the new run added 80 actual MuJoCo snapshots. Every array in the full
+neural and physical checkpoints, ordered events, result, and 20 progress
+callbacks matched. Intake was nonzero (0.4032 units). Snapshot observers read
+compiled geometry directly and verified unchanged integration/controller state.
+Both original and new receipts passed admission with expected request, artifact,
+and frozen runtime identity.
+
+Two additional bounded four-neuron fixtures used real dual-fly MuJoCo physics:
+600 ticks of contact and nonzero shared intake tested residual flushing at tick
+600; a modified small ring tested simultaneous tick-1 exits and a unique terminal
+at tick 100. These altered scenes and bounded endpoints are test fixtures, not
+admissible research trials or phenotype qualification.
+
+| Actual 1-second solo run | Historical 20 Hz | New 100 Hz |
+|---|---:|---:|
+| Frames | 21 | 101 |
+| Frame JSON bytes | 102,612 | 494,305 |
+| Scene JSON bytes | 4,743,120 | 4,743,264 |
+| Total evidence bytes | 8,102,639 | 8,494,842 |
+| Measured wall seconds | 18.308 | 17.762 |
+| Node median JSON parse ms | 0.429 | 2.027 |
+| Node median timestamp selection μs | 0.033 | 0.056 |
+
+Wall times are single ordered runs including snapshot instrumentation, loading,
+and serialization; warm-up and scheduling differ. They do not establish a
+speedup or isolate replay overhead. Node/V8 measurements use 15 parse trials and
+150,000 timestamp selections per payload; they are not browser rendering tests.
+
+Separately constructed **synthetic 30-second** payloads repeat recorded 1-second
+poses on a longer timestamp grid: 601/3,001 frames, 2,933,918/14,675,100 bytes,
+12.265/60.702 ms median parse, and 0.263/3.320 μs median selection (old/new).
+These are payload construction estimates, not actual 30-second physics or a
+measured fivefold simulation-cost increase. Scene meshes are transferred once.
+
+Repository regressions live in `tests/test_replay.py`, with opt-in actual parity
+in `tests/test_replay_parity.py`. Set `FLY_REPLAY_ORIGINAL_ROOT` to the read-only
+pre-replay checkout and `FLY_REPLAY_OUTPUT` to a new scratch directory for the
+latter; no original store is created. Frontend selection tests and reproducible
+Node cost measurement are `web/tests/replay.test.mjs` and
+`web/tests/replay-cost.mjs`. Browser visual QA, research-bridge retained-graph
+parity, longer horizons, and biological/phenotype acceptance remain unclaimed.

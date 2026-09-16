@@ -2,6 +2,7 @@ import {AuthDialogs} from './features/auth/AuthDialogs'
 import {DevelopersFeature} from './features/developers/DevelopersFeature'
 import {ArenaFeature} from './features/arena/ArenaFeature'
 import {useReplay} from './features/arena/useReplay'
+import {selectReplayFrames} from './features/arena/replayFrames'
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react'
 import {ArrowDownToLine,ArrowRight,ArrowUpRight,AudioLines,Beaker,Bug,Check,ChevronDown,Code2,Copy,Dna,ExternalLink,FlaskConical,GitBranch,Leaf,Loader2,Pause,Play,Plus,RotateCcw,Settings2,ShieldCheck,Sparkles,Swords,Terminal,Trophy,UserRound,X} from 'lucide-react'
 import {api,setCsrfToken} from './api'
@@ -159,11 +160,7 @@ export default function App(){
     return Object.entries(scales).reduce((s,[k,v])=>s+(season.connectome.circuits.find(c=>c.id===k)?.edge_count||0)/e*Math.abs(Math.log(v))/.08*100,0)+100*Math.abs(Math.log(tau))+20*Math.abs(threshold)
   },[scales,tau,threshold,season])
   const used=report?.budget_used??estimated
-  const frameIndex=frames.length?Math.max(0,frames.findIndex(f=>f.time>playtime)-1):0
-  const index=frames.length&&playtime>=frames[frames.length-1].time?frames.length-1:frameIndex
-  const frame=frames[index]
-  const next=frames[Math.min(index+1,frames.length-1)]
-  const alpha=frame&&next&&next.time>frame.time?(playtime-frame.time)/(next.time-frame.time):0
+  const {frame,next,alpha}=selectReplayFrames(frames,playtime)
 
   return <div className="app-shell">
     <header className="header">

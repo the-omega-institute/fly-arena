@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,71 @@ import numpy as np
 from .common import digest, file_sha
 from .contracts import MatchRequest
 from .scenarios import RULES, receipt_scene
+from .replay import LEGACY_RECEIPTS, REPLAY_RECEIPT, validate_policy
+
+
+def _replay_cadence(receipt: dict, stored_scene: dict) -> int:
+    """Dispatch recorded versions using frozen identities, never today's source hash."""
+    runtime = receipt["runtime"]
+    rules = runtime.get("rules")
+    if (not isinstance(rules, dict) or rules.keys() != RULES.keys() or
+            any(type(rules[k]) is not type(v) or rules[k] != v for k, v in RULES.items())):
+        raise ValueError("Incompatible frozen replay rules")
+    version = receipt.get("schema")
+    if version == REPLAY_RECEIPT:
+        for container in (receipt, runtime, stored_scene):
+            validate_policy(container.get("replay_policy"), rules)
+        sources = (runtime.get("closure", {}).get("sources", {})
+                   if receipt["request"].get("bridge_profile") == "sensorimotor-research-v2"
+                   else runtime.get("sources", {}))
+        source = sources.get("replay.py")
+        if not isinstance(source, str) or re.fullmatch(r"[0-9a-f]{64}", source) is None:
+            raise ValueError("Replay policy source is not bound to runtime")
+        return receipt["replay_policy"]["pose_ticks"]
+    if isinstance(version, str) and version in LEGACY_RECEIPTS:
+        if any("replay_policy" in c for c in (receipt, runtime, stored_scene)):
+            raise ValueError("Legacy receipt cannot declare replay policy")
+        return rules["snapshot_ticks"]
+    raise ValueError("Unknown receipt version")
+
+
+def _finite_array(value, shape: tuple, name: str) -> np.ndarray:
+    try:
+        array = np.asarray(value)
+        if array.shape != shape or array.dtype.kind not in "fiu" or not np.isfinite(array).all():
+            raise ValueError
+    except (TypeError, ValueError):
+        raise ValueError(f"Invalid replay {name} shape or non-finite data") from None
+    return array
+
+
+def _validate_frames(frames: list, scene: dict, end: int, cadence: int, n: int) -> None:
+    ticks = list(range(0, end + 1, cadence))
+    if ticks[-1] != end:
+        ticks.append(end)
+    if (not isinstance(frames, list) or any(not isinstance(f, dict) or
+            type(f.get("tick")) is not int for f in frames) or
+            [f["tick"] for f in frames] != ticks):
+        raise ValueError("Replay is missing ticks or final state")
+    geoms = scene.get("body", {}).get("geoms")
+    if (not isinstance(geoms, list) or not geoms or any(not isinstance(g, dict) or
+            type(g.get("id")) is not int or g["id"] < 0 or
+            type(g.get("slot")) is not int or not 0 <= g["slot"] < n or
+            g.get("mesh") not in scene["body"].get("meshes", {}) for g in geoms) or
+            len({g["id"] for g in geoms}) != len(geoms)):
+        raise ValueError("Invalid replay geometry manifest")
+    for frame in frames:
+        seconds = frame.get("time")
+        if (type(seconds) not in (int, float) or not math.isfinite(seconds) or
+                abs(seconds - frame["tick"] * RULES["physics_dt"]) > 1e-9):
+            raise ValueError("Replay clock mismatch")
+        for key, shape in (("poses", (len(geoms), 7)), ("positions", (n, 3)),
+                           ("scores", (n,)), ("energy", (n,)),
+                           ("food", (len(scene["food"]),)), ("drives", (n, 2))):
+            values = _finite_array(frame.get(key), shape, key)
+            if key == "poses" and not np.allclose(np.linalg.norm(values[:, 3:], axis=1),
+                                                  1, rtol=0, atol=2e-6):
+                raise ValueError("Invalid replay pose quaternion")
 
 
 def verify(folder: Path, *, expected_request: dict | None = None,
@@ -25,13 +91,15 @@ def verify(folder: Path, *, expected_request: dict | None = None,
         if Path(name).name != name or file_sha(folder / name) != sha:
             raise ValueError(f"Evidence hash mismatch: {name}")
     request = MatchRequest.model_validate(receipt["request"])
+    stored_scene = json.loads((folder / "scene.json").read_text())
+    pose_ticks = _replay_cadence(receipt, stored_scene)
     if expected_runtime_hash is not None and digest(receipt["runtime"]) != expected_runtime_hash:
         raise ValueError("Execution backend differs from admitted runtime")
     if expected_request is not None and request.model_dump() != MatchRequest.model_validate(expected_request).model_dump():
         raise ValueError("Run does not match the admitted request")
     if request.bridge_profile == "sensorimotor-research-v2":
         runtime = receipt["runtime"]
-        if (receipt["schema"] != "run-receipt/v2" or runtime.get("bridge_profile") != request.bridge_profile
+        if (receipt["schema"] not in ("run-receipt/v2", REPLAY_RECEIPT) or runtime.get("bridge_profile") != request.bridge_profile
             or runtime.get("actual_backend") != "cpu-numba"
             or runtime.get("profile", {}).get("id") != request.bridge_profile
             or receipt["readout_sha256"] != runtime["profile"]["hashes"]["readout_metadata"]):
@@ -49,29 +117,20 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     result = json.loads((folder / "result.json").read_text())
     scene = receipt_scene(request.map_id, request.seed, request.bridge_profile,
                           receipt["runtime"].get("sources", {}).get("scenarios.py"))
-    stored_scene = json.loads((folder / "scene.json").read_text())
     if any(stored_scene.get(k) != v for k, v in scene.items()):
         raise ValueError("Scenario digest mismatch")
     end = receipt["final_tick"]
+    if type(end) is not int or end <= 0 or end > request.duration_seconds * 10000 or end % RULES["sense_ticks"]:
+        raise ValueError("Invalid simulation endpoint")
     for i in range(len(artifacts)):
         with np.load(folder / f"brain-{i}.npz", allow_pickle=False) as checkpoint:
             if int(checkpoint["tick"]) != end:
                 raise ValueError("Neural and physical clocks differ")
             if not all(np.isfinite(checkpoint[k]).all() for k in checkpoint.files):
                 raise ValueError("Invalid neural checkpoint")
-    if end <= 0 or end > request.duration_seconds * 10000 or end % RULES["sense_ticks"]:
-        raise ValueError("Invalid simulation endpoint")
-    ticks = list(range(0, end + 1, RULES["snapshot_ticks"]))
-    if ticks[-1] != end:
-        ticks.append(end)
-    if [f["tick"] for f in frames] != ticks or result["final_tick"] != end:
+    if type(result["final_tick"]) is not int or result["final_tick"] != end:
         raise ValueError("Replay is missing ticks or final state")
-    for frame in frames:
-        if abs(frame["time"] - frame["tick"] * RULES["physics_dt"]) > 1e-9:
-            raise ValueError("Replay clock mismatch")
-        for key in ["poses", "positions", "scores", "energy", "food", "drives"]:
-            if not np.isfinite(np.asarray(frame[key])).all():
-                raise ValueError("Non-finite replay data")
+    _validate_frames(frames, stored_scene, end, pose_ticks, len(artifacts))
     n, nf = len(artifacts), len(scene["food"])
     scores, eaten = np.zeros(n), np.zeros(nf)
     exits = [None] * n
