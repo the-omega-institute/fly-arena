@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 import traceback
 
@@ -12,10 +13,11 @@ from .store import Store
 
 def main():
     ident, lease, generation = sys.argv[1:4]
-    store = Store()
+    store = Store(Path(sys.argv[4])) if len(sys.argv) > 4 else Store()
     try:
         match = store.match(ident)
-        if match["runtime_hash"] != digest(runtime_manifest()):
+        request = MatchRequest.model_validate(match["request"])
+        if match["runtime_hash"] != digest(runtime_manifest(bridge_profile=request.bridge_profile)):
             raise ValueError("Runtime changed after admission; create a match under the current season")
         if match["attempt"] != int(generation):
             raise ValueError("Attempt generation changed")
@@ -25,7 +27,7 @@ def main():
             raise ValueError("Contestants changed after admission")
         folder = store.result_folder(match)
         store.heartbeat(ident, lease, 0)
-        simulate(request, flies, folder, lambda p: store.heartbeat(ident, lease, p))
+        simulate(request, flies, folder, lambda p: store.heartbeat(ident, lease, p), var=store.root)
         verdict = verify(folder, expected_request=match["request"], expected_artifacts=match["artifacts"], expected_runtime_hash=match["runtime_hash"])
         store.finish(ident, lease, verdict)
     except BaseException as error:

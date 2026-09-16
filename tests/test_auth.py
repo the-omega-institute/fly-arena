@@ -127,7 +127,7 @@ def test_csrf_agent_token_revocation_and_logout(oidc,monkeypatch):
     assert agent.post('/api/v1/auth/agent-tokens').status_code==401
     assert c.get('/api/v1/me',headers={'Authorization':'Bearer wrong'}).status_code==401
     # Both transports enter the same match/ownership path.
-    monkeypatch.setattr('flyarena.api.runtime_manifest',lambda:{'frozen':'test'})
+    monkeypatch.setattr('flyarena.api.runtime_manifest',lambda **kwargs:{'frozen':'test'})
     fly=store.add_fly(session['user']['id'],{'name':'fixture','color':'mint'},{'artifact_id':'a'*64})
     request={'fly_ids':[fly['id']],'mode':'forage','duration_seconds':1}
     assert c.post('/api/v1/matches',json=request).status_code==403

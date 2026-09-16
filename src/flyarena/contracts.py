@@ -27,6 +27,39 @@ class NeuronParameters(StrictModel):
     threshold_shift_mv: float = Field(default=0.0, ge=-1, le=1)
 
 
+class NeuronSelector(StrictModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, populate_by_name=True)
+    class_: str | None = Field(default=None, alias="class", min_length=1, max_length=128)
+    type: str | None = Field(default=None, min_length=1, max_length=128)
+    side: Literal["L", "R"] | None = None
+    ids: list[str] | None = Field(default=None, min_length=1, max_length=10000)
+
+    @model_validator(mode="after")
+    def nonempty(self):
+        if all(v is None for v in (self.class_, self.type, self.side, self.ids)):
+            raise ValueError("Empty neuron selector")
+        if self.ids is not None and (len(set(self.ids)) != len(self.ids) or
+                any(not i.isascii() or not i.isdigit() or str(int(i)) != i for i in self.ids)):
+            raise ValueError("Neuron IDs must be distinct canonical decimal strings")
+        return self
+
+
+class EdgeSelector(StrictModel):
+    pre: NeuronSelector | None = None
+    post: NeuronSelector | None = None
+
+    @model_validator(mode="after")
+    def nonempty(self):
+        if self.pre is None and self.post is None:
+            raise ValueError("Empty edge selector")
+        return self
+
+
+class InterventionSpec(StrictModel):
+    selector: EdgeSelector
+    scale: float = Field(ge=.5, le=2)
+
+
 class FlySpec(StrictModel):
     schema_version: Literal["flyspec/v1"] = "flyspec/v1"
     name: str = Field(min_length=1, max_length=64)
@@ -39,6 +72,7 @@ class FlySpec(StrictModel):
     edge_deltas: list[EdgeDelta] = Field(default_factory=list, max_length=100_000)
     neuron_parameters: NeuronParameters = Field(default_factory=NeuronParameters)
     plasticity: Literal["none"] = "none"
+    interventions: list[InterventionSpec] = Field(default_factory=list, max_length=64)
 
     @model_validator(mode="after")
     def unique_edges(self):
@@ -50,7 +84,11 @@ class FlySpec(StrictModel):
         return self
 
 
+BridgeProfile = Literal["legacy-v1", "sensorimotor-research-v2"]
+
+
 class MatchRequest(StrictModel):
+    bridge_profile: BridgeProfile = "legacy-v1"
     fly_ids: list[str] = Field(min_length=1, max_length=2)
     map_id: Literal["orchard", "maze", "ring"] = "orchard"
     mode: Literal["forage", "contest", "sumo"] = "contest"
@@ -74,6 +112,7 @@ class CreateIdentity(StrictModel):
 
 
 class TournamentRequest(StrictModel):
+    bridge_profile: BridgeProfile = "legacy-v1"
     name: str = Field(min_length=1, max_length=80)
     fly_ids: list[str] = Field(min_length=2, max_length=8)
     map_id: Literal["orchard", "maze", "ring"] = "orchard"
@@ -88,5 +127,5 @@ class TournamentRequest(StrictModel):
         if len(set(self.seeds)) != len(self.seeds) or any(s < 0 or s > 2**31 - 1 for s in self.seeds):
             raise ValueError("Seeds must be distinct nonnegative int32 values")
         MatchRequest(fly_ids=self.fly_ids[:2], map_id=self.map_id, mode=self.mode,
-                     seed=self.seeds[0], duration_seconds=self.duration_seconds)
+                     seed=self.seeds[0], duration_seconds=self.duration_seconds, bridge_profile=self.bridge_profile)
         return self

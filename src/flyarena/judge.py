@@ -9,7 +9,7 @@ import numpy as np
 
 from .common import digest, file_sha
 from .contracts import MatchRequest
-from .scenarios import RULES, scenario
+from .scenarios import RULES, receipt_scene
 
 
 def verify(folder: Path, *, expected_request: dict | None = None,
@@ -27,8 +27,18 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     request = MatchRequest.model_validate(receipt["request"])
     if expected_runtime_hash is not None and digest(receipt["runtime"]) != expected_runtime_hash:
         raise ValueError("Execution backend differs from admitted runtime")
-    if expected_request is not None and request.model_dump() != expected_request:
+    if expected_request is not None and request.model_dump() != MatchRequest.model_validate(expected_request).model_dump():
         raise ValueError("Run does not match the admitted request")
+    if request.bridge_profile == "sensorimotor-research-v2":
+        runtime = receipt["runtime"]
+        if (receipt["schema"] != "run-receipt/v2" or runtime.get("bridge_profile") != request.bridge_profile
+            or runtime.get("actual_backend") != "cpu-numba"
+            or runtime.get("profile", {}).get("id") != request.bridge_profile
+            or receipt["readout_sha256"] != runtime["profile"]["hashes"]["readout_metadata"]):
+            raise ValueError("Receipt bridge/backend/readout identity mismatch")
+        # Compare frozen identities internally; historical evidence never requires today's sources.
+        if digest(runtime["closure"]) != runtime["profile"]["hashes"]["runtime_closure"]:
+            raise ValueError("Receipt scientific closure mismatch")
     artifacts = [f["artifact_id"] for f in receipt["flies"]]
     if expected_artifacts is not None and artifacts != expected_artifacts:
         raise ValueError("Run used different contestant artifacts")
@@ -37,7 +47,8 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     frames = json.loads((folder / "frames.json").read_text())
     events = json.loads((folder / "events.json").read_text())
     result = json.loads((folder / "result.json").read_text())
-    scene = scenario(request.map_id, request.seed)
+    scene = receipt_scene(request.map_id, request.seed, request.bridge_profile,
+                          receipt["runtime"].get("sources", {}).get("scenarios.py"))
     stored_scene = json.loads((folder / "scene.json").read_text())
     if any(stored_scene.get(k) != v for k, v in scene.items()):
         raise ValueError("Scenario digest mismatch")

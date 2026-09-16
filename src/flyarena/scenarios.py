@@ -51,3 +51,31 @@ def scenario(map_id: str, seed: int) -> dict:
                       for i, (x, y) in enumerate(result["food"])]
     result["sha256"] = digest(result)
     return result
+
+
+def arena_scene(map_id: str, seed: int, bridge_profile: str = "legacy-v1") -> dict:
+    if bridge_profile == "legacy-v1":
+        return scenario(map_id, seed)
+    if bridge_profile != "sensorimotor-research-v2":
+        raise ValueError("Unknown arena bridge profile")
+    result = scenario(map_id, seed)
+    result.pop("sha256")
+    result["geometry_version"] = "arena-offaxis-v2"
+    result["bridge_profile"] = bridge_profile
+    # Fixed mirrored headings are independent of targets and contestant identity.
+    for spawn in result["spawns"]:
+        spawn[2] += .65
+    result["sha256"] = digest(result)
+    return result
+
+
+def receipt_scene(map_id: str, seed: int, bridge_profile: str, source_sha256: str | None) -> dict:
+    result = arena_scene(map_id, seed, bridge_profile)
+    # Pinned historical source at commit 73d1472, before the ring spawn offset.
+    # No arbitrary receipt geometry is accepted as a substitute for reconstruction.
+    if (bridge_profile == "legacy-v1" and map_id == "ring" and source_sha256 ==
+            "a6da0a58972be8789340fe542f77aeefaa56c682d275cc43f7fae720d21957b2"):
+        result.pop("sha256")
+        result["spawns"] = [[-5, 0, 0], [5, 0, 3.141592653589793]]
+        result["sha256"] = digest(result)
+    return result

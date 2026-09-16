@@ -15,16 +15,26 @@ from .compiler import Compiler
 from .connectome import Connectome
 from .contracts import MatchRequest
 from .neural import Brain, PROFILE
-from .scenarios import RULES, scenario
+from .scenarios import RULES, arena_scene
 
 
-def runtime_manifest() -> dict:
+def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> dict:
+    if bridge_profile == "sensorimotor-research-v2":
+        from .experiments.probes import profile_manifest, runtime_closure
+        profile = profile_manifest(data)
+        if not profile["ready"]:
+            raise ValueError(f"Research bridge unavailable: {profile.get('reason')}")
+        return {"schema": "arena-runtime/v2", "bridge_profile": bridge_profile,
+                "profile": profile, "closure": runtime_closure(), "rules": RULES,
+                "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba"}
+    if bridge_profile != "legacy-v1":
+        raise ValueError("Unknown arena bridge profile")
     files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "rules": RULES,
-            "connectome_sha256": json.loads((DATA / "connectome/manifest.json").read_text())["sha256"],
-            "readout_weights_sha256": file_sha(DATA / "connectome/readout.npz"),
+            "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
+            "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
             "mujoco": mujoco.__version__, "python": platform.python_version(),
             "platform": platform.platform(), "machine": platform.machine()}
 
@@ -34,20 +44,41 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
              data: Path = DATA, var: Path = VAR) -> dict:
     start = time.perf_counter()
     output.mkdir(parents=True, exist_ok=True)
+    if any(p.name != "worker.log" for p in output.iterdir()):
+        raise FileExistsError("Arena evidence directory must be empty; immutable run")
+    v2 = request.bridge_profile == "sensorimotor-research-v2"
+    frozen_runtime = runtime_manifest(data, request.bridge_profile)
     graph = Connectome(data, verify=True)
     compiler = Compiler(graph)
-    readout = json.loads((data / "connectome/readout.json").read_text())
-    if (readout["connectome_sha256"] != graph.manifest["sha256"] or
-        readout["neural_profile_sha256"] != digest(PROFILE) or
-        readout["readout_sha256"] != file_sha(data / "connectome/readout.npz")):
-        raise ValueError("Frozen motor readout is incompatible or corrupted")
-    ro = np.load(data / "connectome/readout.npz", allow_pickle=False)
+    readout, ro = None, None
+    if not v2:
+        readout = json.loads((data / "connectome/readout.json").read_text())
+        if (readout["connectome_sha256"] != graph.manifest["sha256"] or
+            readout["neural_profile_sha256"] != digest(PROFILE) or
+            readout["readout_sha256"] != file_sha(data / "connectome/readout.npz")):
+            raise ValueError("Frozen motor readout is incompatible or corrupted")
+        ro = np.load(data / "connectome/readout.npz", allow_pickle=False)
     brains = []
     for fly in flies:
         weights, artifact = compiler.load_weights(fly["artifact_id"], var)
         params = artifact["phenotype"]["neuron_parameters"]
         brains.append(Brain(graph, weights, params["tau_scale"], params["threshold_shift_mv"]))
-    scene = scenario(request.map_id, request.seed)
+    backends, motors = [], []
+    decoder = None
+    if v2:
+        from .backend import CPUBrainBackend, V2_IDS, CAPABILITIES
+        from .experiments.decoder import Decoder
+        from .experiments.sensor import encode_odor
+        from .experiments.motor import MotorTransfer
+        decoder = Decoder(data / "connectome/research-v2/readout.npz")
+        readout = json.loads((data / "connectome/research-v2/readout.json").read_text())
+        for brain in brains:
+            backend = CPUBrainBackend(brain)
+            backend.prepare(V2_IDS | {"capabilities": sorted(CAPABILITIES)})
+            backend.reset(request.seed)
+            backends.append(backend)
+            motors.append(MotorTransfer())
+    scene = arena_scene(request.map_id, request.seed, request.bridge_profile)
     bodies = Bodies(scene, len(flies), request.seed)
     scene["body"] = bodies.rendering_manifest()
     scene["flies"] = [{k: f[k] for k in ["id", "name", "color", "artifact_id"]} for f in flies]
@@ -85,16 +116,24 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             odor = []
             for antenna in antennae:
                 distance2 = np.sum((sources - antenna[:2]) ** 2, axis=1)
-                odor.append(float(np.clip(np.sum(strength * np.exp(-distance2 / (2 * 5**2))), 0, 1)))
-            # Bilateral sensory contrast gain uses only the fly's two local sensors.
-            contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
-            common = (odor[0] + odor[1]) / 2
-            encoded = np.clip([common + 2 * contrast, common - 2 * contrast], 0, 1)
-            brain.stimulate(float(encoded[0]), float(encoded[1]))
-            brain.advance(RULES["sense_ticks"])
-            command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
-            # Fixed low-pass decoder; no access to food or world coordinates.
-            drives[slot] = .85 * drives[slot] + .15 * np.clip(command, 0, 1.5)
+                raw = float(np.sum(strength * np.exp(-distance2 / (2 * RULES["odor_sigma_mm"]**2))))
+                odor.append(raw if v2 else float(np.clip(raw, 0, 1)))
+            if v2:
+                backend = backends[slot]
+                backend.stimulate(*encode_odor(*odor))
+                backend.advance(RULES["sense_ticks"])
+                command = decoder.command(backend.neural_output(decoder.neurons))
+                drives[slot] = motors[slot].advance(command)
+            else:
+                # Bilateral sensory contrast gain uses only the fly's two local sensors.
+                contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
+                common = (odor[0] + odor[1]) / 2
+                encoded = np.clip([common + 2 * contrast, common - 2 * contrast], 0, 1)
+                brain.stimulate(float(encoded[0]), float(encoded[1]))
+                brain.advance(RULES["sense_ticks"])
+                command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
+                # Fixed low-pass decoder; no access to food or world coordinates.
+                drives[slot] = .85 * drives[slot] + .15 * np.clip(command, 0, 1.5)
             if silence_output or eliminated[slot] or energy[slot] <= 0:
                 drives[slot] = 0
         for _ in range(RULES["sense_ticks"]):
@@ -157,10 +196,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     write_json(output / "events.json", events)
     write_json(output / "result.json", {"scores": scores.tolist(), "exit_ticks": exit_ticks,
                "final_tick": bodies.tick, "food_remaining": remaining.tolist(), "contact_ticks": contact_ticks})
-    receipt = {"schema": "run-receipt/v1", "request": request.model_dump(),
+    receipt = {"schema": "run-receipt/v2" if v2 else "run-receipt/v1", "request": request.model_dump(),
                "flies": scene["flies"], "connectome_sha256": graph.manifest["sha256"],
                "neuron_count": graph.n, "edge_count": graph.e,
-               "readout_sha256": readout["sha256"], "runtime": runtime_manifest(),
+               "readout_sha256": readout["sha256"], "runtime": frozen_runtime,
                "silence_output": silence_output, "final_tick": bodies.tick,
                "total_spikes": [b.total_spikes for b in brains],
                "timing": {"wall_seconds": time.perf_counter() - start,

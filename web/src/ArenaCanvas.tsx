@@ -1,11 +1,14 @@
 import {useEffect,useMemo,useRef} from 'react'
 import {Canvas,useFrame} from '@react-three/fiber'
-import {OrbitControls,Grid} from '@react-three/drei'
+import {OrbitControls,Grid,Html} from '@react-three/drei'
 import * as THREE from 'three'
 import type {BodyModel,Frame,Scene,Preview} from './types'
+import {useI18n} from './shared/i18n'
+import {sceneThemes} from './shared/theme'
 import {colors} from './types'
 
 function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;frame:Frame;next?:Frame;alpha:number;color:string;slot?:number}){
+  const {resolved}=useI18n();const tokens=sceneThemes[resolved]
   const refs=useRef<(THREE.Mesh|null)[]>([])
   const geometries=useMemo(()=>Object.fromEntries(Object.entries(body.meshes).map(([key,data])=>{
     const geometry=new THREE.BufferGeometry()
@@ -26,39 +29,42 @@ function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;fram
     })
   })
   return <>{body.geoms.map((g,index)=>g.slot===slot&&<mesh key={g.id} ref={r=>{refs.current[index]=r}} geometry={geometries[g.mesh]} castShadow receiveShadow>
-    <meshStandardMaterial color={g.name.includes('eye')?'#51271f':g.name.includes('wing')?'#c8d1b8':color}
+    <meshStandardMaterial color={g.name.includes('eye')?tokens.eye:g.name.includes('wing')?tokens.wing:color}
       transparent={g.name.includes('wing')} opacity={g.name.includes('wing')?.48:1} roughness={g.name.includes('eye')?.28:.62} metalness={.08}/>
   </mesh>)}</>
 }
 
 function World({scene,frame}:{scene:Scene;frame:Frame}){
+  const {resolved}=useI18n();const tokens=sceneThemes[resolved]
   return <>
-    <mesh receiveShadow position={[0,0,-.1]}><boxGeometry args={[scene.size,scene.size,.2]}/><meshStandardMaterial color="#27392e" roughness={.95}/></mesh>
-    <Grid args={[scene.size,scene.size]} rotation={[Math.PI/2,0,0]} position={[0,0,.012]} cellSize={1} sectionSize={5} cellColor="#3a4b3c" sectionColor="#53624c" fadeDistance={65} cellThickness={.35} sectionThickness={.6}/>
-    {scene.ring_radius&&<mesh position={[0,0,.02]}><ringGeometry args={[scene.ring_radius-.09,scene.ring_radius,96]}/><meshBasicMaterial color="#c6bd85" transparent opacity={.65} side={THREE.DoubleSide}/></mesh>}
-    {scene.obstacles.map((o,i)=><mesh key={i} position={o.position as [number,number,number]} castShadow receiveShadow><boxGeometry args={o.size as [number,number,number]}/><meshStandardMaterial color="#8d967d" roughness={.8}/></mesh>)}
+    <mesh receiveShadow position={[0,0,-.1]}><boxGeometry args={[scene.size,scene.size,.2]}/><meshStandardMaterial color={tokens.floor} roughness={.95}/></mesh>
+    <Grid args={[scene.size,scene.size]} rotation={[Math.PI/2,0,0]} position={[0,0,.012]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={65} cellThickness={.35} sectionThickness={.6}/>
+    {scene.ring_radius&&<mesh position={[0,0,.02]}><ringGeometry args={[scene.ring_radius-.09,scene.ring_radius,96]}/><meshBasicMaterial color={tokens.ring} transparent opacity={.65} side={THREE.DoubleSide}/></mesh>}
+    {scene.obstacles.map((o,i)=><mesh key={i} position={o.position as [number,number,number]} castShadow receiveShadow><boxGeometry args={o.size as [number,number,number]}/><meshStandardMaterial color={tokens.obstacle} roughness={.8}/></mesh>)}
     {scene.food.map((food,i)=>{
       const left=frame.food?.[i]??food.initial
       return left>.001&&<group key={food.id} position={[food.position[0],food.position[1],.12]}>
-        <mesh><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color="#edbd66" emissive="#cc8e32" emissiveIntensity={.18} roughness={.4}/></mesh>
-        <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color="#d8ba6f" transparent opacity={.3} side={THREE.DoubleSide}/></mesh>
+        <mesh><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={tokens.food} emissive={tokens.foodEmissive} emissiveIntensity={.18} roughness={.4}/></mesh>
+        <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={.3} side={THREE.DoubleSide}/></mesh>
       </group>
     })}
   </>
 }
 
-export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false}:{preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean}){
+export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles}:{preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
+  const {resolved,t}=useI18n();const tokens=sceneThemes[resolved]
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
   return <Canvas shadows dpr={[1,1.7]} camera={{position:design?[6,-9,5]:[22,-28,26],up:[0,0,1],fov:design?33:40,near:.05,far:250}} gl={{antialias:true,alpha:true}}>
-    <ambientLight intensity={.8}/><hemisphereLight args={['#f3ead2','#172d20',1.6]}/>
+    <ambientLight intensity={.8}/><hemisphereLight args={[tokens.sky,tokens.ground,1.6]}/>
     <directionalLight position={[6,-5,12]} intensity={3.2} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-bias={-.0003}/>
-    <directionalLight position={[-7,5,3]} intensity={1.5} color="#9fbba6"/>
+    <directionalLight position={[-7,5,3]} intensity={1.5} color={tokens.fill}/>
     {body&&shown&&<>
       {scene?<World scene={scene} frame={shown}/>:<>
-        <mesh position={[0,0,-.14]} rotation={[Math.PI/2,0,0]} receiveShadow><cylinderGeometry args={[4.8,5,.18,96]} /><meshStandardMaterial color="#334538" roughness={.93}/></mesh>
-        <Grid args={[15,15]} rotation={[Math.PI/2,0,0]} position={[0,0,-.2]} cellSize={1} sectionSize={5} cellColor="#455643" sectionColor="#596b52" fadeDistance={15} cellThickness={.35}/>
+        <mesh position={[0,0,-.14]} rotation={[Math.PI/2,0,0]} receiveShadow><cylinderGeometry args={[4.8,5,.18,96]} /><meshStandardMaterial color={tokens.platform} roughness={.93}/></mesh>
+        <Grid args={[15,15]} rotation={[Math.PI/2,0,0]} position={[0,0,-.2]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={15} cellThickness={.35}/>
       </>}
+      {scene?.flies.map((fly,i)=>{const p=shown.positions?.[i],n=next?.positions?.[i]||p;if(!p)return null;return <Html key={'label-'+i} position={[p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,(p[2]||0)+1.6]} center style={{pointerEvents:'none'}}><div className={'fly-world-label '+(fly.id===selectedId?'selected':'')}><b>{fly.id===selectedId?'▣':'○'} {t('Slot')} {i+1} · {fly.name}</b><small>{subjectRoles?.[fly.id]||t('Participant')}</small></div></Html>})}
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
     <OrbitControls makeDefault target={design?[0,0,.8]:[0,0,0]} enablePan={!design} minDistance={design?4:10} maxDistance={design?18:75} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>

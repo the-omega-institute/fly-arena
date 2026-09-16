@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from .store import Store
+from .services.ports import IdentityProvider
 
 SESSION_COOKIE = '__Host-arena_session'
 FLOW_COOKIE = '__Host-arena_login'
@@ -88,6 +89,9 @@ class AuthConfig:
 
 
 class NyxIDClient:
+    def close(self):
+        self.http.close()
+
     def __init__(self, config: AuthConfig, http: httpx.Client | None = None):
         self.config = config
         self.http = http or httpx.Client(timeout=10, follow_redirects=False)
@@ -152,7 +156,7 @@ class NyxIDClient:
 
 
 class AuthBoundary:
-    def __init__(self, store: Store, config: AuthConfig, provider: NyxIDClient | None = None):
+    def __init__(self, store: Store, config: AuthConfig, provider: IdentityProvider | None = None):
         self.store, self.config = store, config
         self.provider = provider or NyxIDClient(config)
         with store.db() as db:

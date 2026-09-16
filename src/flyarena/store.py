@@ -29,6 +29,9 @@ class Store:
             CREATE INDEX IF NOT EXISTS match_queue ON matches(status,created);
             """)
 
+            from .services.experiments import initialize
+            initialize(db)
+
     @contextmanager
     def db(self):
         db = sqlite3.connect(self.path, timeout=15)
@@ -55,15 +58,25 @@ class Store:
             row = db.execute("SELECT id,name FROM identities WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
         return dict(row) if row else None
 
-    def add_fly(self, owner: str, spec: dict, report: dict) -> dict:
+    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False) -> dict:
+        if any(k in spec for k in ('provenance','scientific_version','reference_kind','release_id','submission_channel')):
+            raise ValueError('Provenance is server-owned')
+        if submission_channel not in {'web','api'}:
+            raise ValueError('Invalid public submission channel')
         ident = uuid.uuid4().hex
         with self.db() as db:
+            db.execute('BEGIN IMMEDIATE')
             if spec.get("parent_id") and not db.execute("SELECT 1 FROM flies WHERE id=?", (spec["parent_id"],)).fetchone():
                 raise ValueError("Parent fly does not exist")
+            if spec.get('parent_id'):
+                parent = json.loads(db.execute('SELECT spec FROM flies WHERE id=?', (spec['parent_id'],)).fetchone()[0])
+                if any(parent.get(k) != spec.get(k) for k in ('connectome_sha256','model_profile')):
+                    raise ValueError('Parent must use the same graph and model profile')
             if db.execute("SELECT count(*) FROM flies WHERE owner=?", (owner,)).fetchone()[0] >= 100:
                 raise ValueError("This workspace allows 100 published flies per designer")
             db.execute("INSERT INTO flies VALUES(?,?,?,?,?,?,?,?)", (ident, owner, spec["name"], spec["color"], canonical(spec).decode(),
                         report["artifact_id"], canonical(report).decode(), time.time()))
+            db.execute('INSERT INTO fly_provenance VALUES(?,?,?,?,NULL)', (ident,'ai' if agent_channel else 'user',None,submission_channel))
         return self.fly(ident)
 
     def fly(self, ident: str) -> dict | None:
@@ -73,12 +86,44 @@ class Store:
             return None
         result = dict(row)
         result["spec"], result["report"] = json.loads(result["spec"]), json.loads(result["report"])
+        with self.db() as db:
+            provenance = db.execute('SELECT reference_kind,release_id,submission_channel FROM fly_provenance WHERE fly_id=?', (ident,)).fetchone()
+            scheduled = db.execute('SELECT experiment_id,status,error FROM fly_experiments WHERE fly_id=?', (ident,)).fetchone()
+        result.update(dict(provenance) if provenance else {'reference_kind':'user','release_id':None,'submission_channel':'web'})
+        result.update(experiment_id=scheduled['experiment_id'] if scheduled else None,
+                      experiment_status=scheduled['status'] if scheduled else None,
+                      experiment_error=scheduled['error'] if scheduled else None)
+        if scheduled and scheduled['experiment_id']:
+            from .services.experiments import ExperimentRepository
+            experiment = ExperimentRepository(self).get(scheduled['experiment_id'])
+            if experiment:
+                result.update(experiment_status=experiment['status'],experiment_error=experiment['error'])
         return result
 
     def flies(self) -> list[dict]:
         with self.db() as db:
             ids = [r[0] for r in db.execute("SELECT id FROM flies ORDER BY created DESC LIMIT 200")]
         return [self.fly(i) for i in ids]
+
+    def prior_submission(self, owner: str, key: str | None, request: dict, *, tournament: bool = False):
+        """Resolve immutable retries before mutable runtime availability checks.
+
+        Normalizing additive defaults preserves legacy keys whose stored payload
+        predates bridge_profile. A key cannot cross resource kinds or semantics.
+        """
+        if not key:
+            return None
+        with self.db() as db:
+            row = db.execute("SELECT resource FROM idempotency WHERE owner=? AND key=?", (owner,key)).fetchone()
+        if row is None:
+            return None
+        from .contracts import MatchRequest, TournamentRequest
+        prior = self.tournament(row[0]) if tournament else self.match(row[0])
+        model = TournamentRequest if tournament else MatchRequest
+        field = "spec" if tournament else "request"
+        if prior is None or model.model_validate(prior[field]).model_dump() != model.model_validate(request).model_dump():
+            raise ValueError("Idempotency key already used for a different request")
+        return prior
 
     def add_match(self, owner: str, request: dict, runtime_hash: str, *, key: str | None = None, tournament: str | None = None) -> dict:
         ident, now = uuid.uuid4().hex, time.time()
@@ -88,9 +133,7 @@ class Store:
             if key:
                 existing = db.execute("SELECT payload,resource FROM idempotency WHERE owner=? AND key=?", (owner, key)).fetchone()
                 if existing:
-                    if existing["payload"] != payload:
-                        raise ValueError("Idempotency key already used for a different request")
-                    return self.match(existing["resource"])
+                    return self.prior_submission(owner, key, request)
             if db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')", (owner,)).fetchone()[0] >= 12:
                 raise ValueError("Queue quota reached: at most 12 unfinished matches per designer")
             artifacts = []
@@ -162,31 +205,12 @@ class Store:
     def result_folder(self, match: dict) -> Path:
         return self.root / "runs" / match["id"] / str(match["attempt"])
 
-    def leaderboard(self) -> list[dict]:
-        rows = {f["id"]: {"fly": f, "wins": 0, "draws": 0, "losses": 0, "matches": 0, "food": 0.0, "points": 0} for f in self.flies()}
+    def leaderboard(self, *, runtime_hash=None, scenario_id=None, mode=None, season_id='genesis-alpha', bridge_profile=None) -> list[dict]:
+        from .services.ranking import rank
         with self.db() as db:
-            all_ids = [r[0] for r in db.execute("SELECT id FROM matches WHERE status='verified'")]
-        for match in [self.match(i) for i in all_ids]:
-            if match["status"] != "verified":
-                continue
-            ids, verdict = match["request"]["fly_ids"], match["result"]
-            if len(ids) != 2 or ids[0] == ids[1]:
-                continue
-            for slot, ident in enumerate(ids):
-                if ident not in rows:
-                    continue
-                row = rows[ident]
-                row["matches"] += 1
-                row["food"] += verdict["scores"][slot]
-                if verdict["winner_slot"] is None:
-                    row["draws"] += 1
-                    row["points"] += 1
-                elif verdict["winner_slot"] == slot:
-                    row["wins"] += 1
-                    row["points"] += 3
-                else:
-                    row["losses"] += 1
-        return sorted(rows.values(), key=lambda r: (-r["points"], -r["food"], r["fly"]["id"]))
+            ids = [r[0] for r in db.execute("SELECT id FROM matches WHERE status='verified'")]
+        return rank(self.flies(), [self.match(i) for i in ids], runtime_hash=runtime_hash,
+                    scenario_id=scenario_id, mode=mode, season_id=season_id, bridge_profile=bridge_profile)
 
     def add_tournament(self, owner: str, spec: dict, runtime_hash: str, key: str | None = None) -> dict:
         """Admit the complete round robin atomically, including reversed slots."""
@@ -199,9 +223,7 @@ class Store:
             if key:
                 old = db.execute('SELECT payload,resource FROM idempotency WHERE owner=? AND key=?', (owner,key)).fetchone()
                 if old:
-                    if old['payload'] != payload:
-                        raise ValueError('Idempotency key already used for a different request')
-                    return self.tournament(old['resource'])
+                    return self.prior_submission(owner, key, spec, tournament=True)
             artifacts = {}
             for fly in spec['fly_ids']:
                 row = db.execute('SELECT artifact_id FROM flies WHERE id=?',(fly,)).fetchone()
@@ -211,7 +233,7 @@ class Store:
             for seed in spec['seeds']:
                 for a,b in combinations(spec['fly_ids'],2):
                     for slots in [[a,b],[b,a]]:
-                        schedule.append(MatchRequest(fly_ids=slots,map_id=spec['map_id'],mode=spec['mode'],seed=seed,duration_seconds=spec['duration_seconds']).model_dump())
+                        schedule.append(MatchRequest(fly_ids=slots,map_id=spec['map_id'],mode=spec['mode'],seed=seed,duration_seconds=spec['duration_seconds'],bridge_profile=spec.get('bridge_profile','legacy-v1')).model_dump())
             pending = db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')",(owner,)).fetchone()[0]
             if pending+len(schedule)>12:
                 raise ValueError(f'Tournament needs {len(schedule)} matches; {12-pending} queue slots available. Use fewer entrants or seeds.')
@@ -228,17 +250,8 @@ class Store:
         if row is None: return None
         result = dict(row); result['spec'] = json.loads(result['spec'])
         matches = [self.match(i) for i in ids]
-        standings = {f:{'fly_id':f,'points':0,'played':0,'wins':0,'draws':0,'losses':0} for f in result['spec']['fly_ids']}
-        for match in matches:
-            if match['status']!='verified': continue
-            for slot,f in enumerate(match['request']['fly_ids']):
-                r = standings[f]; r['played']+=1
-                winner = match['result']['winner_slot']
-                if winner is None: r['draws']+=1; r['points']+=1
-                elif winner==slot: r['wins']+=1; r['points']+=3
-                else: r['losses']+=1
-        terminal = all(m['status'] in {'verified','failed'} for m in matches)
-        result.update(matches=matches,standings=sorted(standings.values(),key=lambda r:(-r['points'],r['fly_id'])),status=('incomplete' if any(m['status']=='failed' for m in matches) else 'complete') if terminal else 'running')
+        from .services.ranking import tournament_projection
+        result.update(matches=matches, **tournament_projection(matches,result['spec']['fly_ids']))
         return result
 
     def tournaments(self) -> list[dict]:

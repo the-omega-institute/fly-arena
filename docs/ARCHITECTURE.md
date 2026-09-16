@@ -348,3 +348,25 @@ docs/                       # ADR、研究、运维与来源
 ```
 
 将 `contracts` 作为最小依赖底座，禁止 `neural/arena/judge` 导入 NyxID、Ornn、Heca、Web 或 HTTP 框架；依赖方向用架构检查约束。harness 统一入口建议为 `arena validate / compile / run / verify / compare / benchmark`，既供开发也供 AI 使用；这些命令尚待实现。
+
+## Versioned research integration
+
+Arena requests now carry an explicit `bridge_profile`. Missing fields retain legacy v1 interpretation. `sensorimotor-research-v2` selects the real CPU backend, frozen v2 bilateral sensor/readout, and the separately versioned `dn-cpg-asymmetry-v3` neural-only motor transfer. The body still exposes two action channels. The profile and full scientific source/assets closure are frozen in admission and receipt identities; stale jobs fail instead of changing scientific meaning.
+
+```mermaid
+flowchart LR
+  API[Match or tournament request] --> Admission[Profile availability and runtime admission]
+  Admission --> Queue[Durable fenced job]
+  Queue --> Legacy[Legacy v1 bridge]
+  Queue --> V2[CPU backend and frozen v2 decoder]
+  V2 --> Motor[Versioned neural-only motor filter]
+  Motor --> Body[Shared MuJoCo bodies]
+  Legacy --> Body
+  Body --> Receipt[Scene, replay, checkpoints and receipt]
+  Receipt --> Judge[Independent event and identity verification]
+  Judge --> Ranking[Season, runtime, scene, mode and bridge scope]
+```
+
+The research service executes independent WT/official/design trials. Their typed reports include the actual receipted scene, complete common time grid, measured metrics and neural traces. The comparison service rejects mismatched profile/conditions/grids; failures and censored outcomes never become successful zero-filled reports. Research experiments do not feed competition standings.
+
+`bridge.py` admits v2 matches only after the held-out motor qualification receipt matches the current profile and its bound evidence passes verification. Research measurements can still run while that arena qualification is unavailable. CPU is the actual backend; CUDA remains explicitly unavailable. No live identity integration is activated by these routes.

@@ -40,20 +40,15 @@ def main():
         from .store import Store
         g, store = Connectome(), Store()
         c = Compiler(g)
-        existing = {f["name"] for f in store.flies() if f["owner"] == "arena"}
-        presets = [
-            ("Wild Type / 原型", "mint", [], "未修改权重的全图基线。"),
-            ("Nectar / 花蜜", "amber", [{"selector": "olfactory", "scale": 1.18}, {"selector": "projection", "scale": 1.10}], "加强嗅觉输入与投射连接。行为优势仍需比赛验证。"),
-            ("Moss / 苔原", "violet", [{"selector": "descending", "scale": 1.25}, {"selector": "local", "scale": 1.12}], "调整下行输出与局部回路。用相同任务比较它的行为。"),
-        ]
-        for name, color, mutations, description in presets:
-            if name in existing:
-                continue
-            spec = FlySpec(name=name, color=color, description=description,
-                           connectome_sha256=g.manifest["sha256"], weight_mutations=mutations)
-            report = c.compile(spec, publish=True)
-            fly = store.add_fly("arena", spec.model_dump(), report)
-            print(f"Published {name}: {fly['id']}")
+        from .registry.platform_references import initialize_references
+        for role, fly in initialize_references(store,c).items():
+            print(f"Published trusted {role}: {fly['id']}")
+        # Preserve the third starter without assigning it reference authority.
+        spec = FlySpec(name="Moss / 苔原",color="violet",connectome_sha256=g.manifest['sha256'],
+                       weight_mutations=[{'selector':'descending','scale':1.25},{'selector':'local','scale':1.12}])
+        report = c.compile(spec,publish=True,root=store.root)
+        if not any(f['owner']=='arena' and f['artifact_id']==report['artifact_id'] and f['spec'].get('weight_mutations')==spec.model_dump()['weight_mutations'] for f in store.flies()):
+            print(f"Published starter: {store.add_fly('arena',spec.model_dump(),report)['id']}")
     elif args.command == "validate":
         from .connectome import Connectome
         from .compiler import Compiler
