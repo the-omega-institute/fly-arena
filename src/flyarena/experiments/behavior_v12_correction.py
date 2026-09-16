@@ -46,7 +46,7 @@ IMMUTABLE_SOURCE_HASHES = {
 ORIGINAL_INDEX_SHA256 = "2feab6649e24a2b8d3dde616cdfd4ef0db13d723bd1b232aa7d631ecb7aeae1f"
 ORIGINAL_ARCHIVE_SHA256 = "b9f5921112812e23f7f581bbc24c776178946e9148bba10cba2e2f5830b53bf8"
 VALIDATION_SCHEMA = "behavior-v12-correction-validation/v3"
-VALIDATION_IDENTITY = "contract-02"
+VALIDATION_IDENTITY = "contract-03"
 VALIDATION_SOURCE_PATHS = (
     "src/flyarena/experiments/behavior_v12_correction.py",
     "src/flyarena/experiments/verify_behavior_v12_correction.py",
@@ -56,8 +56,8 @@ VALIDATION_SNAPSHOT_PATHS = {
     relative: f"sealed-sources/{Path(relative).name}" for relative in VALIDATION_SOURCE_PATHS
 }
 VALIDATION_TEST_INVOCATIONS = (1, 2)
-EXPECTED_VALIDATION_REPO = Path("/tmp/fly-arena-behavior-v12-boundary").resolve()
-EXPECTED_VALIDATION_OUTPUT = EXPECTED_VALIDATION_REPO / "var/behavior-v12-correction-validation/contract-02"
+EXPECTED_VALIDATION_REPO = Path("/tmp/fly-arena-behavior-v12-final").resolve()
+EXPECTED_VALIDATION_OUTPUT = EXPECTED_VALIDATION_REPO / "var/behavior-v12-correction-validation/contract-03"
 EXPECTED_LEGACY_REPO = Path("/tmp/fly-arena-behavior-v12").resolve()
 EXPECTED_LEGACY_ANALYSIS = EXPECTED_LEGACY_REPO / "var/behavior-v12-correction/analysis-01/revision-02"
 FAILED_ATTEMPT_ROOT = Path("/tmp/fly-v12-boundary-scratch/failed-contract-d93334a0")
@@ -68,19 +68,7 @@ FAILED_ATTEMPT_SOURCE_SEAL = {
     "src/flyarena/experiments/verify_behavior_v12_correction.py": {"bytes": 55145, "sha256": "c0d23ebfb25076dfe880de21c7a845a967ceccf2f8e68073fb9767463f99d218"},
     "tests/test_behavior_v12_correction.py": {"bytes": 28713, "sha256": "4302d44ff84718cfa068fa47592826358fced641dd6e9e285819b05cfcb4e731"},
 }
-PARENT_CONTRACT = {
-    "identity": "contract-01",
-    "status": "rejected",
-    "registration_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/registration.json",
-    "registration_sha256": "f28782de39f2af5d8a3a7b8554948973cddfc52b39a5fb01a44202ac15e8e8d8",
-    "inventory_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/output-inventory.json",
-    "inventory_sha256": "b52f8b8853e71b2098b5157b61eb1f401073eea238493de8b8ca77083df142cc",
-    "source_sha256": {
-        "src/flyarena/experiments/behavior_v12_correction.py": "9bab645ba1575b31b32e15fa023f85ed67fdd2cd11ea0844d9ecaf01e762d269",
-        "src/flyarena/experiments/verify_behavior_v12_correction.py": "fb0e263d6bf98eaed16180c2a5721ce243f4a7b4c1f9d49711a4b15296b66919",
-        "tests/test_behavior_v12_correction.py": "6493bab232f8aac6ab4328c2a91d1280bba7ac2a5ae6b67cbe072d63f9499b89",
-    },
-}
+PARENT_CONTRACT = {'identity': 'contract-02', 'status': 'rejected', 'registration_path': '/tmp/fly-arena-behavior-v12-boundary/var/behavior-v12-correction-validation/contract-02/registration.json', 'registration_sha256': '331a1e16d7e2f61ddfa69f29fefa4a1a9d73bf3328551a06182c3a0a9260ba67', 'inventory_path': '/tmp/fly-arena-behavior-v12-boundary/var/behavior-v12-correction-validation/contract-02/output-inventory.json', 'inventory_sha256': 'af534057e0db6a8f82071997cca9a709a676f37d8a5cfec7e0ba85dcecde8d75', 'source_sha256': {'src/flyarena/experiments/behavior_v12_correction.py': 'a23d4bc9a5fd48378b54253e5acce57172cf29653fe0ae37cf3673759966b957', 'src/flyarena/experiments/verify_behavior_v12_correction.py': 'c05e5df452039e8dd92e845d0d0f0ad55c46cb77abbdfa0a74f66e0b368a79d7', 'tests/test_behavior_v12_correction.py': '159ac41d33c116eb07c0ae6e1a3ff0fcaa9050141ee19b2a93fc67bc24538891'}}
 VALIDATION_PAYLOAD = tuple(sorted((
     "attempts/registration-01.json",
     "attempts/sealed-sources-01/behavior_v12_correction.py",
@@ -1271,6 +1259,26 @@ def _validate_restoration_digest_sequences(expected: dict, actual: dict, checkpo
                             or any(not isinstance(size, int) or isinstance(size, bool) or size < 0 for size in shape)
                             or record["finite"] is not True or not _is_sha256(record["sha256"])):
                         raise ValueError(f"{label} restoration array digest mismatch: {name}")
+                    if record["dtype"] != checkpoint_record["dtype"]:
+                        raise ValueError(f"restoration pinned dtype mismatch: {name}")
+                    expected_shape = checkpoint_record["shape"]
+                    if name.startswith("contact."):
+                        count = entry.get("scalar.ncon", {}).get("value")
+                        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                            raise ValueError("restoration contact count mismatch")
+                        expected_shape = [count, *expected_shape[1:]]
+                    elif name in {"efc_D", "efc_force", "efc_frictionloss", "efc_margin", "efc_pos", "efc_vel"}:
+                        count = entry.get("scalar.nefc", {}).get("value")
+                        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                            raise ValueError("restoration constraint count mismatch")
+                        expected_shape = [count]
+                    elif name == "efc_J":
+                        # MuJoCo stores this sparse Jacobian as a flat variable-length nnz buffer.
+                        if len(shape) != 1:
+                            raise ValueError("restoration sparse constraint Jacobian rank mismatch")
+                        expected_shape = shape
+                    if shape != expected_shape:
+                        raise ValueError(f"restoration pinned shape mismatch: {name}")
                     try:
                         np.dtype(record["dtype"])
                     except (TypeError, ValueError) as exc:
@@ -1693,7 +1701,7 @@ def register_validation(
             or output.resolve() != EXPECTED_VALIDATION_OUTPUT.resolve()
             or legacy_repo.resolve() != EXPECTED_LEGACY_REPO
             or legacy_analysis.resolve() != EXPECTED_LEGACY_ANALYSIS):
-        raise ValueError("contract-02 registration locations are fixed")
+        raise ValueError("contract-03 registration locations are fixed")
     expected_sources = {
         (repo / "src/flyarena/experiments/behavior_v12_correction.py").resolve(),
         (repo / "src/flyarena/experiments/verify_behavior_v12_correction.py").resolve(),
@@ -1773,7 +1781,8 @@ def register_validation(
         "revision_01": {"completed_trials": 16, "status": "partial outcomes observed before interruption"},
         "revision_02": {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"},
         "contract_01": {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"},
-        "contract_02": {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"},
+        "contract_02": {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"},
+        "contract_03": {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"},
         "contract_02_attempt_01": {
             "status": "failed focused test invocation preserved under its own registration/source identity",
             "tests": 76,
@@ -1878,7 +1887,7 @@ def _validate_validation_registration(
         path = Path(PARENT_CONTRACT[f"{kind}_path"])
         if not path.is_file() or file_sha(path) != PARENT_CONTRACT[f"{kind}_sha256"]:
             raise ValueError(f"rejected parent {kind} identity changed")
-    parent_repo = Path("/tmp/fly-arena-behavior-v12-validation")
+    parent_repo = Path("/tmp/fly-arena-behavior-v12-boundary")
     for relative, expected in PARENT_CONTRACT["source_sha256"].items():
         if file_sha(parent_repo / relative) != expected:
             raise ValueError(f"rejected parent source identity changed: {relative}")
@@ -2137,13 +2146,38 @@ def validate_retained(repo: Path, output: Path, trusted_registration_sha256: str
 
 def _junit_counts(junit: Path) -> tuple[int, int, int, int]:
     root = ET.parse(junit).getroot()
-    suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
-    return (
-        sum(int(suite.attrib.get("tests", 0)) for suite in suites),
-        sum(int(suite.attrib.get("failures", 0)) for suite in suites),
-        sum(int(suite.attrib.get("errors", 0)) for suite in suites),
-        sum(int(suite.attrib.get("skipped", 0)) for suite in suites),
-    )
+    names = ("tests", "failures", "errors", "skipped")
+
+    def counts(node):
+        if node.tag not in {"testsuites", "testsuite"}:
+            raise ValueError("unsupported JUnit root/suite")
+        total = [0, 0, 0, 0]
+        for child in node:
+            if child.tag == "testsuite":
+                values = counts(child)
+                total = [a + b for a, b in zip(total, values)]
+            elif child.tag == "testcase" and node.tag == "testsuite":
+                if not child.get("name"):
+                    raise ValueError("JUnit testcase identity missing")
+                if any(item.tag not in {"failure", "error", "skipped", "system-out", "system-err", "properties"} for item in child):
+                    raise ValueError("unsupported JUnit testcase structure")
+                outcomes = [item.tag for item in child if item.tag in {"failure", "error", "skipped"}]
+                if len(outcomes) > 1:
+                    raise ValueError("ambiguous JUnit testcase outcome")
+                total[0] += 1
+                for index, tag in enumerate(("failure", "error", "skipped"), 1):
+                    total[index] += int(tag in outcomes)
+            elif child.tag not in {"properties", "system-out", "system-err"}:
+                raise ValueError("unsupported JUnit suite structure")
+        for index, name in enumerate(names):
+            declared = node.get(name)
+            if declared is None and node.tag == "testsuites":
+                continue
+            if declared is None or re.fullmatch(r"[0-9]+", declared) is None or int(declared) != total[index]:
+                raise ValueError(f"JUnit {name} disagrees with actual testcase outcomes")
+        return tuple(total)
+
+    return counts(root)
 
 
 def record_validation_test(
@@ -2247,6 +2281,71 @@ def _expected_retained_coverage() -> dict:
     }
 
 
+def _registered_trial_receipt_bindings(registration: dict) -> dict:
+    """Read only sealed retained metadata; no trajectory or physical recomputation."""
+    original = Path(registration["original_experiment"])
+    original_registration = json.loads((original / "registration.json").read_text())
+    legacy = json.loads((Path(registration["legacy_analysis"]) / "analysis.json").read_text())
+    expected = _expected_trials(original_registration)
+    if set(legacy["trials"]) != set(expected):
+        raise ValueError("registered retained trial set mismatch")
+    index_path = original.parent / "evidence-index.json"
+    if file_sha(index_path) != ORIGINAL_INDEX_SHA256:
+        raise ValueError("registered trial identity index mismatch")
+    indexed = json.loads(index_path.read_text())["files"]
+    bindings = {}
+    for name, specification in expected.items():
+        trial = original / "development" / name
+        for stream in ("core", "dense", "contacts"):
+            path = trial / stream / "start.json"
+            relative = str(path.relative_to(Path(registration["legacy_repo"])))
+            _validate_file_record(path, indexed[relative], "registered trial start")
+        identity = _validate_trial_identity(original, trial, original_registration, specification)
+        active = specification[2][1] > original_registration["controller"]["silence_common_max"]
+        reported = legacy["trials"][name]
+        status = []
+        if active:
+            for leg, partition in enumerate(reported["phase_partitions"]):
+                status.append({
+                    "leg": LEGS[leg],
+                    "swings": [record["status"] == "pass" for record in reported["swing_cycles"][leg]],
+                    "stances": [record["status"] == "pass" for record in reported["stance_cycles"][leg]],
+                    "swing_boundary_partials": len(partition["swing_boundary_partials"]),
+                    "stance_boundary_partials": len(partition["stance_boundary_partials"]),
+                    "invalid": 0,
+                    "full_active_window_invalid_increments": 0,
+                })
+        bindings[name] = {
+            "eligible_active": active, "zero_control": not active,
+            "identity_sha256": _json_sha(identity),
+            "derived_sha256": reported["derived_npz_sha256"],
+            "raw_contact_rows": reported["raw_contact_rows"],
+            "active_phase_increments_checked": 114000 if active else 0,
+            "endpoint_next_cache_rows": 40000,
+            "stance_slips_checked": sum(len(records) for records in reported["stance_cycles"]),
+            "max_endpoint_next_cache_error": reported["paired_state_verification"]["endpoint_vs_next_cache_max_abs_mm"],
+            "max_slip_formula_error": 0.0,
+            "raw_positive_normal_force_closed": True,
+            "gates": reported["gates"], "cycle_status": status,
+        }
+    return bindings
+
+
+def _receipt_trial_coverage(trials: dict, bindings: dict) -> dict:
+    return {
+        "trials": len(trials),
+        "active_trials": sum(record["eligible_active"] is True for record in trials.values()),
+        "zero_controls": sum(record["zero_control"] is True for record in trials.values()),
+        "active_phase_increments": sum(record["active_phase_increments_checked"] for record in trials.values()),
+        "complete_phase_runs": sum(len(leg["swings"]) + len(leg["stances"])
+                                   for record in bindings.values() for leg in record["cycle_status"]),
+        "endpoint_next_cache_rows": sum(record["endpoint_next_cache_rows"] for record in trials.values()),
+        "final_endpoints_without_next_cache": len(trials),
+        "stance_slip_formulas": sum(record["stance_slips_checked"] for record in trials.values()),
+        "raw_positive_normal_force_rows": sum(record["raw_contact_rows"] for record in trials.values()),
+    }
+
+
 def _validate_producer_receipt(output: Path, registration: dict, trusted_digest: str) -> dict:
     receipt = _require_exact_keys(json.loads((output / "retained-validation.json").read_text()), {
         "schema", "passed", "terminal_state", "process_exit", "scientific_admission",
@@ -2281,7 +2380,8 @@ def _validate_producer_receipt(output: Path, registration: dict, trusted_digest:
             or receipt["scope"] != "retained byte/array/contract validation only; no Jacobian or wrench reconstruction"
             or receipt["scope_stop"] != registration["scope_stop"]):
         raise ValueError("producer receipt identity, scope, or coverage mismatch")
-    if not isinstance(receipt["trials"], dict) or len(receipt["trials"]) != 32:
+    bindings = _registered_trial_receipt_bindings(registration)
+    if not isinstance(receipt["trials"], dict) or set(receipt["trials"]) != set(bindings):
         raise ValueError("producer trial coverage mismatch")
     trial_keys = {
         "eligible_active", "zero_control", "identity_sha256", "derived_sha256", "raw_contact_rows",
@@ -2292,6 +2392,15 @@ def _validate_producer_receipt(output: Path, registration: dict, trusted_digest:
     active = zero = 0
     for name, trial in receipt["trials"].items():
         _require_exact_keys(trial, trial_keys, f"producer trial {name}")
+        if any(trial[key] != value for key, value in bindings[name].items() if key != "cycle_status"):
+            raise ValueError(f"producer registered per-trial binding mismatch: {name}")
+        expected_phase = {
+            "classification": "eligible nonzero movement trial" if trial["eligible_active"] else "registered zero/silence control",
+            "strict_increment_rule_applied": trial["eligible_active"],
+            "increments_checked": trial["active_phase_increments_checked"], "failures": [],
+        }
+        if trial["phase_contract"] != expected_phase:
+            raise ValueError(f"producer phase coverage mismatch: {name}")
         if (trial["eligible_active"] is not (not trial["zero_control"])
                 or not _is_sha256(trial["identity_sha256"]) or not _is_sha256(trial["derived_sha256"])
                 or trial["phase_failures"] != [] or trial["endpoint_next_cache_rows"] != 40000
@@ -2300,6 +2409,8 @@ def _validate_producer_receipt(output: Path, registration: dict, trusted_digest:
             raise ValueError(f"producer trial contract mismatch: {name}")
         active += int(trial["eligible_active"] is True)
         zero += int(trial["zero_control"] is True)
+    if _receipt_trial_coverage(receipt["trials"], bindings) != actual:
+        raise ValueError("producer per-trial summary coverage mismatch")
     if (active, zero) != (28, 4):
         raise ValueError("producer eligible coverage mismatch")
     if (receipt["index_closure"] != {"files": 12338, "bytes": 3217398285, "index_sha256": ORIGINAL_INDEX_SHA256}
@@ -2333,7 +2444,9 @@ def _validate_independent_receipt(
             or receipt["scope"] != "full retained normal-force/cache/slip/phase/gate validation; no exhaustive Jacobian velocity or six-component wrench reconstruction"
             or receipt["scope_stop"] != registration["scope_stop"]):
         raise ValueError("independent verifier identity, scope, link, or coverage mismatch")
-    if (not isinstance(receipt["trials"], dict) or len(receipt["trials"]) != 32
+    bindings = _registered_trial_receipt_bindings(registration)
+    if (not isinstance(receipt["trials"], dict) or set(receipt["trials"]) != set(bindings)
+            or set(receipt["trials"]) != set(producer["trials"])
             or receipt["restoration"].get("passed") is not True
             or receipt["restoration"].get("integration_width_from_pinned_model") != 752
             or receipt["restoration"].get("ticks_checked") != 100):
@@ -2346,12 +2459,19 @@ def _validate_independent_receipt(
     }
     for name, trial in receipt["trials"].items():
         _require_exact_keys(trial, trial_keys, f"independent trial {name}")
+        if any(trial[key] != value for key, value in bindings[name].items() if key != "derived_sha256"):
+            raise ValueError(f"independent registered per-trial binding mismatch: {name}")
+        shared = set(trial) & set(producer["trials"][name])
+        if any(trial[key] != producer["trials"][name][key] for key in shared):
+            raise ValueError(f"producer/verifier per-trial disagreement: {name}")
         if (trial["eligible_active"] is not (not trial["zero_control"])
                 or not _is_sha256(trial["identity_sha256"])
                 or trial["endpoint_next_cache_rows"] != 40000
                 or trial["final_endpoint_without_next_cache"] != 1
                 or trial["raw_positive_normal_force_closed"] is not True):
             raise ValueError(f"independent trial contract mismatch: {name}")
+    if _receipt_trial_coverage(receipt["trials"], receipt["trials"]) != receipt["coverage"]:
+        raise ValueError("independent per-trial summary coverage mismatch")
     _validate_execution_resources(receipt["resources"], registration["limits"], "independent verifier")
     return receipt
 
@@ -2407,13 +2527,14 @@ def finalize_validation(output: Path, repo: Path, trusted_registration_sha256: s
             raise ValueError(f"missing validation receipt: {required}")
     chronology = json.loads((output / "chronology.json").read_text())
     if (not isinstance(chronology, dict)
-            or set(chronology) != {"schema", "initial", "revision_01", "revision_02", "contract_01", "contract_02", "contract_02_attempt_01", "historical_test_claim", "blind_preregistration", "scientific_admission"}
+            or set(chronology) != {"schema", "initial", "revision_01", "revision_02", "contract_01", "contract_02", "contract_03", "contract_02_attempt_01", "historical_test_claim", "blind_preregistration", "scientific_admission"}
             or chronology.get("schema") != "behavior-v12-correction-validation-chronology/v3"
             or chronology.get("initial") != {"completed_trials": 0, "status": "failed before outcome", "cause": "one-column contact schema was not flattened"}
             or chronology.get("revision_01") != {"completed_trials": 16, "status": "partial outcomes observed before interruption"}
             or chronology.get("revision_02") != {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"}
             or chronology.get("contract_01") != {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"}
-            or chronology.get("contract_02") != {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"}
+            or chronology.get("contract_02") != {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"}
+            or chronology.get("contract_03") != {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"}
             or chronology.get("contract_02_attempt_01") != {"status": "failed focused test invocation preserved under its own registration/source identity", "tests": 76, "passed": 75, "failed": 1, "data_or_gate_inconsistency": False}
             or chronology.get("historical_test_claim") != {"self_reported_runs": 3, "distinct_retained_execution_receipts": 1, "supported_distinct_run_count": 1, "historical_tiny_physics_seconds_reported": 0.0068, "status": "unsupported as three distinct executions; not reused as v3 evidence"}
             or chronology.get("blind_preregistration") is not False

@@ -34,7 +34,7 @@ EXPECTED_DERIVED_FIELDS = {
     "interval_peak_pre_tangent_speed",
 }
 VALIDATION_SCHEMA = "behavior-v12-correction-validation/v3"
-VALIDATION_IDENTITY = "contract-02"
+VALIDATION_IDENTITY = "contract-03"
 VALIDATION_SOURCE_PATHS = (
     "src/flyarena/experiments/behavior_v12_correction.py",
     "src/flyarena/experiments/verify_behavior_v12_correction.py",
@@ -43,8 +43,8 @@ VALIDATION_SOURCE_PATHS = (
 VALIDATION_SNAPSHOT_PATHS = {
     relative: f"sealed-sources/{Path(relative).name}" for relative in VALIDATION_SOURCE_PATHS
 }
-EXPECTED_VALIDATION_REPO = Path("/tmp/fly-arena-behavior-v12-boundary").resolve()
-EXPECTED_VALIDATION_OUTPUT = EXPECTED_VALIDATION_REPO / "var/behavior-v12-correction-validation/contract-02"
+EXPECTED_VALIDATION_REPO = Path("/tmp/fly-arena-behavior-v12-final").resolve()
+EXPECTED_VALIDATION_OUTPUT = EXPECTED_VALIDATION_REPO / "var/behavior-v12-correction-validation/contract-03"
 EXPECTED_LEGACY_REPO = Path("/tmp/fly-arena-behavior-v12").resolve()
 EXPECTED_LEGACY_ANALYSIS = EXPECTED_LEGACY_REPO / "var/behavior-v12-correction/analysis-01/revision-02"
 FAILED_ATTEMPT_REGISTRATION_SHA256 = "d93334a0a43ddf750a2eb23067208060c6ebe9e85e812124d002707fbc57c35b"
@@ -69,18 +69,7 @@ VALIDATION_PAYLOAD = sorted((
     "tests/test-invocation-01.json", "tests/test-invocation-01.junit.xml",
     "tests/test-invocation-02.json", "tests/test-invocation-02.junit.xml",
 ))
-PARENT_CONTRACT = {
-    "identity": "contract-01", "status": "rejected",
-    "registration_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/registration.json",
-    "registration_sha256": "f28782de39f2af5d8a3a7b8554948973cddfc52b39a5fb01a44202ac15e8e8d8",
-    "inventory_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/output-inventory.json",
-    "inventory_sha256": "b52f8b8853e71b2098b5157b61eb1f401073eea238493de8b8ca77083df142cc",
-    "source_sha256": {
-        "src/flyarena/experiments/behavior_v12_correction.py": "9bab645ba1575b31b32e15fa023f85ed67fdd2cd11ea0844d9ecaf01e762d269",
-        "src/flyarena/experiments/verify_behavior_v12_correction.py": "fb0e263d6bf98eaed16180c2a5721ce243f4a7b4c1f9d49711a4b15296b66919",
-        "tests/test_behavior_v12_correction.py": "6493bab232f8aac6ab4328c2a91d1280bba7ac2a5ae6b67cbe072d63f9499b89",
-    },
-}
+PARENT_CONTRACT = {'identity': 'contract-02', 'status': 'rejected', 'registration_path': '/tmp/fly-arena-behavior-v12-boundary/var/behavior-v12-correction-validation/contract-02/registration.json', 'registration_sha256': '331a1e16d7e2f61ddfa69f29fefa4a1a9d73bf3328551a06182c3a0a9260ba67', 'inventory_path': '/tmp/fly-arena-behavior-v12-boundary/var/behavior-v12-correction-validation/contract-02/output-inventory.json', 'inventory_sha256': 'af534057e0db6a8f82071997cca9a709a676f37d8a5cfec7e0ba85dcecde8d75', 'source_sha256': {'src/flyarena/experiments/behavior_v12_correction.py': 'a23d4bc9a5fd48378b54253e5acce57172cf29653fe0ae37cf3673759966b957', 'src/flyarena/experiments/verify_behavior_v12_correction.py': 'c05e5df452039e8dd92e845d0d0f0ad55c46cb77abbdfa0a74f66e0b368a79d7', 'tests/test_behavior_v12_correction.py': '159ac41d33c116eb07c0ae6e1a3ff0fcaa9050141ee19b2a93fc67bc24538891'}}
 RESTORATION_FIELDS = {"integration", "core", "dense", "contacts", "contact_offsets"}
 
 
@@ -479,6 +468,26 @@ def _validate_digest_document(document: object, checkpoint_cache: dict, label: s
                         or any(not isinstance(size, int) or isinstance(size, bool) or size < 0 for size in shape)
                         or record["finite"] is not True or not _is_sha256(record["sha256"])):
                     raise ValueError(f"independent {label} array record mismatch: {name}")
+                if record["dtype"] != template["dtype"]:
+                    raise ValueError(f"restoration pinned dtype mismatch: {name}")
+                expected_shape = template["shape"]
+                if name.startswith("contact."):
+                    count = entry.get("scalar.ncon", {}).get("value")
+                    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                        raise ValueError("restoration contact count mismatch")
+                    expected_shape = [count, *expected_shape[1:]]
+                elif name in {"efc_D", "efc_force", "efc_frictionloss", "efc_margin", "efc_pos", "efc_vel"}:
+                    count = entry.get("scalar.nefc", {}).get("value")
+                    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+                        raise ValueError("restoration constraint count mismatch")
+                    expected_shape = [count]
+                elif name == "efc_J":
+                    # MuJoCo stores this sparse Jacobian as a flat variable-length nnz buffer.
+                    if len(shape) != 1:
+                        raise ValueError("restoration sparse constraint Jacobian rank mismatch")
+                    expected_shape = shape
+                if shape != expected_shape:
+                    raise ValueError(f"restoration pinned shape mismatch: {name}")
                 try:
                     np.dtype(record["dtype"])
                 except (TypeError, ValueError) as exc:
@@ -512,10 +521,38 @@ def _independent_legacy_input_seal(legacy_analysis: Path, original_root: Path) -
 
 def _independent_junit_counts(path: Path) -> tuple[int, int, int, int]:
     root = ET.parse(path).getroot()
-    suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
-    return tuple(sum(int(suite.attrib.get(name, 0)) for suite in suites) for name in (
-        "tests", "failures", "errors", "skipped",
-    ))
+    names = ("tests", "failures", "errors", "skipped")
+
+    def counts(node):
+        if node.tag not in {"testsuites", "testsuite"}:
+            raise ValueError("unsupported JUnit root/suite")
+        total = [0, 0, 0, 0]
+        for child in node:
+            if child.tag == "testsuite":
+                values = counts(child)
+                total = [a + b for a, b in zip(total, values)]
+            elif child.tag == "testcase" and node.tag == "testsuite":
+                if not child.get("name"):
+                    raise ValueError("JUnit testcase identity missing")
+                if any(item.tag not in {"failure", "error", "skipped", "system-out", "system-err", "properties"} for item in child):
+                    raise ValueError("unsupported JUnit testcase structure")
+                outcomes = [item.tag for item in child if item.tag in {"failure", "error", "skipped"}]
+                if len(outcomes) > 1:
+                    raise ValueError("ambiguous JUnit testcase outcome")
+                total[0] += 1
+                for index, tag in enumerate(("failure", "error", "skipped"), 1):
+                    total[index] += int(tag in outcomes)
+            elif child.tag not in {"properties", "system-out", "system-err"}:
+                raise ValueError("unsupported JUnit suite structure")
+        for index, name in enumerate(names):
+            declared = node.get(name)
+            if declared is None and node.tag == "testsuites":
+                continue
+            if declared is None or re.fullmatch(r"[0-9]+", declared) is None or int(declared) != total[index]:
+                raise ValueError(f"JUnit {name} disagrees with actual testcase outcomes")
+        return tuple(total)
+
+    return counts(root)
 
 
 def _validate_prior_failed_attempt(output: Path, registered: object) -> None:
@@ -666,7 +703,7 @@ def _validate_v3_registration(repo: Path, output: Path, trusted_registration_sha
         parent_path = Path(PARENT_CONTRACT[f"{kind}_path"])
         if not parent_path.is_file() or file_sha(parent_path) != PARENT_CONTRACT[f"{kind}_sha256"]:
             raise ValueError(f"independent rejected-parent {kind} mismatch")
-    parent_repo = Path("/tmp/fly-arena-behavior-v12-validation")
+    parent_repo = Path("/tmp/fly-arena-behavior-v12-boundary")
     for relative, expected in PARENT_CONTRACT["source_sha256"].items():
         if file_sha(parent_repo / relative) != expected:
             raise ValueError(f"independent rejected-parent source mismatch: {relative}")

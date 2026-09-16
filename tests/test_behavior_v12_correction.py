@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import shutil
 from pathlib import Path
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ from flyarena.experiments.behavior_v12_correction import (
     _cycle_metrics,
     _inventory_payload,
     _integration_state,
+    _junit_counts,
     _int_column,
     _phase_increment_failures,
     _phase_window_contract,
@@ -27,7 +29,7 @@ from flyarena.experiments.behavior_v12_correction import (
     finalize_validation,
     record_validation_test,
 )
-from flyarena.experiments.verify_behavior_v12_correction import _runs, _validate_digest_document
+from flyarena.experiments.verify_behavior_v12_correction import _runs, _validate_digest_document, _independent_junit_counts
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -383,7 +385,7 @@ def test_record_validation_test_refuses_duplicate_execution_claim(tmp_path):
     output = tmp_path / "out"
     junit = output / "tests/test-invocation-01.junit.xml"
     junit.parent.mkdir(parents=True)
-    junit.write_text('<testsuite tests="2" failures="0" errors="0" skipped="0"/>')
+    junit.write_text('<testsuite tests="2" failures="0" errors="0" skipped="0"><testcase name="one"/><testcase name="two"/></testsuite>')
     (output / "registration.json").write_text("{}")
     registration = {"validation_source_seal": {"x": "y"}, "source_identity_sha256": "a" * 64}
     with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value=registration):
@@ -414,135 +416,25 @@ def _write_json(path, value):
     path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
 
 
+PARENT_OUTPUT = Path("/tmp/fly-arena-behavior-v12-boundary/var/behavior-v12-correction-validation/contract-02")
+
+
 def _finalizer_fixture(root):
+    # Use authentic retained records so the successful control exercises trial bindings.
+    # Only registration location/source mediation is isolated by the caller's patch.
     root.mkdir()
-    (root / "sealed-sources").mkdir()
-    (root / "tests").mkdir()
-    source_seal = {"source": {"bytes": 1, "sha256": "1" * 64}}
-    registration = {
-        "source_identity_sha256": "2" * 64,
-        "validation_source_seal": source_seal,
-        "scope_stop": "no walking, held-out, neural, phenotype, ablation, Lab/API/replay, or product admission",
-        "legacy_v1_analysis_sha256": "3" * 64,
-        "limits": {
-            "workers": 1, "wall_seconds": 2700, "peak_rss_bytes": 2147483648,
-            "new_output_scratch_bytes": 104857600, "physics_seconds": 0, "neural_seconds": 0,
-            "network": False, "installs": False, "gpu": False, "remote_operations": False,
-        },
-    }
-    trusted = "4" * 64
-    _write_json(root / "registration.json", {"synthetic": True})
-    chronology = {
-        "schema": "behavior-v12-correction-validation-chronology/v3",
-        "initial": {"completed_trials": 0, "status": "failed before outcome", "cause": "one-column contact schema was not flattened"},
-        "revision_01": {"completed_trials": 16, "status": "partial outcomes observed before interruption"},
-        "revision_02": {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"},
-        "contract_01": {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"},
-        "contract_02": {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"},
-        "contract_02_attempt_01": {
-            "status": "failed focused test invocation preserved under its own registration/source identity",
-            "tests": 76, "passed": 75, "failed": 1, "data_or_gate_inconsistency": False,
-        },
-        "historical_test_claim": {
-            "self_reported_runs": 3, "distinct_retained_execution_receipts": 1,
-            "supported_distinct_run_count": 1, "historical_tiny_physics_seconds_reported": 0.0068,
-            "status": "unsupported as three distinct executions; not reused as v3 evidence",
-        },
-        "blind_preregistration": False,
-        "scientific_admission": False,
-    }
-    _write_json(root / "chronology.json", chronology)
-    for name in ("behavior_v12_correction.py", "verify_behavior_v12_correction.py", "test_behavior_v12_correction.py"):
-        (root / "sealed-sources" / name).write_text("x")
-    resources = {
-        "wall_seconds": 1.0, "user_cpu_seconds": 0.5, "system_cpu_seconds": 0.1,
-        "peak_rss_bytes": 1024, "physics_seconds": 0, "neural_seconds": 0, "workers": 1,
-    }
-    producer_trial = {
-        "eligible_active": True, "zero_control": False, "identity_sha256": "5" * 64,
-        "derived_sha256": "6" * 64, "raw_contact_rows": 1,
-        "active_phase_increments_checked": 114000, "phase_failures": [],
-        "phase_contract": {}, "endpoint_next_cache_rows": 40000,
-        "final_endpoint_policy": "core row 40000 has no next cache row and is explicitly excluded",
-        "stance_slips_checked": 1, "max_endpoint_next_cache_error": 0.0,
-        "max_slip_formula_error": 0.0, "raw_positive_normal_force_closed": True, "gates": {},
-    }
-    producer_trials = {f"trial-{index:02d}": copy.deepcopy(producer_trial) for index in range(32)}
-    for index in range(28, 32):
-        producer_trials[f"trial-{index:02d}"].update(
-            eligible_active=False, zero_control=True, active_phase_increments_checked=0,
-        )
-    producer = {
-        "schema": "behavior-v12-correction-retained-validation/v3", "passed": True,
-        "terminal_state": "completed", "process_exit": 0, "scientific_admission": False,
-        "legacy_v1_status": "rejected", "future_positive_experiments": "require fresh repaired seals",
-        "registration_sha256": trusted, "trusted_registration_sha256": trusted,
-        "source_identity_sha256": registration["source_identity_sha256"],
-        "legacy_analysis_sha256": registration["legacy_v1_analysis_sha256"],
-        "trial_count": 32, "active_trial_count": 28, "zero_control_count": 4,
-        "active_phase_increments_checked": 3192000, "complete_phase_runs_recalculated": 5008,
-        "endpoint_next_cache_rows_checked": 1280000, "final_endpoints_without_next_cache": 32,
-        "stance_slip_formulas_checked": 2768, "raw_contact_rows_closed": 9095759,
-        "index_closure": {"files": 12338, "bytes": 3217398285, "index_sha256": "2feab6649e24a2b8d3dde616cdfd4ef0db13d723bd1b232aa7d631ecb7aeae1f"},
-        "restoration": {"passed": True, "integration_width_from_pinned_model": 752, "native_horizon_ticks": 100},
-        "aggregate_gates": {"active_restoration_raw_join": True}, "trials": producer_trials,
-        "scope": "retained byte/array/contract validation only; no Jacobian or wrench reconstruction",
-        "scope_stop": registration["scope_stop"], "resources": resources,
-    }
-    _write_json(root / "retained-validation.json", producer)
-    verifier_trial = {
-        "eligible_active": True, "zero_control": False, "identity_sha256": "7" * 64,
-        "raw_contact_rows": 1, "active_phase_increments_checked": 114000,
-        "endpoint_next_cache_rows": 40000, "final_endpoint_without_next_cache": 1,
-        "stance_slips_checked": 1, "max_endpoint_next_cache_error": 0.0,
-        "max_slip_formula_error": 0.0, "raw_positive_normal_force_closed": True,
-        "gates": {}, "cycle_status": [],
-    }
-    verifier_trials = {f"trial-{index:02d}": copy.deepcopy(verifier_trial) for index in range(32)}
-    for index in range(28, 32):
-        verifier_trials[f"trial-{index:02d}"].update(
-            eligible_active=False, zero_control=True, active_phase_increments_checked=0,
-        )
-    coverage = {
-        "trials": 32, "active_trials": 28, "zero_controls": 4,
-        "active_phase_increments": 3192000, "complete_phase_runs": 5008,
-        "endpoint_next_cache_rows": 1280000, "final_endpoints_without_next_cache": 32,
-        "stance_slip_formulas": 2768, "raw_positive_normal_force_rows": 9095759,
-    }
-    verifier = {
-        "schema": "behavior-v12-correction-independent-verification/v3", "passed": True,
-        "terminal_state": "completed", "process_exit": 0, "scientific_admission": False,
-        "registration_sha256": trusted, "trusted_registration_sha256": trusted,
-        "source_identity_sha256": registration["source_identity_sha256"],
-        "producer_receipt_sha256": file_sha(root / "retained-validation.json"),
-        "legacy_v1_status": "rejected", "coverage": coverage,
-        "aggregate_gates": producer["aggregate_gates"],
-        "restoration": {"passed": True, "integration_width_from_pinned_model": 752, "ticks_checked": 100},
-        "trials": verifier_trials,
-        "scope": "full retained normal-force/cache/slip/phase/gate validation; no exhaustive Jacobian velocity or six-component wrench reconstruction",
-        "scope_stop": registration["scope_stop"], "resources": resources,
-    }
-    _write_json(root / "independent-verification.json", verifier)
-    for invocation in (1, 2):
-        junit_relative = f"tests/test-invocation-{invocation:02d}.junit.xml"
-        junit = root / junit_relative
-        junit.write_text('<testsuite tests="2" failures="0" errors="0" skipped="0"/>')
-        receipt = {
-            "schema": "behavior-v12-correction-validation-test-run/v3", "invocation": invocation,
-            "status": "passed", "terminal_state": "completed", "process_exit": 0,
-            "command": f"pytest selection {invocation}", "tests": 2, "passed": 2,
-            "failed": 0, "errors": 0, "skipped": 0, "junit": junit_relative,
-            "junit_sha256": file_sha(junit), "registration_sha256": trusted,
-            "trusted_registration_sha256": trusted,
-            "source_identity_sha256": registration["source_identity_sha256"],
-            "executed_source_seal": source_seal, "physics_seconds": 0, "neural_seconds": 0,
-        }
-        _write_json(root / f"tests/test-invocation-{invocation:02d}.json", receipt)
     for relative in VALIDATION_PAYLOAD:
-        path = root / relative
-        if relative.startswith("attempts/") and not path.exists():
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("preserved")
+        if relative == "resource-receipt.json":
+            continue
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PARENT_OUTPUT / relative, destination)
+    registration = json.loads((PARENT_OUTPUT / "registration.json").read_text())
+    trusted = file_sha(PARENT_OUTPUT / "registration.json")
+    chronology = json.loads((root / "chronology.json").read_text())
+    chronology["contract_02"]["status"] = "rejected; immutable identity retained separately"
+    chronology["contract_03"] = {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"}
+    _write_json(root / "chronology.json", chronology)
     return registration, trusted
 
 
@@ -624,3 +516,105 @@ def test_real_registration_rejects_mutation_under_stale_trusted_root(tmp_path, m
     _write_json(output / "registration.json", value)
     with pytest.raises(ValueError, match="trusted registration digest"):
         _validate_validation_registration(ROOT, output, trusted)
+
+
+@pytest.mark.parametrize("mutation", ["object-dtype", "qpos-width", "contact-width", "contact-count", "constraint-count"])
+def test_restoration_pinned_nested_schema_rejects_paired_substitution(mutation):
+    registration = json.loads((PARENT_OUTPUT / "registration.json").read_text())
+    restoration = Path(registration["original_experiment"]) / "restoration"
+    checkpoint = json.loads((restoration / "checkpoint.json").read_text())
+    expected = json.loads((restoration / "expected-digests.json").read_text())
+    entry = expected["cache"][0]
+    if mutation == "object-dtype":
+        entry["qpos"]["dtype"] = "|O"
+    elif mutation == "qpos-width":
+        entry["qpos"]["shape"] = [1]
+    elif mutation == "contact-width":
+        entry["contact.pos"]["shape"][1] = 1
+    elif mutation == "contact-count":
+        entry["contact.pos"]["shape"][0] += 1
+    else:
+        entry["efc_force"]["shape"][0] += 1
+    before = copy.deepcopy(expected)
+    with pytest.raises(ValueError):
+        _validate_restoration_digest_sequences(expected, copy.deepcopy(expected), checkpoint)
+    with pytest.raises(ValueError):
+        _validate_digest_document(expected, checkpoint["cache"], "expected")
+    assert expected == before
+
+
+def test_restoration_pinned_nested_schema_accepts_actual_dynamic_contacts():
+    registration = json.loads((PARENT_OUTPUT / "registration.json").read_text())
+    restoration = Path(registration["original_experiment"]) / "restoration"
+    checkpoint = json.loads((restoration / "checkpoint.json").read_text())
+    expected = json.loads((restoration / "expected-digests.json").read_text())
+    actual = json.loads((restoration / "actual-digests.json").read_text())
+    assert {tuple(record["contact.pos"]["shape"]) for record in expected["cache"]} == {(5, 3), (6, 3)}
+    assert _validate_restoration_digest_sequences(expected, actual, checkpoint)["expected_actual_exact"]
+    _validate_digest_document(expected, checkpoint["cache"], "expected")
+    _validate_digest_document(actual, checkpoint["cache"], "actual")
+
+
+@pytest.mark.parametrize("mutation", ["wrong-root", "missing-cases", "hidden-failure"])
+def test_finalizer_rejects_actual_junit_counterexamples(tmp_path, mutation):
+    output = tmp_path / mutation
+    registration, trusted = _finalizer_fixture(output)
+    path = output / "tests/test-invocation-02.json"
+    receipt = json.loads(path.read_text())
+    junit = output / receipt["junit"]
+    if mutation == "wrong-root":
+        value = junit.read_text().replace("testsuites", "unrelated")
+    elif mutation == "missing-cases":
+        value = '<testsuite tests="76" failures="0" errors="0" skipped="0"/>'
+    else:
+        value = '<testsuite tests="76" failures="0" errors="0" skipped="0"><testcase name="hidden"><failure/></testcase>' + ''.join(f'<testcase name="case-{i}"/>' for i in range(75)) + '</testsuite>'
+    junit.write_text(value)
+    receipt["junit_sha256"] = file_sha(junit)
+    _write_json(path, receipt)
+    with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value=registration):
+        with pytest.raises(ValueError, match="JUnit"):
+            finalize_validation(output, ROOT, trusted)
+    assert not (output / "resource-receipt.json").exists()
+    assert not (output / "output-inventory.json").exists()
+
+
+@pytest.mark.parametrize("side", ["producer", "verifier", "both"])
+@pytest.mark.parametrize("mutation", ["renamed-trial", "wrong-identity", "all-zero", "contact-count", "slip-count"])
+def test_finalizer_rejects_registered_trial_counterexamples(tmp_path, side, mutation):
+    output = tmp_path / (side + mutation)
+    registration, trusted = _finalizer_fixture(output)
+    producer_path = output / "retained-validation.json"
+    verifier_path = output / "independent-verification.json"
+    producer, verifier = json.loads(producer_path.read_text()), json.loads(verifier_path.read_text())
+    for receipt in ([producer, verifier] if side == "both" else [producer] if side == "producer" else [verifier]):
+        trials = receipt["trials"]
+        name = next(iter(trials))
+        if mutation == "renamed-trial":
+            trials["unregistered-trial"] = trials.pop(name)
+        elif mutation == "wrong-identity":
+            trials[name]["identity_sha256"] = "0" * 64
+        elif mutation == "all-zero":
+            for record in trials.values():
+                record.update(eligible_active=False, zero_control=True, active_phase_increments_checked=0)
+        elif mutation == "contact-count":
+            trials[name]["raw_contact_rows"] += 1
+        else:
+            trials[name]["stance_slips_checked"] += 1
+    _write_json(producer_path, producer)
+    verifier["producer_receipt_sha256"] = file_sha(producer_path)
+    _write_json(verifier_path, verifier)
+    with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value=registration):
+        with pytest.raises(ValueError, match="trial|coverage"):
+            finalize_validation(output, ROOT, trusted)
+    assert not (output / "resource-receipt.json").exists()
+    assert not (output / "output-inventory.json").exists()
+
+
+def test_junit_actual_cases_include_historical_failure_error_skip_and_nested_suites(tmp_path):
+    path = tmp_path / "outcomes.xml"
+    path.write_text('<testsuites tests="4" failures="1" errors="1" skipped="1"><testsuite tests="4" failures="1" errors="1" skipped="1"><testcase name="pass"/><testcase name="fail"><failure/></testcase><testcase name="error"><error/></testcase><testsuite tests="1" failures="0" errors="0" skipped="1"><testcase name="skip"><skipped/></testcase></testsuite></testsuite></testsuites>')
+    assert _junit_counts(path) == (4, 1, 1, 1)
+    assert _independent_junit_counts(path) == (4, 1, 1, 1)
+    historical = PARENT_OUTPUT / "attempts/tests/test-invocation-02.junit.xml"
+    assert _junit_counts(historical) == (76, 1, 0, 0)
+    assert _independent_junit_counts(historical) == (76, 1, 0, 0)
