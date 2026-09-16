@@ -91,7 +91,9 @@ class ResearchService:
             if fly['spec'].get('connectome_sha256') != self.compiler().graph.manifest['sha256'] or fly['spec'].get('model_profile') != 'malecns-lif-cpu-v1':
                 raise ValueError('Subject graph/profile mismatch')
             self.compiler().load_weights(fly['artifact_id'],self.store.root)
-        subjects = [{'role':role,'fly_id':fly['id'],'name':fly['name'],'artifact_id':fly['artifact_id']}
+        subjects = [{'role':role,'fly_id':fly['id'],'name':fly['name'],'artifact_id':fly['artifact_id'],
+                     'parent_id':fly['spec'].get('parent_id'),'reference_kind':fly.get('reference_kind'),
+                     'submission_channel':fly.get('submission_channel'),'release_id':fly.get('release_id')}
                     for role,fly in zip(('wildtype','official','design'),flies)]
         runtime = self.probes.runtime_closure()
         conditions = [ConditionSpec(probe=selected,profile=profile,runtime=runtime,

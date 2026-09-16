@@ -1,0 +1,163 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import {createRequire} from 'node:module'
+import ts from 'typescript'
+import React from 'react'
+import {renderToStaticMarkup} from 'react-dom/server'
+
+// Compile the real components with the declared TypeScript dependency. React SSR
+// renders their actual markup; no DOM, component mocks, browser or service is used.
+const web = new URL('../', import.meta.url).pathname
+const output = fs.mkdtempSync(path.join(process.env.FLY_TEST_SCRATCH || os.tmpdir(), 'provenance-render-'))
+fs.writeFileSync(path.join(output, 'package.json'), '{"type":"commonjs"}')
+fs.symlinkSync(fs.realpathSync(path.join(web, 'node_modules')), path.join(output, 'node_modules'))
+function compile(folder) {
+  for (const entry of fs.readdirSync(path.join(web, folder), {withFileTypes:true})) {
+    const relative = path.join(folder, entry.name)
+    if (entry.isDirectory()) compile(relative)
+    else if (/\.tsx?$/.test(entry.name)) {
+      const result = ts.transpileModule(fs.readFileSync(path.join(web, relative), 'utf8'), {
+        compilerOptions:{target:ts.ScriptTarget.ES2022, module:ts.ModuleKind.CommonJS, jsx:ts.JsxEmit.ReactJSX, esModuleInterop:true},
+      })
+      const dest = path.join(output, relative.replace(/\.tsx?$/, '.js'))
+      fs.mkdirSync(path.dirname(dest), {recursive:true})
+      fs.writeFileSync(dest, result.outputText)
+    }
+  }
+}
+compile('src')
+const require = createRequire(path.join(output, 'package.json'))
+const {SavedFlyCard} = require('./src/features/design/SavedFlyCard.js')
+const {ArenaFeature} = require('./src/features/arena/ArenaFeature.js')
+const {ArenaWorldLabel} = require('./src/features/arena/ArenaWorldLabel.js')
+const {PhenotypeLab} = require('./src/features/phenotype/PhenotypeLab.js')
+const {FrozenSubjects} = require('./src/features/phenotype/FrozenSubjects.js')
+const {I18nProvider} = require('./src/shared/i18n.js')
+test.after(() => fs.rmSync(output, {recursive:true, force:true}))
+const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props))
+const noop = () => {}
+const fly = (id, patch={}) => ({id, owner:'owner', designer:'Arena Lab', name:'Wild Type / 原型', color:'mint',
+  artifact_id:'same-artifact', spec:{parent_id:null}, report:{}, reference_kind:null, submission_channel:null, release_id:null, ...patch})
+const legacy = fly('legacy01-full-id')
+const wt = fly('trusted1-full-id', {reference_kind:'wildtype', submission_channel:'seed', release_id:'release-1'})
+const official = fly('official-full-id', {reference_kind:'official', submission_channel:'seed', release_id:'release-1'})
+const flies = [legacy, wt, official, fly('clone001-full-id', {reference_kind:'user', submission_channel:'web'}),
+  fly('agent001-full-id', {reference_kind:'ai', submission_channel:'api'})]
+function arena(identity, extra={}) {
+  return render(ArenaFeature, {replayStatus:'idle', replayError:'', bridgeProfile:'', scene:null, focused:'', preview:null,
+    selected:legacy.id, identity, flies, frames:[], play:false, playtime:0, playbackSpeed:1, season:null, matches:[], maps:[],
+    mapId:'orchard', mode:'contest', opponent:wt.id, duration:5, seed:42, busy:'', ...extra})
+}
+const options = html => [...html.matchAll(/<option\b[^>]*value="([^"]+)"[^>]*>(.*?)<\/option>/g)]
+const textOnly = html => html.replace(/<[^>]*>/g, '')
+
+test('actual Studio cards distinguish identical names/artifacts and ownership without invented authorship', () => {
+  for (const viewer of [undefined, 'owner', 'other']) {
+    const html = render(SavedFlyCard, {fly:legacy, viewer, selected:true, onClone:noop})
+    assert.match(textOnly(html), /Wild Type \/ 原型/)
+    assert.match(textOnly(html), /Provenance not recorded/)
+    assert.match(textOnly(html), viewer==='owner' ? /Your saved design/ : /Saved design/)
+    assert.match(html, /title="Wild Type \/ 原型 · legacy01-full-id"/)
+    assert.match(textOnly(html), /legacy01/)
+    assert.doesNotMatch(textOnly(html), /Trusted|Arena Lab|web|AI authored|Human/)
+  }
+  for (const [record, label] of [[wt, 'Trusted Wild Type'], [official, 'Trusted official release']]) {
+    const html = render(SavedFlyCard, {fly:record, viewer:'owner', selected:false, onClone:noop})
+    assert.ok(textOnly(html).includes(label))
+    assert.doesNotMatch(textOnly(html), /Your saved design|Provenance not recorded/)
+  }
+  for (const record of flies.slice(3)) {
+    const html = render(SavedFlyCard, {fly:record, viewer:'owner', selected:false, onClone:noop})
+    assert.match(textOnly(html), /Your saved design/)
+    assert.doesNotMatch(textOnly(html), /Trusted|Provenance not recorded|AI|Human/)
+  }
+})
+
+test('both actual Arena selectors retain saved IDs and show distinct visible identities for all viewers', () => {
+  for (const identity of [null, {id:'owner'}, {id:'other'}]) {
+    const html = arena(identity)
+    for (const record of flies) {
+      const choices = options(html).filter(o => o[1]===record.id)
+      assert.equal(choices.length, 2)
+      for (const choice of choices) {
+        assert.ok(choice[2].includes(record.name))
+        assert.ok(choice[2].includes(record.id.slice(0,8)))
+        if (record===legacy) {
+          assert.match(choice[2], /Provenance not recorded/)
+          assert.match(choice[2], identity?.id==='owner' ? /Your saved design/ : /Saved design/)
+        }
+        if (record===wt) assert.match(choice[2], /Trusted Wild Type/)
+        if (record===official) assert.match(choice[2], /Trusted official release/)
+      }
+      assert.ok(html.includes(`title="${record.name} · ${record.id}"`))
+    }
+  }
+})
+
+test('actual replay score and world labels keep identity and treat a missing record as participant', () => {
+  const absent = fly('missing1-full-id')
+  const participants = [legacy, wt, official, absent]
+  const scene = {flies:participants, body:{meshes:{}, geoms:[]}, size:80, food:[], obstacles:[]}
+  const html = arena({id:'owner'}, {scene, frame:{positions:[], poses:[], time:0, tick:0, scores:[1,2,3,4]}, replayStatus:'ready'})
+  const scores = html.match(/<div class="score-overlay">([\s\S]*?)<div class="playback">/)[1]
+  assert.match(textOnly(scores), /Your saved design · Provenance not recorded · legacy01/)
+  assert.match(textOnly(scores), /Trusted Wild Type · trusted1/)
+  assert.match(textOnly(scores), /Trusted official release · official/)
+  assert.match(textOnly(scores), /Participant · Provenance not recorded · missing1/)
+  const world = render(ArenaWorldLabel, {fly:absent, slot:3, selected:true})
+  assert.match(textOnly(world), /Slot 4 · Wild Type \/ 原型/)
+  assert.match(textOnly(world), /Participant · Provenance not recorded · missing1/)
+  assert.match(world, /missing1-full-id/)
+  assert.doesNotMatch(textOnly(world), /Trusted|Your saved design/)
+})
+
+test('actual Lab selector retains an owned legacy design and excludes nonowners', () => {
+  for (const identity of [null, {id:'owner'}, {id:'other'}]) {
+    const html = render(PhenotypeLab, {flies, identity, selected:legacy.id, experimentId:'', onExperiment:noop, onLogin:noop})
+    const choices = options(html).filter(o => flies.some(f => f.id===o[1]))
+    assert.equal(choices.length, identity?.id==='owner' ? flies.length : 0)
+    if (choices.length) assert.match(choices.find(o=>o[1]===legacy.id)[2], /Your saved design · Provenance not recorded · legacy01/)
+  }
+})
+
+test('actual Frozen cards distinguish absent fields, explicit nulls and recorded metadata without live fallback', () => {
+  const base = {role:'design', fly_id:legacy.id, artifact_id:legacy.artifact_id, name:legacy.name}
+  const live = fly(legacy.id, {reference_kind:'ai', submission_channel:'api', release_id:'LIVE-RELEASE', spec:{parent_id:'LIVE-PARENT'}})
+  const props = {owner:'owner', viewer:'owner', flies:[live]}
+  const card = subjects => render(FrozenSubjects, {...props, subjects}).match(/<article class="panel subject-card design">([\s\S]*?)<\/article>/)[1]
+  const missing = card([base])
+  assert.equal((missing.match(/Not recorded in this experiment/g)||[]).length, 4)
+  const explicit = card([{...base, parent_id:null, reference_kind:null, submission_channel:null, release_id:null}])
+  assert.equal((explicit.match(/<dd>Unknown<\/dd>/g)||[]).length, 2)
+  assert.equal((explicit.match(/<dd>Not supplied<\/dd>/g)||[]).length, 2)
+  assert.doesNotMatch(explicit, /Not recorded in this experiment/)
+  for (const html of [missing, explicit]) {
+    assert.match(html, /Provenance not recorded/)
+    assert.doesNotMatch(html, /LIVE-|<dd>api<\/dd>|<dd>ai<\/dd>/)
+  }
+  const recorded = card([{...base, parent_id:'frozen-parent', reference_kind:'user', submission_channel:'web', release_id:'frozen-release'}])
+  for (const value of ['frozen-parent', 'user', 'web', 'frozen-release']) assert.ok(recorded.includes(`<dd>${value}</dd>`))
+  assert.doesNotMatch(recorded, /Not recorded|Provenance not recorded|LIVE-/)
+})
+
+test('actual translated cards and frozen details render Chinese via the existing catalog', () => {
+  const saved = Object.fromEntries(['navigator','localStorage','matchMedia'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+  // Preference inputs only; SSR creates no document or DOM.
+  Object.defineProperty(globalThis, 'navigator', {configurable:true, value:{language:'zh-CN'}})
+  globalThis.localStorage = {getItem:()=>null}
+  globalThis.matchMedia = ()=>({matches:false})
+  try {
+    const html = renderToStaticMarkup(React.createElement(I18nProvider, null,
+      React.createElement(SavedFlyCard, {fly:legacy, viewer:'owner', selected:false, onClone:noop}),
+      React.createElement(FrozenSubjects, {subjects:[{role:'design', fly_id:legacy.id, name:legacy.name, artifact_id:legacy.artifact_id, reference_kind:null}]})))
+    for (const phrase of ['你保存的设计','来源未记录','本实验未记录','未知','参考类型']) assert.ok(html.includes(phrase))
+  } finally {
+    for (const [key, descriptor] of Object.entries(saved)) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor)
+      else delete globalThis[key]
+    }
+  }
+})
