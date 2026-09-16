@@ -174,8 +174,8 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         return research.admit(owner['id'],body,idempotency_key)
 
     @app.get('/api/v1/experiments')
-    def experiments():
-        return research.repository.list()
+    def experiments(summary: bool = False):
+        return research.repository.list_summaries() if summary else research.repository.list()
 
     @app.get('/api/v1/experiments/{ident}')
     def experiment_get(ident: str):
