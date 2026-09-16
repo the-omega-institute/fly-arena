@@ -89,7 +89,7 @@ class Store:
         with self.db() as db:
             provenance = db.execute('SELECT reference_kind,release_id,submission_channel FROM fly_provenance WHERE fly_id=?', (ident,)).fetchone()
             scheduled = db.execute('SELECT experiment_id,status,error FROM fly_experiments WHERE fly_id=?', (ident,)).fetchone()
-        result.update(dict(provenance) if provenance else {'reference_kind':'user','release_id':None,'submission_channel':'web'})
+        result.update(dict(provenance) if provenance else {'reference_kind':None,'release_id':None,'submission_channel':None})
         result.update(experiment_id=scheduled['experiment_id'] if scheduled else None,
                       experiment_status=scheduled['status'] if scheduled else None,
                       experiment_error=scheduled['error'] if scheduled else None)

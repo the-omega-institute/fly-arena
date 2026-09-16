@@ -51,3 +51,7 @@ input:not([type=range]),select,textarea{background:var(--surface-raised);color:v
 .exploratory-controls{margin-top:18px;border-top:1px solid var(--border);padding-top:12px;font-size:11px}.exploratory-controls summary{cursor:pointer;line-height:1.6}.exploratory-controls p{line-height:1.7;color:var(--text-muted);margin:10px 0 16px}.profile-reason{padding:16px 22px;font-size:12px;line-height:1.8;overflow-wrap:anywhere}
 .annotation-discovery{min-width:0}.annotation-discovery small{display:block;line-height:1.6;margin-top:7px;overflow-wrap:anywhere}.annotation-evidence{font-size:10px;line-height:1.7;margin-top:8px}.annotation-evidence summary{cursor:pointer}.metadata-hash{display:block;overflow-wrap:anywhere;margin:8px 0}.annotation-options{display:flex;flex-wrap:wrap;gap:5px;max-height:160px;overflow:auto}.annotation-options button{padding:5px 8px;border:1px solid var(--border);border-radius:4px;overflow-wrap:anywhere;max-width:100%;text-align:left}.capabilities-grid>div{flex-wrap:wrap}.capabilities-grid p{width:100%;margin:0;font-size:11px}
 .subject-card dl{font-size:11px;line-height:1.6}.subject-card dd{user-select:text}.match-setup .capability-note{overflow-wrap:anywhere}
+
+/* Saved identity qualifiers wrap independently of the compact display name. */
+.fly-card>div:nth-child(2){min-width:0}.fly-card small{overflow-wrap:anywhere;line-height:1.4}
+.score-overlay>div>span{min-width:0;overflow-wrap:anywhere}.fly-world-label small{max-width:250px;white-space:normal}

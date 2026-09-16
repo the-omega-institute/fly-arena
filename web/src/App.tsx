@@ -1,3 +1,4 @@
+import {SavedFlyCard} from './features/design/SavedFlyCard'
 import {AuthDialogs} from './features/auth/AuthDialogs'
 import {DevelopersFeature} from './features/developers/DevelopersFeature'
 import {ArenaFeature} from './features/arena/ArenaFeature'
@@ -177,7 +178,7 @@ export default function App(){
       {tab==='design'&&<>
         <div className="design-workspace">
           <aside className="collection panel"><div className="panel-heading"><span>{t("我的果蝇库")}</span><span className="count">{flies.length.toString().padStart(2,'0')}</span></div><div className="tiny-label">{t("SELECT A STARTING POINT")}</div><p className="draft-status">{parentId?t('Unsaved draft from parent')+': '+parentId:t('Unsaved canonical draft')}</p>
-            <div className="fly-list">{flies.slice(0,12).map(f=><button key={f.id} className={'fly-card '+(parentId===f.id?'selected':'')} onClick={()=>clone(f)}><div className="fly-avatar" style={{'--fly-color':colors[f.color]} as React.CSSProperties}><Bug size={27} strokeWidth={1.1}/></div><div><strong>{f.name.split(' / ')[0]}</strong><small>{f.reference_kind==='wildtype'?t('Trusted Wild Type'):f.reference_kind==='official'?t('Trusted official release'):f.owner===identity?.id?t('Your design'):f.designer}</small></div>{parentId===f.id&&<span className="selected-dot"/>}</button>)}</div>
+            <div className="fly-list">{flies.slice(0,12).map(f=><SavedFlyCard key={f.id} fly={f} viewer={identity?.id} selected={parentId===f.id} onClone={clone}/>)}</div>
             <button className="new-fly" onClick={()=>{setScales(defaultScales());setTau(1);setThreshold(0);setName('Untitled 01');setSelected('');setParentId(null);setBaseSpec({});setInterventions([]);setEdgeDeltas([]);setReport(null);setToast(t("已恢复基线参数，为新设计取个名字吧。"))}}><Plus size={15}/>{t("从原型开始设计")}</button>
             <div className="collection-footer"><GitBranch size={18}/><strong>{t("进化，有迹可循")}</strong><p>{t("每个设计都保留图谱来源、父代和不可变的权重版本。")}</p><button onClick={()=>setTab('lab')}>{t("查看实验记录")}<ArrowRight size={14}/></button></div>
           </aside>
