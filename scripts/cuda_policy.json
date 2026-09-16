@@ -1,0 +1,10 @@
+{
+  "schema": "cuda-differential-policy/v1",
+  "atol": 1e-10,
+  "rtol": 1e-12,
+  "exact": ["counts", "refractory", "tick", "total_spikes"],
+  "same_runtime_repeat_chunk_restore": "array-exact",
+  "fixture_ticks": 48,
+  "hardware_qualification": "NOT RUN/UNQUALIFIED",
+  "scope": "tiny neural recurrence only; no readout or embodiment admission"
+}
