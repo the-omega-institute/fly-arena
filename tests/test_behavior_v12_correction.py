@@ -1,3 +1,6 @@
+import copy
+import json
+import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -9,6 +12,7 @@ from flyarena.common import file_sha
 from flyarena.experiments.behavior_v12_correction import (
     IMMUTABLE_SOURCE_HASHES,
     TOLERANCE,
+    VALIDATION_PAYLOAD,
     _cycle_metrics,
     _inventory_payload,
     _integration_state,
@@ -16,12 +20,14 @@ from flyarena.experiments.behavior_v12_correction import (
     _phase_increment_failures,
     _phase_window_contract,
     _partition_true_runs,
+    _validate_validation_registration,
     _validate_restoration_arrays,
     _validate_restoration_digest_sequences,
     capture_native_step,
+    finalize_validation,
     record_validation_test,
 )
-from flyarena.experiments.verify_behavior_v12_correction import _runs
+from flyarena.experiments.verify_behavior_v12_correction import _runs, _validate_digest_document
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -81,19 +87,18 @@ def test_float64_cast_must_precede_mesh_mean():
     assert not np.array_equal(correct, rejected)
 
 
-def test_partition_distinguishes_boundary_partial_and_invalid_interior():
+def test_partition_distinguishes_boundary_partial_and_complete_run():
     state = np.zeros(20, dtype=bool)
     state[0:3] = True
     state[5:9] = True
     state[12:16] = True
     phase = np.arange(20, dtype=np.float64)
-    phase[12:16] = 7.0
     result = _partition_true_runs(state, phase, 0, 19)
-    assert result["complete"] == [(5, 9)]
+    assert result["complete"] == [(5, 9), (12, 16)]
     assert result["boundary_partials"] == [{
         "start_tick": 0, "end_tick_exclusive": 3, "reason": "analysis-window boundary"
     }]
-    assert result["invalid_interior"][0]["reason"] == "nonincreasing phase within run"
+    assert result["invalid_interior"] == []
 
 
 def test_invalid_interior_phase_fails_cycle_gates_closed():
@@ -153,7 +158,8 @@ def test_full_window_phase_check_catches_cross_membership_backjump():
     phase[8:] -= 3.0
     assert _phase_increment_failures(phase, 0, 19)[0]["from_tick"] == 7
     producer = _partition_true_runs(state, phase, 0, 19)
-    assert producer["complete"]
+    assert producer["complete"] == []
+    assert producer["invalid_interior"][0]["from_tick"] == 7
     rows = 25001
     phases = np.repeat(np.arange(rows, dtype=np.float64)[:, None], 6, axis=1)
     phases[8000:, 0] -= 3.0
@@ -164,6 +170,27 @@ def test_full_window_phase_check_catches_cross_membership_backjump():
     ] > 0
 
 
+@pytest.mark.parametrize("bad_tick", [5, 7])
+def test_direct_helpers_reject_transition_plateau_and_between_run_reversal(bad_tick):
+    phase = np.arange(20, dtype=np.float64)
+    state = np.zeros(20, dtype=bool)
+    state[2:5] = True
+    state[7:10] = True
+    phase[bad_tick] = phase[bad_tick - 1]
+    producer = _partition_true_runs(state, phase, 0, 19)
+    assert producer["complete"] == producer["boundary_partials"] == []
+    assert producer["invalid_interior"]
+
+    full_phase = np.arange(25001, dtype=np.float64)
+    full_state = np.zeros(25001, dtype=bool)
+    full_state[6002:6005] = True
+    full_state[6007:6010] = True
+    full_phase[6000:6020] = phase + 6000
+    complete, partial, invalid = _runs(full_state, full_phase)
+    assert complete == partial == []
+    assert invalid
+
+
 def test_bad_increment_in_boundary_partial_is_invalid_not_partial():
     state = np.zeros(20, dtype=bool)
     state[:5] = True
@@ -171,7 +198,7 @@ def test_bad_increment_in_boundary_partial_is_invalid_not_partial():
     phase[3] = phase[2]
     result = _partition_true_runs(state, phase, 0, 19)
     assert result["boundary_partials"] == []
-    assert result["invalid_interior"][0]["invalid_from_tick"] == 2
+    assert result["invalid_interior"][0]["from_tick"] == 2
 
 
 def test_genuinely_increasing_boundary_partial_remains_separate():
@@ -203,7 +230,9 @@ def test_direct_partition_helpers_reject_recovered_reversal():
     padded_state = np.zeros(25001, dtype=bool)
     padded_phase[7000:7008] = phase
     padded_state[7001:7007] = True
-    assert _runs(padded_state, padded_phase)[2] == [(7001, 7007)]
+    complete, partial, invalid = _runs(padded_state, padded_phase)
+    assert complete == partial == []
+    assert invalid
 
 
 def _restoration_arrays():
@@ -275,33 +304,69 @@ def test_restoration_rejection_does_not_mutate_arrays():
     assert all(np.array_equal(values[name], before[name], equal_nan=True) for name in values)
 
 
-@pytest.mark.parametrize("mutation", ["actual", "cache-length", "cache-schema", "controller-length", "controller-digest"])
+def _array_digest():
+    return {"dtype": "<f8", "shape": [3], "finite": True, "sha256": "a" * 64}
+
+
+@pytest.mark.parametrize("mutation", [
+    "actual", "cache-length", "cache-schema", "controller-length", "controller-digest",
+    "paired-null", "paired-object", "paired-nonhex", "paired-uppercase", "paired-bad-dtype",
+    "paired-negative-shape", "paired-nonfinite-flag", "paired-scalar-object",
+])
 def test_restoration_digest_sequences_are_exact_and_horizon_bound(mutation):
-    checkpoint = {"cache": {"qpos": {}, "qvel": {}}}
+    checkpoint = {"cache": {"qpos": _array_digest(), "scalar.time": {"value": 1.0}}}
     expected = {
-        "cache": [{"qpos": {}, "qvel": {}} for _ in range(100)],
+        "cache": [{"qpos": _array_digest(), "scalar.time": {"value": 1.0}} for _ in range(100)],
         "controller_state_sha256": ["a" * 64 for _ in range(100)],
     }
-    actual = {
-        "cache": [{"qpos": {}, "qvel": {}} for _ in range(100)],
-        "controller_state_sha256": ["a" * 64 for _ in range(100)],
-    }
+    actual = copy.deepcopy(expected)
     if mutation == "actual":
         actual["controller_state_sha256"][0] = "b" * 64
     elif mutation == "cache-length":
         expected["cache"].pop()
         actual["cache"].pop()
     elif mutation == "cache-schema":
-        expected["cache"][0].pop("qvel")
-        actual["cache"][0].pop("qvel")
+        expected["cache"][0].pop("qpos")
+        actual["cache"][0].pop("qpos")
     elif mutation == "controller-length":
         expected["controller_state_sha256"].pop()
         actual["controller_state_sha256"].pop()
     elif mutation == "controller-digest":
         expected["controller_state_sha256"][0] = "short"
         actual["controller_state_sha256"][0] = "short"
+    elif mutation == "paired-null":
+        expected["cache"][0]["qpos"] = None
+        actual["cache"][0]["qpos"] = None
+    elif mutation == "paired-object":
+        expected["cache"][0]["qpos"] = {}
+        actual["cache"][0]["qpos"] = {}
+    elif mutation == "paired-nonhex":
+        expected["controller_state_sha256"][0] = "z" * 64
+        actual["controller_state_sha256"][0] = "z" * 64
+    elif mutation == "paired-uppercase":
+        expected["cache"][0]["qpos"]["sha256"] = "A" * 64
+        actual["cache"][0]["qpos"]["sha256"] = "A" * 64
+    elif mutation == "paired-bad-dtype":
+        expected["cache"][0]["qpos"]["dtype"] = "not-a-dtype"
+        actual["cache"][0]["qpos"]["dtype"] = "not-a-dtype"
+    elif mutation == "paired-negative-shape":
+        expected["cache"][0]["qpos"]["shape"] = [-1]
+        actual["cache"][0]["qpos"]["shape"] = [-1]
+    elif mutation == "paired-nonfinite-flag":
+        expected["cache"][0]["qpos"]["finite"] = False
+        actual["cache"][0]["qpos"]["finite"] = False
+    elif mutation == "paired-scalar-object":
+        expected["cache"][0]["scalar.time"] = {"value": {}}
+        actual["cache"][0]["scalar.time"] = {"value": {}}
     with pytest.raises(ValueError):
         _validate_restoration_digest_sequences(expected, actual, checkpoint)
+    if mutation == "actual":
+        _validate_digest_document(expected, checkpoint["cache"], "expected")
+        _validate_digest_document(actual, checkpoint["cache"], "actual")
+        assert expected != actual
+    else:
+        with pytest.raises(ValueError):
+            _validate_digest_document(expected, checkpoint["cache"], "expected")
 
 
 def test_cycle_contract_rejects_shape_and_dtype_mismatch():
@@ -320,10 +385,11 @@ def test_record_validation_test_refuses_duplicate_execution_claim(tmp_path):
     junit.parent.mkdir(parents=True)
     junit.write_text('<testsuite tests="2" failures="0" errors="0" skipped="0"/>')
     (output / "registration.json").write_text("{}")
-    with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value={"validation_source_seal": {"x": "y"}}):
-        record_validation_test(output, ROOT, junit, "pytest focused", invocation=1)
+    registration = {"validation_source_seal": {"x": "y"}, "source_identity_sha256": "a" * 64}
+    with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value=registration):
+        record_validation_test(output, ROOT, junit, "pytest focused", "b" * 64, invocation=1)
         with pytest.raises(ValueError, match="duplicate"):
-            record_validation_test(output, ROOT, junit, "pytest focused", invocation=1)
+            record_validation_test(output, ROOT, junit, "pytest focused", "b" * 64, invocation=1)
 
 
 def test_inventory_requires_exact_regular_sorted_payload(tmp_path):
@@ -341,3 +407,220 @@ def test_inventory_rejects_duplicate_unsorted_and_symlink(tmp_path):
     (tmp_path / "link").symlink_to(tmp_path / "a")
     with pytest.raises(ValueError, match="nonregular"):
         _inventory_payload(tmp_path, ("a", "link"))
+
+
+def _write_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n")
+
+
+def _finalizer_fixture(root):
+    root.mkdir()
+    (root / "sealed-sources").mkdir()
+    (root / "tests").mkdir()
+    source_seal = {"source": {"bytes": 1, "sha256": "1" * 64}}
+    registration = {
+        "source_identity_sha256": "2" * 64,
+        "validation_source_seal": source_seal,
+        "scope_stop": "no walking, held-out, neural, phenotype, ablation, Lab/API/replay, or product admission",
+        "legacy_v1_analysis_sha256": "3" * 64,
+        "limits": {
+            "workers": 1, "wall_seconds": 2700, "peak_rss_bytes": 2147483648,
+            "new_output_scratch_bytes": 104857600, "physics_seconds": 0, "neural_seconds": 0,
+            "network": False, "installs": False, "gpu": False, "remote_operations": False,
+        },
+    }
+    trusted = "4" * 64
+    _write_json(root / "registration.json", {"synthetic": True})
+    chronology = {
+        "schema": "behavior-v12-correction-validation-chronology/v3",
+        "initial": {"completed_trials": 0, "status": "failed before outcome", "cause": "one-column contact schema was not flattened"},
+        "revision_01": {"completed_trials": 16, "status": "partial outcomes observed before interruption"},
+        "revision_02": {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"},
+        "contract_01": {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"},
+        "contract_02": {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"},
+        "contract_02_attempt_01": {
+            "status": "failed focused test invocation preserved under its own registration/source identity",
+            "tests": 76, "passed": 75, "failed": 1, "data_or_gate_inconsistency": False,
+        },
+        "historical_test_claim": {
+            "self_reported_runs": 3, "distinct_retained_execution_receipts": 1,
+            "supported_distinct_run_count": 1, "historical_tiny_physics_seconds_reported": 0.0068,
+            "status": "unsupported as three distinct executions; not reused as v3 evidence",
+        },
+        "blind_preregistration": False,
+        "scientific_admission": False,
+    }
+    _write_json(root / "chronology.json", chronology)
+    for name in ("behavior_v12_correction.py", "verify_behavior_v12_correction.py", "test_behavior_v12_correction.py"):
+        (root / "sealed-sources" / name).write_text("x")
+    resources = {
+        "wall_seconds": 1.0, "user_cpu_seconds": 0.5, "system_cpu_seconds": 0.1,
+        "peak_rss_bytes": 1024, "physics_seconds": 0, "neural_seconds": 0, "workers": 1,
+    }
+    producer_trial = {
+        "eligible_active": True, "zero_control": False, "identity_sha256": "5" * 64,
+        "derived_sha256": "6" * 64, "raw_contact_rows": 1,
+        "active_phase_increments_checked": 114000, "phase_failures": [],
+        "phase_contract": {}, "endpoint_next_cache_rows": 40000,
+        "final_endpoint_policy": "core row 40000 has no next cache row and is explicitly excluded",
+        "stance_slips_checked": 1, "max_endpoint_next_cache_error": 0.0,
+        "max_slip_formula_error": 0.0, "raw_positive_normal_force_closed": True, "gates": {},
+    }
+    producer_trials = {f"trial-{index:02d}": copy.deepcopy(producer_trial) for index in range(32)}
+    for index in range(28, 32):
+        producer_trials[f"trial-{index:02d}"].update(
+            eligible_active=False, zero_control=True, active_phase_increments_checked=0,
+        )
+    producer = {
+        "schema": "behavior-v12-correction-retained-validation/v3", "passed": True,
+        "terminal_state": "completed", "process_exit": 0, "scientific_admission": False,
+        "legacy_v1_status": "rejected", "future_positive_experiments": "require fresh repaired seals",
+        "registration_sha256": trusted, "trusted_registration_sha256": trusted,
+        "source_identity_sha256": registration["source_identity_sha256"],
+        "legacy_analysis_sha256": registration["legacy_v1_analysis_sha256"],
+        "trial_count": 32, "active_trial_count": 28, "zero_control_count": 4,
+        "active_phase_increments_checked": 3192000, "complete_phase_runs_recalculated": 5008,
+        "endpoint_next_cache_rows_checked": 1280000, "final_endpoints_without_next_cache": 32,
+        "stance_slip_formulas_checked": 2768, "raw_contact_rows_closed": 9095759,
+        "index_closure": {"files": 12338, "bytes": 3217398285, "index_sha256": "2feab6649e24a2b8d3dde616cdfd4ef0db13d723bd1b232aa7d631ecb7aeae1f"},
+        "restoration": {"passed": True, "integration_width_from_pinned_model": 752, "native_horizon_ticks": 100},
+        "aggregate_gates": {"active_restoration_raw_join": True}, "trials": producer_trials,
+        "scope": "retained byte/array/contract validation only; no Jacobian or wrench reconstruction",
+        "scope_stop": registration["scope_stop"], "resources": resources,
+    }
+    _write_json(root / "retained-validation.json", producer)
+    verifier_trial = {
+        "eligible_active": True, "zero_control": False, "identity_sha256": "7" * 64,
+        "raw_contact_rows": 1, "active_phase_increments_checked": 114000,
+        "endpoint_next_cache_rows": 40000, "final_endpoint_without_next_cache": 1,
+        "stance_slips_checked": 1, "max_endpoint_next_cache_error": 0.0,
+        "max_slip_formula_error": 0.0, "raw_positive_normal_force_closed": True,
+        "gates": {}, "cycle_status": [],
+    }
+    verifier_trials = {f"trial-{index:02d}": copy.deepcopy(verifier_trial) for index in range(32)}
+    for index in range(28, 32):
+        verifier_trials[f"trial-{index:02d}"].update(
+            eligible_active=False, zero_control=True, active_phase_increments_checked=0,
+        )
+    coverage = {
+        "trials": 32, "active_trials": 28, "zero_controls": 4,
+        "active_phase_increments": 3192000, "complete_phase_runs": 5008,
+        "endpoint_next_cache_rows": 1280000, "final_endpoints_without_next_cache": 32,
+        "stance_slip_formulas": 2768, "raw_positive_normal_force_rows": 9095759,
+    }
+    verifier = {
+        "schema": "behavior-v12-correction-independent-verification/v3", "passed": True,
+        "terminal_state": "completed", "process_exit": 0, "scientific_admission": False,
+        "registration_sha256": trusted, "trusted_registration_sha256": trusted,
+        "source_identity_sha256": registration["source_identity_sha256"],
+        "producer_receipt_sha256": file_sha(root / "retained-validation.json"),
+        "legacy_v1_status": "rejected", "coverage": coverage,
+        "aggregate_gates": producer["aggregate_gates"],
+        "restoration": {"passed": True, "integration_width_from_pinned_model": 752, "ticks_checked": 100},
+        "trials": verifier_trials,
+        "scope": "full retained normal-force/cache/slip/phase/gate validation; no exhaustive Jacobian velocity or six-component wrench reconstruction",
+        "scope_stop": registration["scope_stop"], "resources": resources,
+    }
+    _write_json(root / "independent-verification.json", verifier)
+    for invocation in (1, 2):
+        junit_relative = f"tests/test-invocation-{invocation:02d}.junit.xml"
+        junit = root / junit_relative
+        junit.write_text('<testsuite tests="2" failures="0" errors="0" skipped="0"/>')
+        receipt = {
+            "schema": "behavior-v12-correction-validation-test-run/v3", "invocation": invocation,
+            "status": "passed", "terminal_state": "completed", "process_exit": 0,
+            "command": f"pytest selection {invocation}", "tests": 2, "passed": 2,
+            "failed": 0, "errors": 0, "skipped": 0, "junit": junit_relative,
+            "junit_sha256": file_sha(junit), "registration_sha256": trusted,
+            "trusted_registration_sha256": trusted,
+            "source_identity_sha256": registration["source_identity_sha256"],
+            "executed_source_seal": source_seal, "physics_seconds": 0, "neural_seconds": 0,
+        }
+        _write_json(root / f"tests/test-invocation-{invocation:02d}.json", receipt)
+    for relative in VALIDATION_PAYLOAD:
+        path = root / relative
+        if relative.startswith("attempts/") and not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("preserved")
+    return registration, trusted
+
+
+def test_finalizer_valid_serialized_control_passes(tmp_path):
+    output = tmp_path / "valid"
+    registration, trusted = _finalizer_fixture(output)
+    with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value=registration):
+        result = finalize_validation(output, ROOT, trusted)
+    assert result["payload_files"] == len(VALIDATION_PAYLOAD)
+
+
+@pytest.mark.parametrize("mutation", [
+    "omitted-verifier-identity", "minimal-verifier", "forged-zero-junit", "empty-source-seal",
+    "wrong-registration-digest", "wrong-producer-link", "changed-junit-bytes", "missing-output",
+    "extra-output", "symlink-output",
+])
+def test_finalizer_rejects_serialized_boundary_attacks(tmp_path, mutation):
+    output = tmp_path / mutation
+    registration, trusted = _finalizer_fixture(output)
+    if mutation in {"omitted-verifier-identity", "minimal-verifier", "wrong-producer-link"}:
+        path = output / "independent-verification.json"
+        value = json.loads(path.read_text())
+        if mutation == "omitted-verifier-identity":
+            value.pop("source_identity_sha256")
+        elif mutation == "minimal-verifier":
+            value = {"passed": True, "resources": value["resources"]}
+        else:
+            value["producer_receipt_sha256"] = "0" * 64
+        _write_json(path, value)
+    elif mutation in {"forged-zero-junit", "empty-source-seal", "wrong-registration-digest"}:
+        receipt_path = output / "tests/test-invocation-02.json"
+        receipt = json.loads(receipt_path.read_text())
+        if mutation == "forged-zero-junit":
+            junit = output / receipt["junit"]
+            junit.write_text('<testsuite tests="0" failures="0" errors="0" skipped="0"/>')
+            receipt.update(tests=0, passed=0, junit_sha256=file_sha(junit))
+        elif mutation == "empty-source-seal":
+            receipt["executed_source_seal"] = {}
+        else:
+            receipt["registration_sha256"] = "0" * 64
+        _write_json(receipt_path, receipt)
+    elif mutation == "changed-junit-bytes":
+        (output / "tests/test-invocation-02.junit.xml").write_text(
+            '<testsuite tests="3" failures="0" errors="0" skipped="0"/>'
+        )
+    elif mutation == "missing-output":
+        (output / "sealed-sources/test_behavior_v12_correction.py").unlink()
+    elif mutation == "extra-output":
+        (output / "extra.json").write_text("{}")
+    elif mutation == "symlink-output":
+        target = output / "sealed-sources/test_behavior_v12_correction.py"
+        target.unlink()
+        target.symlink_to(output / "registration.json")
+    with patch("flyarena.experiments.behavior_v12_correction._validate_validation_registration", return_value=registration):
+        with pytest.raises((ValueError, FileNotFoundError)):
+            finalize_validation(output, ROOT, trusted)
+
+
+@pytest.mark.parametrize("mutation", ["policy", "limits", "legacy", "source-set", "output-path"])
+def test_real_registration_rejects_mutation_under_stale_trusted_root(tmp_path, mutation):
+    contract = os.environ.get("FLY_V12_CONTRACT_OUTPUT")
+    trusted = os.environ.get("FLY_V12_TRUSTED_REGISTRATION_SHA256")
+    if not contract or not trusted:
+        pytest.skip("sealed contract environment is required")
+    source = Path(contract) / "registration.json"
+    value = json.loads(source.read_text())
+    if mutation == "policy":
+        value["scientific_admission"] = True
+    elif mutation == "limits":
+        value["limits"]["network"] = True
+    elif mutation == "legacy":
+        value["legacy_v1_registration_sha256"] = "0" * 64
+    elif mutation == "source-set":
+        value["validation_source_seal"].pop(next(iter(value["validation_source_seal"])))
+    else:
+        value["output"] = str(tmp_path / "elsewhere")
+    output = tmp_path / "mutated"
+    output.mkdir()
+    _write_json(output / "registration.json", value)
+    with pytest.raises(ValueError, match="trusted registration digest"):
+        _validate_validation_registration(ROOT, output, trusted)

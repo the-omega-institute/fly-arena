@@ -13,6 +13,7 @@ import hashlib
 import json
 from pathlib import Path
 import resource
+import re
 import shutil
 import stat
 import sys
@@ -44,22 +45,51 @@ IMMUTABLE_SOURCE_HASHES = {
 }
 ORIGINAL_INDEX_SHA256 = "2feab6649e24a2b8d3dde616cdfd4ef0db13d723bd1b232aa7d631ecb7aeae1f"
 ORIGINAL_ARCHIVE_SHA256 = "b9f5921112812e23f7f581bbc24c776178946e9148bba10cba2e2f5830b53bf8"
-VALIDATION_SCHEMA = "behavior-v12-correction-validation/v2"
+VALIDATION_SCHEMA = "behavior-v12-correction-validation/v3"
+VALIDATION_IDENTITY = "contract-02"
+VALIDATION_SOURCE_PATHS = (
+    "src/flyarena/experiments/behavior_v12_correction.py",
+    "src/flyarena/experiments/verify_behavior_v12_correction.py",
+    "tests/test_behavior_v12_correction.py",
+)
+VALIDATION_SNAPSHOT_PATHS = {
+    relative: f"sealed-sources/{Path(relative).name}" for relative in VALIDATION_SOURCE_PATHS
+}
+VALIDATION_TEST_INVOCATIONS = (1, 2)
+EXPECTED_VALIDATION_REPO = Path("/tmp/fly-arena-behavior-v12-boundary").resolve()
+EXPECTED_VALIDATION_OUTPUT = EXPECTED_VALIDATION_REPO / "var/behavior-v12-correction-validation/contract-02"
+EXPECTED_LEGACY_REPO = Path("/tmp/fly-arena-behavior-v12").resolve()
+EXPECTED_LEGACY_ANALYSIS = EXPECTED_LEGACY_REPO / "var/behavior-v12-correction/analysis-01/revision-02"
+FAILED_ATTEMPT_ROOT = Path("/tmp/fly-v12-boundary-scratch/failed-contract-d93334a0")
+FAILED_ATTEMPT_REGISTRATION_SHA256 = "d93334a0a43ddf750a2eb23067208060c6ebe9e85e812124d002707fbc57c35b"
+FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256 = "6bf979a72b72cea811f6f7a543dee373490b657ecb177e34f17e5e0a4df0bfcc"
+FAILED_ATTEMPT_SOURCE_SEAL = {
+    "src/flyarena/experiments/behavior_v12_correction.py": {"bytes": 126599, "sha256": "8e7cb467fa1ee8cb3c38021d964741efda39cc6de5e8566911aaa82e698e7bfb"},
+    "src/flyarena/experiments/verify_behavior_v12_correction.py": {"bytes": 55145, "sha256": "c0d23ebfb25076dfe880de21c7a845a967ceccf2f8e68073fb9767463f99d218"},
+    "tests/test_behavior_v12_correction.py": {"bytes": 28713, "sha256": "4302d44ff84718cfa068fa47592826358fced641dd6e9e285819b05cfcb4e731"},
+}
+PARENT_CONTRACT = {
+    "identity": "contract-01",
+    "status": "rejected",
+    "registration_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/registration.json",
+    "registration_sha256": "f28782de39f2af5d8a3a7b8554948973cddfc52b39a5fb01a44202ac15e8e8d8",
+    "inventory_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/output-inventory.json",
+    "inventory_sha256": "b52f8b8853e71b2098b5157b61eb1f401073eea238493de8b8ca77083df142cc",
+    "source_sha256": {
+        "src/flyarena/experiments/behavior_v12_correction.py": "9bab645ba1575b31b32e15fa023f85ed67fdd2cd11ea0844d9ecaf01e762d269",
+        "src/flyarena/experiments/verify_behavior_v12_correction.py": "fb0e263d6bf98eaed16180c2a5721ce243f4a7b4c1f9d49711a4b15296b66919",
+        "tests/test_behavior_v12_correction.py": "6493bab232f8aac6ab4328c2a91d1280bba7ac2a5ae6b67cbe072d63f9499b89",
+    },
+}
 VALIDATION_PAYLOAD = tuple(sorted((
     "attempts/registration-01.json",
-    "attempts/registration-02.json",
-    "attempts/registration-03.json",
-    "attempts/independent-verification-01.json",
-    "attempts/retained-validation-01.json",
-    "attempts/sealed-sources/behavior_v12_correction.py",
-    "attempts/sealed-sources/test_behavior_v12_correction.py",
-    "attempts/sealed-sources/verify_behavior_v12_correction.py",
-    "attempts/sealed-sources-02/behavior_v12_correction.py",
-    "attempts/sealed-sources-02/test_behavior_v12_correction.py",
-    "attempts/sealed-sources-02/verify_behavior_v12_correction.py",
-    "attempts/sealed-sources-03/behavior_v12_correction.py",
-    "attempts/sealed-sources-03/test_behavior_v12_correction.py",
-    "attempts/sealed-sources-03/verify_behavior_v12_correction.py",
+    "attempts/sealed-sources-01/behavior_v12_correction.py",
+    "attempts/sealed-sources-01/test_behavior_v12_correction.py",
+    "attempts/sealed-sources-01/verify_behavior_v12_correction.py",
+    "attempts/tests/test-invocation-01.json",
+    "attempts/tests/test-invocation-01.junit.xml",
+    "attempts/tests/test-invocation-02.json",
+    "attempts/tests/test-invocation-02.junit.xml",
     "chronology.json",
     "independent-verification.json",
     "registration.json",
@@ -72,10 +102,6 @@ VALIDATION_PAYLOAD = tuple(sorted((
     "tests/test-invocation-01.junit.xml",
     "tests/test-invocation-02.json",
     "tests/test-invocation-02.junit.xml",
-    "tests/test-invocation-03.json",
-    "tests/test-invocation-03.junit.xml",
-    "tests/test-invocation-04.json",
-    "tests/test-invocation-04.junit.xml",
 )))
 RESTORATION_FIELDS = {"integration", "core", "dense", "contacts", "contact_offsets"}
 DERIVED_FIELDS = {
@@ -90,6 +116,25 @@ DERIVED_FIELDS = {
 def _json_sha(value: object) -> str:
     raw = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(raw).hexdigest()
+
+
+def _is_sha256(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _file_record(path: Path) -> dict:
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(f"sealed path is not a regular file: {path}")
+    return {"bytes": path.stat().st_size, "sha256": file_sha(path)}
+
+
+def _validate_file_record(path: Path, record: object, label: str) -> None:
+    if (not isinstance(record, dict) or set(record) != {"bytes", "sha256"}
+            or not isinstance(record["bytes"], int) or isinstance(record["bytes"], bool)
+            or record["bytes"] < 0 or not _is_sha256(record["sha256"])
+            or not path.is_file() or path.is_symlink()
+            or path.stat().st_size != record["bytes"] or file_sha(path) != record["sha256"]):
+        raise ValueError(f"{label} file record mismatch: {path}")
 
 
 def _peak_rss_bytes() -> int:
@@ -386,6 +431,9 @@ def _partition_true_runs(state: np.ndarray, phase: np.ndarray, lo: int, hi: int)
     if (state.ndim != 1 or phase.ndim != 1 or state.shape != phase.shape
             or phase.dtype != np.float64 or lo < 0 or hi >= len(phase) or lo > hi):
         raise ValueError("invalid phase/run inputs")
+    full_window_failures = _phase_increment_failures(phase, lo, hi)
+    if full_window_failures:
+        return {"complete": [], "boundary_partials": [], "invalid_interior": full_window_failures}
     window = np.asarray(state[lo:hi + 1], dtype=bool)
     changes = np.flatnonzero(np.r_[True, window[1:] != window[:-1], True])
     complete, boundary, invalid = [], [], []
@@ -1190,18 +1238,50 @@ def _validate_restoration_arrays(arrays: dict[str, np.ndarray], integration_widt
 
 
 def _validate_restoration_digest_sequences(expected: dict, actual: dict, checkpoint: dict) -> dict:
-    cache_digests = expected.get("cache")
-    controller_digests = expected.get("controller_state_sha256")
-    valid = bool(
-        expected == actual
-        and isinstance(cache_digests, list) and len(cache_digests) == 100
-        and isinstance(controller_digests, list) and len(controller_digests) == 100
-        and all(isinstance(value, dict) and set(value) == set(checkpoint.get("cache", {}))
-                for value in cache_digests)
-        and all(isinstance(value, str) and len(value) == 64 for value in controller_digests)
-    )
-    if not valid:
-        raise ValueError("restoration digest sequence contract mismatch")
+    checkpoint_cache = checkpoint.get("cache")
+    if not isinstance(checkpoint_cache, dict) or not checkpoint_cache:
+        raise ValueError("restoration checkpoint cache schema missing")
+
+    def validate_document(document: object, label: str) -> None:
+        if not isinstance(document, dict) or set(document) != {"cache", "controller_state_sha256"}:
+            raise ValueError(f"{label} restoration digest document schema mismatch")
+        cache = document["cache"]
+        controllers = document["controller_state_sha256"]
+        if (not isinstance(cache, list) or len(cache) != 100
+                or not isinstance(controllers, list) or len(controllers) != 100):
+            raise ValueError(f"{label} restoration digest horizon mismatch")
+        for entry in cache:
+            if not isinstance(entry, dict) or set(entry) != set(checkpoint_cache):
+                raise ValueError(f"{label} restoration cache key mismatch")
+            for name, record in entry.items():
+                checkpoint_record = checkpoint_cache[name]
+                if not isinstance(record, dict) or not isinstance(checkpoint_record, dict):
+                    raise ValueError(f"{label} restoration cache record mismatch: {name}")
+                if set(checkpoint_record) == {"value"}:
+                    value = record.get("value")
+                    if (set(record) != {"value"} or not isinstance(value, (int, float))
+                            or isinstance(value, bool) or not np.isfinite(value)):
+                        raise ValueError(f"{label} restoration scalar digest mismatch: {name}")
+                else:
+                    if set(record) != {"dtype", "shape", "finite", "sha256"}:
+                        raise ValueError(f"{label} restoration array digest keys mismatch: {name}")
+                    shape = record["shape"]
+                    if (not isinstance(record["dtype"], str) or not record["dtype"]
+                            or not isinstance(shape, list)
+                            or any(not isinstance(size, int) or isinstance(size, bool) or size < 0 for size in shape)
+                            or record["finite"] is not True or not _is_sha256(record["sha256"])):
+                        raise ValueError(f"{label} restoration array digest mismatch: {name}")
+                    try:
+                        np.dtype(record["dtype"])
+                    except (TypeError, ValueError) as exc:
+                        raise ValueError(f"{label} restoration dtype mismatch: {name}") from exc
+        if not all(_is_sha256(value) for value in controllers):
+            raise ValueError(f"{label} restoration controller digest mismatch")
+
+    validate_document(expected, "expected")
+    validate_document(actual, "actual")
+    if expected != actual:
+        raise ValueError("restoration expected/actual digest mismatch")
     return {"ticks": 100, "cache_entries": 100, "controller_entries": 100, "expected_actual_exact": True}
 
 
@@ -1506,6 +1586,100 @@ def _validate_legacy_v1_sources(legacy_repo: Path, legacy_analysis: Path) -> dic
     return checked
 
 
+def _failed_attempt_record(output: Path, import_from_scratch: bool = False) -> dict:
+    attempt_root = output / "attempts"
+    if import_from_scratch:
+        if attempt_root.exists():
+            raise FileExistsError(attempt_root)
+        (attempt_root / "sealed-sources-01").mkdir(parents=True)
+        (attempt_root / "tests").mkdir()
+        shutil.copyfile(FAILED_ATTEMPT_ROOT / "registration.json", attempt_root / "registration-01.json")
+        for name in ("behavior_v12_correction.py", "verify_behavior_v12_correction.py", "test_behavior_v12_correction.py"):
+            shutil.copyfile(
+                FAILED_ATTEMPT_ROOT / "sealed-sources" / name,
+                attempt_root / "sealed-sources-01" / name,
+            )
+        for name in ("test-invocation-01.json", "test-invocation-01.junit.xml", "test-invocation-02.junit.xml"):
+            shutil.copyfile(FAILED_ATTEMPT_ROOT / "tests" / name, attempt_root / "tests" / name)
+        failed_junit = attempt_root / "tests/test-invocation-02.junit.xml"
+        total, failures, errors, skipped = _junit_counts(failed_junit)
+        _write_exclusive_json(attempt_root / "tests/test-invocation-02.json", {
+            "schema": "behavior-v12-correction-validation-test-run/v3",
+            "invocation": 2,
+            "status": "failed",
+            "terminal_state": "completed",
+            "process_exit": 1,
+            "command": "python -m pytest tests/test_behavior_v12_correction.py -k 'not paired_capture' --junitxml=contract-02/tests/test-invocation-02.junit.xml",
+            "tests": total,
+            "passed": total - failures - errors - skipped,
+            "failed": failures,
+            "errors": errors,
+            "skipped": skipped,
+            "junit": "tests/test-invocation-02.junit.xml",
+            "junit_sha256": file_sha(failed_junit),
+            "registration_sha256": FAILED_ATTEMPT_REGISTRATION_SHA256,
+            "trusted_registration_sha256": FAILED_ATTEMPT_REGISTRATION_SHA256,
+            "source_identity_sha256": FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256,
+            "executed_source_seal": FAILED_ATTEMPT_SOURCE_SEAL,
+            "physics_seconds": 0,
+            "neural_seconds": 0,
+            "failure": "legacy assertion expected the removed helper-local invalid_from_tick field after full-window mediation",
+        })
+    registration_path = attempt_root / "registration-01.json"
+    if file_sha(registration_path) != FAILED_ATTEMPT_REGISTRATION_SHA256:
+        raise ValueError("preserved failed-attempt registration mismatch")
+    old_registration = json.loads(registration_path.read_text())
+    if (old_registration.get("source_identity_sha256") != FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256
+            or old_registration.get("validation_source_seal") != FAILED_ATTEMPT_SOURCE_SEAL):
+        raise ValueError("preserved failed-attempt source identity mismatch")
+    for relative, record in FAILED_ATTEMPT_SOURCE_SEAL.items():
+        snapshot = attempt_root / "sealed-sources-01" / Path(relative).name
+        _validate_file_record(snapshot, record, "preserved failed-attempt snapshot")
+    passed_receipt = json.loads((attempt_root / "tests/test-invocation-01.json").read_text())
+    failed_receipt = json.loads((attempt_root / "tests/test-invocation-02.json").read_text())
+    expected_common = {
+        "registration_sha256": FAILED_ATTEMPT_REGISTRATION_SHA256,
+        "trusted_registration_sha256": FAILED_ATTEMPT_REGISTRATION_SHA256,
+        "source_identity_sha256": FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256,
+        "executed_source_seal": FAILED_ATTEMPT_SOURCE_SEAL,
+        "physics_seconds": 0,
+        "neural_seconds": 0,
+    }
+    for receipt, invocation, status, exit_code, counts in (
+        (passed_receipt, 1, "passed", 0, (31, 31, 0, 0, 0)),
+        (failed_receipt, 2, "failed", 1, (76, 75, 1, 0, 0)),
+    ):
+        junit = attempt_root / receipt.get("junit", "")
+        if (receipt.get("schema") != "behavior-v12-correction-validation-test-run/v3"
+                or receipt.get("invocation") != invocation or receipt.get("status") != status
+                or receipt.get("terminal_state") != "completed" or receipt.get("process_exit") != exit_code
+                or tuple(receipt.get(key) for key in ("tests", "passed", "failed", "errors", "skipped")) != counts
+                or any(receipt.get(key) != value for key, value in expected_common.items())
+                or not junit.is_file() or receipt.get("junit_sha256") != file_sha(junit)
+                or _junit_counts(junit) != (counts[0], counts[2], counts[3], counts[4])):
+            raise ValueError(f"preserved failed-attempt test receipt mismatch: {invocation}")
+    artifact_paths = (
+        "attempts/registration-01.json",
+        "attempts/sealed-sources-01/behavior_v12_correction.py",
+        "attempts/sealed-sources-01/test_behavior_v12_correction.py",
+        "attempts/sealed-sources-01/verify_behavior_v12_correction.py",
+        "attempts/tests/test-invocation-01.json",
+        "attempts/tests/test-invocation-01.junit.xml",
+        "attempts/tests/test-invocation-02.json",
+        "attempts/tests/test-invocation-02.junit.xml",
+    )
+    return {
+        "status": "preserved failed contract-02 attempt; not current successful evidence",
+        "registration_sha256": FAILED_ATTEMPT_REGISTRATION_SHA256,
+        "source_identity_sha256": FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256,
+        "test_invocations": {
+            "passed": {"invocation": 1, "tests": 31, "passed": 31, "failed": 0, "process_exit": 0},
+            "failed": {"invocation": 2, "tests": 76, "passed": 75, "failed": 1, "process_exit": 1},
+        },
+        "artifacts": {relative: _file_record(output / relative) for relative in artifact_paths},
+    }
+
+
 def register_validation(
     repo: Path,
     output: Path,
@@ -1515,6 +1689,11 @@ def register_validation(
 ) -> dict:
     if output.exists():
         raise FileExistsError(f"exclusive validation output already exists: {output}")
+    if (repo.resolve() != EXPECTED_VALIDATION_REPO
+            or output.resolve() != EXPECTED_VALIDATION_OUTPUT.resolve()
+            or legacy_repo.resolve() != EXPECTED_LEGACY_REPO
+            or legacy_analysis.resolve() != EXPECTED_LEGACY_ANALYSIS):
+        raise ValueError("contract-02 registration locations are fixed")
     expected_sources = {
         (repo / "src/flyarena/experiments/behavior_v12_correction.py").resolve(),
         (repo / "src/flyarena/experiments/verify_behavior_v12_correction.py").resolve(),
@@ -1534,16 +1713,18 @@ def register_validation(
     source_seal, snapshot_seal = {}, {}
     for source in sorted(actual_sources):
         relative = str(source.relative_to(repo))
-        source_seal[relative] = file_sha(source)
+        source_seal[relative] = _file_record(source)
         snapshot = snapshot_dir / source.name
         shutil.copyfile(source, snapshot)
-        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
+        snapshot_seal[str(snapshot.relative_to(output))] = _file_record(snapshot)
+    prior_failed_attempt = _failed_attempt_record(output, import_from_scratch=True)
     registration = {
         "schema": VALIDATION_SCHEMA,
-        "identity": "contract-01",
-        "purpose": "post-outcome retained-data contract repair; no new science or admission",
+        "identity": VALIDATION_IDENTITY,
+        "purpose": "targeted post-outcome boundary correction; retained-data validation only; no new science or admission",
         "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "repo": str(repo.resolve()),
+        "output": str(output.resolve()),
         "legacy_repo": str(legacy_repo.resolve()),
         "legacy_analysis": str(legacy_analysis.resolve()),
         "original_experiment": str(original_root),
@@ -1552,7 +1733,10 @@ def register_validation(
         "legacy_v1_source_seal": legacy_v1_sources,
         "validation_source_seal": source_seal,
         "sealed_source_snapshots": snapshot_seal,
+        "source_identity_sha256": _json_sha(source_seal),
         "legacy_input_seal": input_seal,
+        "rejected_parent_contract": PARENT_CONTRACT,
+        "prior_failed_attempt": prior_failed_attempt,
         "eligibility": "registered command common > silence_common_max; zero/silence controls are separate safety/stop controls",
         "active_window": {"ticks_inclusive": list(ANALYSIS_TICKS), "required_increment": "finite and strictly positive"},
         "restoration": {
@@ -1565,8 +1749,10 @@ def register_validation(
         "legacy_status": "rejected; this validation never upgrades v1 for positive admission",
         "future_positive_policy": "fresh preregistration and repaired producer/verifier seals required",
         "scientific_admission": False,
+        "scope_stop": "no walking, held-out, neural, phenotype, ablation, Lab/API/replay, or product admission",
         "payload_allowlist": list(VALIDATION_PAYLOAD),
         "inventory_self_exclusion": "output-inventory.json",
+        "test_plan": {"invocations": list(VALIDATION_TEST_INVOCATIONS), "final_invocation": 2},
         "limits": {
             "workers": 1,
             "wall_seconds": 2700,
@@ -1575,21 +1761,32 @@ def register_validation(
             "physics_seconds": 0,
             "neural_seconds": 0,
             "network": False,
+            "installs": False,
+            "gpu": False,
+            "remote_operations": False,
         },
     }
     _write_exclusive_json(output / "registration.json", registration)
     _write_exclusive_json(output / "chronology.json", {
-        "schema": "behavior-v12-correction-validation-chronology/v2",
+        "schema": "behavior-v12-correction-validation-chronology/v3",
         "initial": {"completed_trials": 0, "status": "failed before outcome", "cause": "one-column contact schema was not flattened"},
         "revision_01": {"completed_trials": 16, "status": "partial outcomes observed before interruption"},
         "revision_02": {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"},
-        "contract_01": {"known_outcomes_before_repair": 32, "status": "post-outcome contract validation"},
+        "contract_01": {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"},
+        "contract_02": {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"},
+        "contract_02_attempt_01": {
+            "status": "failed focused test invocation preserved under its own registration/source identity",
+            "tests": 76,
+            "passed": 75,
+            "failed": 1,
+            "data_or_gate_inconsistency": False,
+        },
         "historical_test_claim": {
             "self_reported_runs": 3,
             "distinct_retained_execution_receipts": 1,
             "supported_distinct_run_count": 1,
             "historical_tiny_physics_seconds_reported": 0.0068,
-            "status": "unsupported as three distinct executions; not reused as v2 evidence",
+            "status": "unsupported as three distinct executions; not reused as v3 evidence",
         },
         "blind_preregistration": False,
         "scientific_admission": False,
@@ -1597,23 +1794,94 @@ def register_validation(
     return registration
 
 
-def _validate_validation_registration(repo: Path, output: Path) -> dict:
-    registration = json.loads((output / "registration.json").read_text())
-    if registration.get("schema") != VALIDATION_SCHEMA or registration.get("identity") != "contract-01":
-        raise ValueError("v2 validation registration required")
-    if registration.get("payload_allowlist") != list(VALIDATION_PAYLOAD):
-        raise ValueError("validation payload allowlist changed")
-    for relative, expected in registration["validation_source_seal"].items():
-        if file_sha(repo / relative) != expected:
-            raise ValueError(f"executed validation source changed: {relative}")
-    for relative, expected in registration["sealed_source_snapshots"].items():
-        if file_sha(output / relative) != expected:
-            raise ValueError(f"sealed validation snapshot changed: {relative}")
-    for record in registration["legacy_input_seal"].values():
-        path = Path(record["path"])
-        if path.stat().st_size != record["bytes"] or file_sha(path) != record["sha256"]:
-            raise ValueError(f"legacy input seal changed: {path}")
-    _validate_legacy_v1_sources(Path(registration["legacy_repo"]), Path(registration["legacy_analysis"]))
+def _validate_validation_registration(
+    repo: Path, output: Path, trusted_registration_sha256: str,
+) -> dict:
+    registration_path = output / "registration.json"
+    if not _is_sha256(trusted_registration_sha256):
+        raise ValueError("caller must supply a lowercase hexadecimal trusted registration digest")
+    if file_sha(registration_path) != trusted_registration_sha256:
+        raise ValueError("trusted registration digest mismatch")
+    registration = json.loads(registration_path.read_text())
+    required_keys = {
+        "schema", "identity", "purpose", "registered_utc", "repo", "output", "legacy_repo",
+        "legacy_analysis", "original_experiment", "legacy_v1_registration_sha256",
+        "legacy_v1_analysis_sha256", "legacy_v1_source_seal", "validation_source_seal",
+        "sealed_source_snapshots", "source_identity_sha256", "legacy_input_seal",
+        "rejected_parent_contract", "prior_failed_attempt", "eligibility", "active_window", "restoration", "legacy_status",
+        "future_positive_policy", "scientific_admission", "scope_stop", "payload_allowlist",
+        "inventory_self_exclusion", "test_plan", "limits",
+    }
+    if set(registration) != required_keys:
+        raise ValueError("v3 validation registration field set mismatch")
+    if (registration["schema"] != VALIDATION_SCHEMA or registration["identity"] != VALIDATION_IDENTITY
+            or registration["purpose"] != "targeted post-outcome boundary correction; retained-data validation only; no new science or admission"
+            or not isinstance(registration["registered_utc"], str)
+            or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", registration["registered_utc"]) is None
+            or repo.resolve() != EXPECTED_VALIDATION_REPO
+            or output.resolve() != EXPECTED_VALIDATION_OUTPUT.resolve()
+            or registration["repo"] != str(EXPECTED_VALIDATION_REPO)
+            or registration["output"] != str(EXPECTED_VALIDATION_OUTPUT.resolve())):
+        raise ValueError("v3 validation identity or location mismatch")
+    if (registration["eligibility"] != "registered command common > silence_common_max; zero/silence controls are separate safety/stop controls"
+            or registration["active_window"] != {"ticks_inclusive": list(ANALYSIS_TICKS), "required_increment": "finite and strictly positive"}
+            or registration["restoration"] != {"fields": sorted(RESTORATION_FIELDS), "ticks_inclusive": [10001, 10100], "ticks": 100, "seconds": 100 * DT, "integration_width": 752}
+            or registration["legacy_status"] != "rejected; this validation never upgrades v1 for positive admission"
+            or registration["future_positive_policy"] != "fresh preregistration and repaired producer/verifier seals required"
+            or registration["scientific_admission"] is not False
+            or registration["scope_stop"] != "no walking, held-out, neural, phenotype, ablation, Lab/API/replay, or product admission"):
+        raise ValueError("v3 validation policy changed")
+    limits = {
+        "workers": 1, "wall_seconds": 2700, "peak_rss_bytes": 2147483648,
+        "new_output_scratch_bytes": 104857600, "physics_seconds": 0, "neural_seconds": 0,
+        "network": False, "installs": False, "gpu": False, "remote_operations": False,
+    }
+    if (registration["payload_allowlist"] != list(VALIDATION_PAYLOAD)
+            or registration["inventory_self_exclusion"] != "output-inventory.json"
+            or registration["test_plan"] != {"invocations": [1, 2], "final_invocation": 2}
+            or registration["limits"] != limits):
+        raise ValueError("v3 validation closure or limits changed")
+    if set(registration["validation_source_seal"]) != set(VALIDATION_SOURCE_PATHS):
+        raise ValueError("v3 validation source set mismatch")
+    if set(registration["sealed_source_snapshots"]) != set(VALIDATION_SNAPSHOT_PATHS.values()):
+        raise ValueError("v3 validation snapshot set mismatch")
+    for relative in VALIDATION_SOURCE_PATHS:
+        source_record = registration["validation_source_seal"][relative]
+        snapshot_relative = VALIDATION_SNAPSHOT_PATHS[relative]
+        snapshot_record = registration["sealed_source_snapshots"][snapshot_relative]
+        _validate_file_record(repo / relative, source_record, "executed source")
+        _validate_file_record(output / snapshot_relative, snapshot_record, "source snapshot")
+        if source_record != snapshot_record:
+            raise ValueError(f"source/snapshot byte identity mismatch: {relative}")
+    if (registration["source_identity_sha256"] != _json_sha(registration["validation_source_seal"])
+            or not _is_sha256(registration["source_identity_sha256"])):
+        raise ValueError("v3 source identity mismatch")
+    legacy_repo = Path(registration["legacy_repo"])
+    legacy_analysis = Path(registration["legacy_analysis"])
+    legacy_registration = json.loads((legacy_analysis / "registration.json").read_text())
+    original_root = Path(legacy_registration["original_experiment"]).resolve()
+    if (legacy_repo.resolve() != EXPECTED_LEGACY_REPO
+            or legacy_analysis.resolve() != EXPECTED_LEGACY_ANALYSIS
+            or registration["legacy_repo"] != str(EXPECTED_LEGACY_REPO)
+            or registration["legacy_analysis"] != str(EXPECTED_LEGACY_ANALYSIS)
+            or registration["original_experiment"] != str(original_root)
+            or registration["legacy_v1_registration_sha256"] != file_sha(legacy_analysis / "registration.json")
+            or registration["legacy_v1_analysis_sha256"] != file_sha(legacy_analysis / "analysis.json")
+            or registration["legacy_v1_source_seal"] != _validate_legacy_v1_sources(legacy_repo, legacy_analysis)
+            or registration["legacy_input_seal"] != _legacy_input_seal(legacy_analysis, original_root)):
+        raise ValueError("registered legacy identity changed")
+    if registration["rejected_parent_contract"] != PARENT_CONTRACT:
+        raise ValueError("rejected parent contract identity changed")
+    if registration["prior_failed_attempt"] != _failed_attempt_record(output):
+        raise ValueError("preserved failed-attempt identity changed")
+    for kind in ("registration", "inventory"):
+        path = Path(PARENT_CONTRACT[f"{kind}_path"])
+        if not path.is_file() or file_sha(path) != PARENT_CONTRACT[f"{kind}_sha256"]:
+            raise ValueError(f"rejected parent {kind} identity changed")
+    parent_repo = Path("/tmp/fly-arena-behavior-v12-validation")
+    for relative, expected in PARENT_CONTRACT["source_sha256"].items():
+        if file_sha(parent_repo / relative) != expected:
+            raise ValueError(f"rejected parent source identity changed: {relative}")
     return registration
 
 
@@ -1676,10 +1944,10 @@ def _reported_slip_checks(reported: dict, derived: dict[str, np.ndarray]) -> tup
     return checked, maximum
 
 
-def validate_retained(repo: Path, output: Path) -> dict:
+def validate_retained(repo: Path, output: Path, trusted_registration_sha256: str) -> dict:
     started = time.monotonic()
     usage_start = resource.getrusage(resource.RUSAGE_SELF)
-    registration = _validate_validation_registration(repo, output)
+    registration = _validate_validation_registration(repo, output, trusted_registration_sha256)
     if (output / "retained-validation.json").exists():
         raise FileExistsError(output / "retained-validation.json")
     legacy_repo = Path(registration["legacy_repo"])
@@ -1827,12 +2095,16 @@ def validate_retained(repo: Path, output: Path) -> dict:
     if aggregate != legacy["aggregate_gates"]:
         raise ValueError("legacy aggregate decision mismatch")
     result = {
-        "schema": "behavior-v12-correction-retained-validation/v2",
+        "schema": "behavior-v12-correction-retained-validation/v3",
         "passed": True,
+        "terminal_state": "completed",
+        "process_exit": 0,
         "scientific_admission": False,
         "legacy_v1_status": "rejected",
         "future_positive_experiments": "require fresh repaired seals",
-        "registration_sha256": file_sha(output / "registration.json"),
+        "registration_sha256": trusted_registration_sha256,
+        "trusted_registration_sha256": trusted_registration_sha256,
+        "source_identity_sha256": registration["source_identity_sha256"],
         "legacy_analysis_sha256": file_sha(legacy_analysis / "analysis.json"),
         "trial_count": len(receipts),
         "active_trial_count": active_trials,
@@ -1874,179 +2146,16 @@ def _junit_counts(junit: Path) -> tuple[int, int, int, int]:
     )
 
 
-def repair_validation_registration(repo: Path, output: Path, failed_command: str) -> dict:
-    old_registration_path = output / "registration.json"
-    old_registration = json.loads(old_registration_path.read_text())
-    failed_junit = output / "tests/test-invocation-01.junit.xml"
-    failed_receipt = output / "tests/test-invocation-01.json"
-    attempt_root = output / "attempts"
-    if (old_registration.get("schema") != VALIDATION_SCHEMA or not failed_junit.is_file()
-            or failed_receipt.exists() or attempt_root.exists()):
-        raise ValueError("validation repair requires exactly one unrecorded failed first invocation")
-    total, failures, errors, skipped = _junit_counts(failed_junit)
-    if total <= 0 or failures + errors <= 0:
-        raise ValueError("first invocation is not a retained failure")
-    attempt_sources = attempt_root / "sealed-sources"
-    attempt_sources.mkdir(parents=True)
-    shutil.copyfile(old_registration_path, attempt_root / "registration-01.json")
-    for relative in old_registration["sealed_source_snapshots"]:
-        source = output / relative
-        shutil.copyfile(source, attempt_sources / source.name)
-    _write_exclusive_json(failed_receipt, {
-        "schema": "behavior-v12-correction-validation-test-run/v2",
-        "invocation": 1,
-        "status": "failed",
-        "command": failed_command,
-        "tests": total,
-        "passed": total - failures - errors - skipped,
-        "failed": failures + errors,
-        "skipped": skipped,
-        "junit": str(failed_junit.relative_to(output)),
-        "junit_sha256": file_sha(failed_junit),
-        "registration_sha256": file_sha(attempt_root / "registration-01.json"),
-        "executed_source_seal": old_registration["validation_source_seal"],
-        "failure": "focused test harness omitted its synthetic registration file",
-        "physics_seconds": 0,
-        "neural_seconds": 0,
-    })
-    source_paths = [repo / relative for relative in old_registration["validation_source_seal"]]
-    source_seal = {str(path.relative_to(repo)): file_sha(path) for path in source_paths}
-    snapshot_seal = {}
-    for source in source_paths:
-        snapshot = output / "sealed-sources" / source.name
-        shutil.copyfile(source, snapshot)
-        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
-    old_registration.update({
-        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "validation_source_seal": source_seal,
-        "sealed_source_snapshots": snapshot_seal,
-        "payload_allowlist": list(VALIDATION_PAYLOAD),
-        "prior_failed_attempt": {
-            "registration": "attempts/registration-01.json",
-            "junit": "tests/test-invocation-01.junit.xml",
-            "receipt": "tests/test-invocation-01.json",
-            "status": "preserved failure",
-        },
-    })
-    write_json(old_registration_path, old_registration)
-    chronology_path = output / "chronology.json"
-    chronology = json.loads(chronology_path.read_text())
-    chronology["validation_test_attempt_01"] = {
-        "status": "failed",
-        "tests": total,
-        "passed": total - failures - errors - skipped,
-        "failed": failures + errors,
-        "cause": "test harness fixture omitted synthetic registration file",
-        "production_contract_failure": False,
-        "preserved": True,
-    }
-    write_json(chronology_path, chronology)
-    return old_registration
-
-
-def reseal_after_validation_failure(repo: Path, output: Path) -> dict:
-    registration_path = output / "registration.json"
-    registration = json.loads(registration_path.read_text())
-    attempt_registration = output / "attempts/registration-02.json"
-    attempt_sources = output / "attempts/sealed-sources-02"
-    invocation_two = json.loads((output / "tests/test-invocation-02.json").read_text())
-    if (registration.get("schema") != VALIDATION_SCHEMA or invocation_two.get("failed") != 0
-            or (output / "retained-validation.json").exists() or attempt_registration.exists()
-            or attempt_sources.exists()):
-        raise ValueError("validation-failure reseal preconditions are not met")
-    shutil.copyfile(registration_path, attempt_registration)
-    attempt_sources.mkdir()
-    for relative in registration["sealed_source_snapshots"]:
-        source = output / relative
-        shutil.copyfile(source, attempt_sources / source.name)
-    source_paths = [repo / relative for relative in registration["validation_source_seal"]]
-    source_seal = {str(path.relative_to(repo)): file_sha(path) for path in source_paths}
-    snapshot_seal = {}
-    for source in source_paths:
-        snapshot = output / "sealed-sources" / source.name
-        shutil.copyfile(source, snapshot)
-        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
-    registration.update({
-        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "validation_source_seal": source_seal,
-        "sealed_source_snapshots": snapshot_seal,
-        "payload_allowlist": list(VALIDATION_PAYLOAD),
-        "prior_validation_failure": {
-            "registration": "attempts/registration-02.json",
-            "status": "preserved in chronology; no producer validation receipt was written",
-            "failure": "historical per-tick digest sequences were incorrectly compared to the single pre-continuation checkpoint digest",
-        },
-    })
-    write_json(registration_path, registration)
-    chronology_path = output / "chronology.json"
-    chronology = json.loads(chronology_path.read_text())
-    chronology["retained_validation_attempt_01"] = {
-        "status": "failed before receipt",
-        "failure": "digest schema interpretation compared 100 post-tick digests with one tick-10000 checkpoint digest",
-        "actual_historical_schema": "100 expected/actual cache and controller digest entries for ticks 10001..10100",
-        "rule_after_correction": "expected and actual sequences must be exact, length 100, and schema-bound to the checkpoint cache keys",
-        "data_or_gate_inconsistency": False,
-        "preserved": True,
-    }
-    write_json(chronology_path, chronology)
-    return registration
-
-
-def reseal_after_verifier_cli_failure(repo: Path, output: Path) -> dict:
-    registration_path = output / "registration.json"
-    registration = json.loads(registration_path.read_text())
-    attempt_registration = output / "attempts/registration-03.json"
-    attempt_sources = output / "attempts/sealed-sources-03"
-    retained = output / "retained-validation.json"
-    independent = output / "independent-verification.json"
-    if (registration.get("schema") != VALIDATION_SCHEMA or not retained.is_file() or not independent.is_file()
-            or attempt_registration.exists() or attempt_sources.exists()):
-        raise ValueError("verifier CLI failure reseal preconditions are not met")
-    if (json.loads(retained.read_text()).get("passed") is not True
-            or json.loads(independent.read_text()).get("passed") is not True):
-        raise ValueError("failed verifier attempt did not complete internal checks")
-    shutil.copyfile(registration_path, attempt_registration)
-    attempt_sources.mkdir()
-    for relative in registration["sealed_source_snapshots"]:
-        source = output / relative
-        shutil.copyfile(source, attempt_sources / source.name)
-    retained.replace(output / "attempts/retained-validation-01.json")
-    independent.replace(output / "attempts/independent-verification-01.json")
-    source_paths = [repo / relative for relative in registration["validation_source_seal"]]
-    source_seal = {str(path.relative_to(repo)): file_sha(path) for path in source_paths}
-    snapshot_seal = {}
-    for source in source_paths:
-        snapshot = output / "sealed-sources" / source.name
-        shutil.copyfile(source, snapshot)
-        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
-    registration.update({
-        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "validation_source_seal": source_seal,
-        "sealed_source_snapshots": snapshot_seal,
-        "payload_allowlist": list(VALIDATION_PAYLOAD),
-        "prior_verifier_cli_failure": {
-            "registration": "attempts/registration-03.json",
-            "producer_receipt": "attempts/retained-validation-01.json",
-            "independent_receipt": "attempts/independent-verification-01.json",
-            "status": "internal checks passed but process exit was nonzero; receipts not terminal evidence",
-        },
-    })
-    write_json(registration_path, registration)
-    chronology_path = output / "chronology.json"
-    chronology = json.loads(chronology_path.read_text())
-    chronology["independent_validation_attempt_01"] = {
-        "status": "internal validation passed; CLI exited nonzero",
-        "failure": "v2 summary accessed the legacy v1 trial_count field instead of coverage.trials",
-        "data_or_gate_inconsistency": False,
-        "receipts_preserved_but_not_terminal": True,
-    }
-    write_json(chronology_path, chronology)
-    return registration
-
-
-def record_validation_test(output: Path, repo: Path, junit: Path, command: str, invocation: int = 4) -> dict:
-    registration = _validate_validation_registration(repo, output)
-    if invocation not in (1, 2, 3, 4):
+def record_validation_test(
+    output: Path,
+    repo: Path,
+    junit: Path,
+    command: str,
+    trusted_registration_sha256: str,
+    invocation: int = 2,
+) -> dict:
+    registration = _validate_validation_registration(repo, output, trusted_registration_sha256)
+    if invocation not in VALIDATION_TEST_INVOCATIONS:
         raise ValueError("unsupported validation test invocation")
     target = output / f"tests/test-invocation-{invocation:02d}.json"
     expected_junit = output / f"tests/test-invocation-{invocation:02d}.junit.xml"
@@ -2056,17 +2165,22 @@ def record_validation_test(output: Path, repo: Path, junit: Path, command: str, 
     if total <= 0 or failures or errors:
         raise ValueError("validation tests did not pass")
     result = {
-        "schema": "behavior-v12-correction-validation-test-run/v2",
+        "schema": "behavior-v12-correction-validation-test-run/v3",
         "invocation": invocation,
         "status": "passed",
+        "terminal_state": "completed",
+        "process_exit": 0,
         "command": command,
         "tests": total,
         "passed": total - failures - errors - skipped,
-        "failed": failures + errors,
+        "failed": failures,
+        "errors": errors,
         "skipped": skipped,
         "junit": str(junit.relative_to(output)),
         "junit_sha256": file_sha(junit),
-        "registration_sha256": file_sha(output / "registration.json"),
+        "registration_sha256": trusted_registration_sha256,
+        "trusted_registration_sha256": trusted_registration_sha256,
+        "source_identity_sha256": registration["source_identity_sha256"],
         "executed_source_seal": registration["validation_source_seal"],
         "physics_seconds": 0,
         "neural_seconds": 0,
@@ -2097,30 +2211,225 @@ def _inventory_payload(output: Path, expected_paths: tuple[str, ...]) -> dict[st
     }
 
 
-def finalize_validation(output: Path, repo: Path) -> dict:
-    registration = _validate_validation_registration(repo, output)
+def _require_exact_keys(value: object, keys: set[str], label: str) -> dict:
+    if not isinstance(value, dict) or set(value) != keys:
+        raise ValueError(f"{label} field set mismatch")
+    return value
+
+
+def _validate_execution_resources(value: object, limits: dict, label: str) -> None:
+    record = _require_exact_keys(value, {
+        "wall_seconds", "user_cpu_seconds", "system_cpu_seconds", "peak_rss_bytes",
+        "physics_seconds", "neural_seconds", "workers",
+    }, f"{label} resources")
+    for name in ("wall_seconds", "user_cpu_seconds", "system_cpu_seconds"):
+        if (not isinstance(record[name], (int, float)) or isinstance(record[name], bool)
+                or not np.isfinite(record[name]) or record[name] < 0):
+            raise ValueError(f"{label} resource value mismatch: {name}")
+    if (not isinstance(record["peak_rss_bytes"], int) or isinstance(record["peak_rss_bytes"], bool)
+            or record["peak_rss_bytes"] < 0 or record["peak_rss_bytes"] > limits["peak_rss_bytes"]
+            or record["workers"] != 1 or record["physics_seconds"] != 0
+            or record["neural_seconds"] != 0 or record["wall_seconds"] > limits["wall_seconds"]):
+        raise ValueError(f"{label} resources exceed immutable limits")
+
+
+def _expected_retained_coverage() -> dict:
+    return {
+        "trials": 32,
+        "active_trials": 28,
+        "zero_controls": 4,
+        "active_phase_increments": 3192000,
+        "complete_phase_runs": 5008,
+        "endpoint_next_cache_rows": 1280000,
+        "final_endpoints_without_next_cache": 32,
+        "stance_slip_formulas": 2768,
+        "raw_positive_normal_force_rows": 9095759,
+    }
+
+
+def _validate_producer_receipt(output: Path, registration: dict, trusted_digest: str) -> dict:
+    receipt = _require_exact_keys(json.loads((output / "retained-validation.json").read_text()), {
+        "schema", "passed", "terminal_state", "process_exit", "scientific_admission",
+        "legacy_v1_status", "future_positive_experiments", "registration_sha256",
+        "trusted_registration_sha256", "source_identity_sha256", "legacy_analysis_sha256",
+        "trial_count", "active_trial_count", "zero_control_count", "active_phase_increments_checked",
+        "complete_phase_runs_recalculated", "endpoint_next_cache_rows_checked",
+        "final_endpoints_without_next_cache", "stance_slip_formulas_checked", "raw_contact_rows_closed",
+        "index_closure", "restoration", "aggregate_gates", "trials", "scope", "scope_stop", "resources",
+    }, "producer receipt")
+    expected = _expected_retained_coverage()
+    actual = {
+        "trials": receipt["trial_count"], "active_trials": receipt["active_trial_count"],
+        "zero_controls": receipt["zero_control_count"],
+        "active_phase_increments": receipt["active_phase_increments_checked"],
+        "complete_phase_runs": receipt["complete_phase_runs_recalculated"],
+        "endpoint_next_cache_rows": receipt["endpoint_next_cache_rows_checked"],
+        "final_endpoints_without_next_cache": receipt["final_endpoints_without_next_cache"],
+        "stance_slip_formulas": receipt["stance_slip_formulas_checked"],
+        "raw_positive_normal_force_rows": receipt["raw_contact_rows_closed"],
+    }
+    if (receipt["schema"] != "behavior-v12-correction-retained-validation/v3"
+            or receipt["passed"] is not True or receipt["terminal_state"] != "completed"
+            or receipt["process_exit"] != 0 or receipt["scientific_admission"] is not False
+            or receipt["legacy_v1_status"] != "rejected"
+            or receipt["future_positive_experiments"] != "require fresh repaired seals"
+            or receipt["registration_sha256"] != trusted_digest
+            or receipt["trusted_registration_sha256"] != trusted_digest
+            or receipt["source_identity_sha256"] != registration["source_identity_sha256"]
+            or receipt["legacy_analysis_sha256"] != registration["legacy_v1_analysis_sha256"]
+            or actual != expected
+            or receipt["scope"] != "retained byte/array/contract validation only; no Jacobian or wrench reconstruction"
+            or receipt["scope_stop"] != registration["scope_stop"]):
+        raise ValueError("producer receipt identity, scope, or coverage mismatch")
+    if not isinstance(receipt["trials"], dict) or len(receipt["trials"]) != 32:
+        raise ValueError("producer trial coverage mismatch")
+    trial_keys = {
+        "eligible_active", "zero_control", "identity_sha256", "derived_sha256", "raw_contact_rows",
+        "active_phase_increments_checked", "phase_failures", "phase_contract",
+        "endpoint_next_cache_rows", "final_endpoint_policy", "stance_slips_checked",
+        "max_endpoint_next_cache_error", "max_slip_formula_error", "raw_positive_normal_force_closed", "gates",
+    }
+    active = zero = 0
+    for name, trial in receipt["trials"].items():
+        _require_exact_keys(trial, trial_keys, f"producer trial {name}")
+        if (trial["eligible_active"] is not (not trial["zero_control"])
+                or not _is_sha256(trial["identity_sha256"]) or not _is_sha256(trial["derived_sha256"])
+                or trial["phase_failures"] != [] or trial["endpoint_next_cache_rows"] != 40000
+                or trial["final_endpoint_policy"] != "core row 40000 has no next cache row and is explicitly excluded"
+                or trial["raw_positive_normal_force_closed"] is not True):
+            raise ValueError(f"producer trial contract mismatch: {name}")
+        active += int(trial["eligible_active"] is True)
+        zero += int(trial["zero_control"] is True)
+    if (active, zero) != (28, 4):
+        raise ValueError("producer eligible coverage mismatch")
+    if (receipt["index_closure"] != {"files": 12338, "bytes": 3217398285, "index_sha256": ORIGINAL_INDEX_SHA256}
+            or receipt["restoration"].get("passed") is not True
+            or receipt["restoration"].get("integration_width_from_pinned_model") != 752
+            or receipt["restoration"].get("native_horizon_ticks") != 100):
+        raise ValueError("producer retained identity or restoration mismatch")
+    _validate_execution_resources(receipt["resources"], registration["limits"], "producer")
+    return receipt
+
+
+def _validate_independent_receipt(
+    output: Path, registration: dict, trusted_digest: str, producer: dict,
+) -> dict:
+    receipt = _require_exact_keys(json.loads((output / "independent-verification.json").read_text()), {
+        "schema", "passed", "terminal_state", "process_exit", "scientific_admission",
+        "registration_sha256", "trusted_registration_sha256", "source_identity_sha256",
+        "producer_receipt_sha256", "legacy_v1_status", "coverage", "aggregate_gates", "restoration",
+        "trials", "scope", "scope_stop", "resources",
+    }, "independent verifier receipt")
+    if (receipt["schema"] != "behavior-v12-correction-independent-verification/v3"
+            or receipt["passed"] is not True or receipt["terminal_state"] != "completed"
+            or receipt["process_exit"] != 0 or receipt["scientific_admission"] is not False
+            or receipt["registration_sha256"] != trusted_digest
+            or receipt["trusted_registration_sha256"] != trusted_digest
+            or receipt["source_identity_sha256"] != registration["source_identity_sha256"]
+            or receipt["producer_receipt_sha256"] != file_sha(output / "retained-validation.json")
+            or receipt["legacy_v1_status"] != "rejected"
+            or receipt["coverage"] != _expected_retained_coverage()
+            or receipt["aggregate_gates"] != producer["aggregate_gates"]
+            or receipt["scope"] != "full retained normal-force/cache/slip/phase/gate validation; no exhaustive Jacobian velocity or six-component wrench reconstruction"
+            or receipt["scope_stop"] != registration["scope_stop"]):
+        raise ValueError("independent verifier identity, scope, link, or coverage mismatch")
+    if (not isinstance(receipt["trials"], dict) or len(receipt["trials"]) != 32
+            or receipt["restoration"].get("passed") is not True
+            or receipt["restoration"].get("integration_width_from_pinned_model") != 752
+            or receipt["restoration"].get("ticks_checked") != 100):
+        raise ValueError("independent verifier trial/restoration mismatch")
+    trial_keys = {
+        "eligible_active", "zero_control", "identity_sha256", "raw_contact_rows",
+        "active_phase_increments_checked", "endpoint_next_cache_rows", "final_endpoint_without_next_cache",
+        "stance_slips_checked", "max_endpoint_next_cache_error", "max_slip_formula_error",
+        "raw_positive_normal_force_closed", "gates", "cycle_status",
+    }
+    for name, trial in receipt["trials"].items():
+        _require_exact_keys(trial, trial_keys, f"independent trial {name}")
+        if (trial["eligible_active"] is not (not trial["zero_control"])
+                or not _is_sha256(trial["identity_sha256"])
+                or trial["endpoint_next_cache_rows"] != 40000
+                or trial["final_endpoint_without_next_cache"] != 1
+                or trial["raw_positive_normal_force_closed"] is not True):
+            raise ValueError(f"independent trial contract mismatch: {name}")
+    _validate_execution_resources(receipt["resources"], registration["limits"], "independent verifier")
+    return receipt
+
+
+def _validate_test_receipts(output: Path, registration: dict, trusted_digest: str) -> list[dict]:
+    receipts = []
+    commands, junit_paths = set(), set()
+    required = {
+        "schema", "invocation", "status", "terminal_state", "process_exit", "command", "tests",
+        "passed", "failed", "errors", "skipped", "junit", "junit_sha256", "registration_sha256",
+        "trusted_registration_sha256", "source_identity_sha256", "executed_source_seal",
+        "physics_seconds", "neural_seconds",
+    }
+    for invocation in VALIDATION_TEST_INVOCATIONS:
+        receipt = _require_exact_keys(json.loads(
+            (output / f"tests/test-invocation-{invocation:02d}.json").read_text()
+        ), required, f"test invocation {invocation}")
+        expected_junit = f"tests/test-invocation-{invocation:02d}.junit.xml"
+        junit = output / expected_junit
+        counts = _junit_counts(junit)
+        total, failures, errors, skipped = counts
+        if (receipt["schema"] != "behavior-v12-correction-validation-test-run/v3"
+                or receipt["invocation"] != invocation or receipt["status"] != "passed"
+                or receipt["terminal_state"] != "completed" or receipt["process_exit"] != 0
+                or not isinstance(receipt["command"], str) or not receipt["command"]
+                or receipt["tests"] != total or receipt["passed"] != total - failures - errors - skipped
+                or receipt["failed"] != failures or receipt["errors"] != errors or receipt["skipped"] != skipped
+                or total <= 0 or failures or errors or receipt["junit"] != expected_junit
+                or receipt["junit_sha256"] != file_sha(junit)
+                or receipt["registration_sha256"] != trusted_digest
+                or receipt["trusted_registration_sha256"] != trusted_digest
+                or receipt["source_identity_sha256"] != registration["source_identity_sha256"]
+                or receipt["executed_source_seal"] != registration["validation_source_seal"]
+                or receipt["physics_seconds"] != 0 or receipt["neural_seconds"] != 0):
+            raise ValueError(f"test invocation contract mismatch: {invocation}")
+        if receipt["command"] in commands or receipt["junit"] in junit_paths:
+            raise ValueError("test invocation identity is not unique")
+        commands.add(receipt["command"])
+        junit_paths.add(receipt["junit"])
+        receipts.append(receipt)
+    return receipts
+
+
+def finalize_validation(output: Path, repo: Path, trusted_registration_sha256: str) -> dict:
+    registration = _validate_validation_registration(repo, output, trusted_registration_sha256)
     if (output / "resource-receipt.json").exists() or (output / "output-inventory.json").exists():
         raise FileExistsError("validation output is already finalized")
     for required in (
         "retained-validation.json", "independent-verification.json",
-        "tests/test-invocation-01.json", "tests/test-invocation-02.json", "tests/test-invocation-03.json",
-        "tests/test-invocation-04.json",
+        "tests/test-invocation-01.json", "tests/test-invocation-02.json",
     ):
         if not (output / required).is_file():
             raise ValueError(f"missing validation receipt: {required}")
-    retained = json.loads((output / "retained-validation.json").read_text())
-    independent = json.loads((output / "independent-verification.json").read_text())
-    failed_tests = json.loads((output / "tests/test-invocation-01.json").read_text())
-    prior_tests = json.loads((output / "tests/test-invocation-02.json").read_text())
-    prior_tests_two = json.loads((output / "tests/test-invocation-03.json").read_text())
-    tests = json.loads((output / "tests/test-invocation-04.json").read_text())
-    if (retained.get("passed") is not True or independent.get("passed") is not True
-            or failed_tests.get("failed", 0) <= 0 or prior_tests.get("failed") != 0
-            or prior_tests_two.get("failed") != 0 or tests.get("failed") != 0):
-        raise ValueError("validation receipts do not support finalization")
+    chronology = json.loads((output / "chronology.json").read_text())
+    if (not isinstance(chronology, dict)
+            or set(chronology) != {"schema", "initial", "revision_01", "revision_02", "contract_01", "contract_02", "contract_02_attempt_01", "historical_test_claim", "blind_preregistration", "scientific_admission"}
+            or chronology.get("schema") != "behavior-v12-correction-validation-chronology/v3"
+            or chronology.get("initial") != {"completed_trials": 0, "status": "failed before outcome", "cause": "one-column contact schema was not flattened"}
+            or chronology.get("revision_01") != {"completed_trials": 16, "status": "partial outcomes observed before interruption"}
+            or chronology.get("revision_02") != {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"}
+            or chronology.get("contract_01") != {"known_outcomes_before_repair": 32, "status": "rejected; immutable identity retained separately"}
+            or chronology.get("contract_02") != {"known_outcomes_before_repair": 32, "status": "targeted post-outcome boundary correction"}
+            or chronology.get("contract_02_attempt_01") != {"status": "failed focused test invocation preserved under its own registration/source identity", "tests": 76, "passed": 75, "failed": 1, "data_or_gate_inconsistency": False}
+            or chronology.get("historical_test_claim") != {"self_reported_runs": 3, "distinct_retained_execution_receipts": 1, "supported_distinct_run_count": 1, "historical_tiny_physics_seconds_reported": 0.0068, "status": "unsupported as three distinct executions; not reused as v3 evidence"}
+            or chronology.get("blind_preregistration") is not False
+            or chronology.get("scientific_admission") is not False):
+        raise ValueError("validation chronology changed")
+    retained = _validate_producer_receipt(output, registration, trusted_registration_sha256)
+    independent = _validate_independent_receipt(
+        output, registration, trusted_registration_sha256, retained,
+    )
+    tests = _validate_test_receipts(output, registration, trusted_registration_sha256)
     bytes_before_resource = sum(path.stat().st_size for path in output.rglob("*") if path.is_file())
     _write_exclusive_json(output / "resource-receipt.json", {
-        "schema": "behavior-v12-correction-validation-resources/v2",
+        "schema": "behavior-v12-correction-validation-resources/v3",
+        "terminal_state": "completed",
+        "registration_sha256": trusted_registration_sha256,
+        "source_identity_sha256": registration["source_identity_sha256"],
         "measured_new_bytes_before_resource_and_inventory": bytes_before_resource,
         "producer": retained["resources"],
         "independent_verifier": independent["resources"],
@@ -2132,8 +2441,11 @@ def finalize_validation(output: Path, repo: Path) -> dict:
         "validation_test_invocations": {
             "count": 4,
             "failed_preserved": 1,
-            "passed": 3,
-            "final_tests": tests["tests"],
+            "prior_passed_preserved": 1,
+            "current_passed": 2,
+            "final_invocation": 2,
+            "final_tests": tests[-1]["tests"],
+            "failed_attempt_registration_sha256": FAILED_ATTEMPT_REGISTRATION_SHA256,
         },
         "within_limits": bool(
             max(retained["resources"]["peak_rss_bytes"], independent["resources"]["peak_rss_bytes"])
@@ -2143,7 +2455,9 @@ def finalize_validation(output: Path, repo: Path) -> dict:
     })
     payload = _inventory_payload(output, VALIDATION_PAYLOAD)
     inventory = {
-        "schema": "behavior-v12-correction-validation-output-inventory/v2",
+        "schema": "behavior-v12-correction-validation-output-inventory/v3",
+        "registration_sha256": trusted_registration_sha256,
+        "source_identity_sha256": registration["source_identity_sha256"],
         "payload": payload,
         "payload_files": len(payload),
         "payload_bytes": sum(record["bytes"] for record in payload.values()),
@@ -2165,8 +2479,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=(
         "register", "raw-closure", "fixture", "record-tests", "analyze",
-        "register-validation", "repair-validation-registration", "reseal-validation",
-        "reseal-verifier-cli", "validate-retained",
+        "register-validation", "validate-retained",
         "record-validation-test", "finalize-validation",
     ))
     parser.add_argument("--repo", type=Path, required=True)
@@ -2179,7 +2492,8 @@ def main() -> None:
     parser.add_argument("--legacy-repo", type=Path)
     parser.add_argument("--legacy-analysis", type=Path)
     parser.add_argument("--command-text")
-    parser.add_argument("--test-invocation", type=int, default=4)
+    parser.add_argument("--test-invocation", type=int, default=2)
+    parser.add_argument("--trusted-registration-sha256")
     args = parser.parse_args()
     repo = args.repo.resolve()
     output = args.output.resolve()
@@ -2192,24 +2506,21 @@ def main() -> None:
             repo, output, args.legacy_repo.resolve(), args.legacy_analysis.resolve(),
             [path.resolve() for path in args.source],
         )
-    elif args.command == "repair-validation-registration":
-        if not args.command_text:
-            parser.error("--command-text is required")
-        result = repair_validation_registration(repo, output, args.command_text)
-    elif args.command == "reseal-validation":
-        result = reseal_after_validation_failure(repo, output)
-    elif args.command == "reseal-verifier-cli":
-        result = reseal_after_verifier_cli_failure(repo, output)
     elif args.command == "validate-retained":
-        result = validate_retained(repo, output)
+        if args.trusted_registration_sha256 is None:
+            parser.error("--trusted-registration-sha256 is required")
+        result = validate_retained(repo, output, args.trusted_registration_sha256)
     elif args.command == "record-validation-test":
-        if args.junit is None or not args.command_text:
-            parser.error("--junit and --command-text are required")
+        if args.junit is None or not args.command_text or args.trusted_registration_sha256 is None:
+            parser.error("--junit, --command-text, and --trusted-registration-sha256 are required")
         result = record_validation_test(
-            output, repo, args.junit.resolve(), args.command_text, args.test_invocation,
+            output, repo, args.junit.resolve(), args.command_text,
+            args.trusted_registration_sha256, args.test_invocation,
         )
     elif args.command == "finalize-validation":
-        result = finalize_validation(output, repo)
+        if args.trusted_registration_sha256 is None:
+            parser.error("--trusted-registration-sha256 is required")
+        result = finalize_validation(output, repo, args.trusted_registration_sha256)
     elif args.command == "raw-closure":
         validate_registration(repo, output)
         result = verify_evidence_index(repo, output)

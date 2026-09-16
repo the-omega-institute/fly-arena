@@ -6,8 +6,10 @@ import hashlib
 import json
 from pathlib import Path
 import resource
+import re
 import sys
 import time
+import xml.etree.ElementTree as ET
 
 import mujoco as mj
 import numpy as np
@@ -31,7 +33,54 @@ EXPECTED_DERIVED_FIELDS = {
     "interval_force_weighted_pre_tangent",
     "interval_peak_pre_tangent_speed",
 }
-VALIDATION_SCHEMA = "behavior-v12-correction-validation/v2"
+VALIDATION_SCHEMA = "behavior-v12-correction-validation/v3"
+VALIDATION_IDENTITY = "contract-02"
+VALIDATION_SOURCE_PATHS = (
+    "src/flyarena/experiments/behavior_v12_correction.py",
+    "src/flyarena/experiments/verify_behavior_v12_correction.py",
+    "tests/test_behavior_v12_correction.py",
+)
+VALIDATION_SNAPSHOT_PATHS = {
+    relative: f"sealed-sources/{Path(relative).name}" for relative in VALIDATION_SOURCE_PATHS
+}
+EXPECTED_VALIDATION_REPO = Path("/tmp/fly-arena-behavior-v12-boundary").resolve()
+EXPECTED_VALIDATION_OUTPUT = EXPECTED_VALIDATION_REPO / "var/behavior-v12-correction-validation/contract-02"
+EXPECTED_LEGACY_REPO = Path("/tmp/fly-arena-behavior-v12").resolve()
+EXPECTED_LEGACY_ANALYSIS = EXPECTED_LEGACY_REPO / "var/behavior-v12-correction/analysis-01/revision-02"
+FAILED_ATTEMPT_REGISTRATION_SHA256 = "d93334a0a43ddf750a2eb23067208060c6ebe9e85e812124d002707fbc57c35b"
+FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256 = "6bf979a72b72cea811f6f7a543dee373490b657ecb177e34f17e5e0a4df0bfcc"
+FAILED_ATTEMPT_SOURCE_SEAL = {
+    "src/flyarena/experiments/behavior_v12_correction.py": {"bytes": 126599, "sha256": "8e7cb467fa1ee8cb3c38021d964741efda39cc6de5e8566911aaa82e698e7bfb"},
+    "src/flyarena/experiments/verify_behavior_v12_correction.py": {"bytes": 55145, "sha256": "c0d23ebfb25076dfe880de21c7a845a967ceccf2f8e68073fb9767463f99d218"},
+    "tests/test_behavior_v12_correction.py": {"bytes": 28713, "sha256": "4302d44ff84718cfa068fa47592826358fced641dd6e9e285819b05cfcb4e731"},
+}
+VALIDATION_PAYLOAD = sorted((
+    "attempts/registration-01.json",
+    "attempts/sealed-sources-01/behavior_v12_correction.py",
+    "attempts/sealed-sources-01/test_behavior_v12_correction.py",
+    "attempts/sealed-sources-01/verify_behavior_v12_correction.py",
+    "attempts/tests/test-invocation-01.json",
+    "attempts/tests/test-invocation-01.junit.xml",
+    "attempts/tests/test-invocation-02.json",
+    "attempts/tests/test-invocation-02.junit.xml",
+    "chronology.json", "independent-verification.json", "registration.json", "resource-receipt.json",
+    "retained-validation.json", "sealed-sources/behavior_v12_correction.py",
+    "sealed-sources/test_behavior_v12_correction.py", "sealed-sources/verify_behavior_v12_correction.py",
+    "tests/test-invocation-01.json", "tests/test-invocation-01.junit.xml",
+    "tests/test-invocation-02.json", "tests/test-invocation-02.junit.xml",
+))
+PARENT_CONTRACT = {
+    "identity": "contract-01", "status": "rejected",
+    "registration_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/registration.json",
+    "registration_sha256": "f28782de39f2af5d8a3a7b8554948973cddfc52b39a5fb01a44202ac15e8e8d8",
+    "inventory_path": "/tmp/fly-arena-behavior-v12-validation/var/behavior-v12-correction-validation/contract-01/output-inventory.json",
+    "inventory_sha256": "b52f8b8853e71b2098b5157b61eb1f401073eea238493de8b8ca77083df142cc",
+    "source_sha256": {
+        "src/flyarena/experiments/behavior_v12_correction.py": "9bab645ba1575b31b32e15fa023f85ed67fdd2cd11ea0844d9ecaf01e762d269",
+        "src/flyarena/experiments/verify_behavior_v12_correction.py": "fb0e263d6bf98eaed16180c2a5721ce243f4a7b4c1f9d49711a4b15296b66919",
+        "tests/test_behavior_v12_correction.py": "6493bab232f8aac6ab4328c2a91d1280bba7ac2a5ae6b67cbe072d63f9499b89",
+    },
+}
 RESTORATION_FIELDS = {"integration", "core", "dense", "contacts", "contact_offsets"}
 
 
@@ -84,6 +133,10 @@ def _runs(state: np.ndarray, phase: np.ndarray):
     if (state.ndim != 1 or phase.ndim != 1 or state.shape != phase.shape
             or phase.dtype != np.float64 or len(phase) <= hi):
         raise ValueError("invalid independent phase/run input")
+    increments = np.diff(phase[lo:hi + 1])
+    bad = np.flatnonzero(~np.isfinite(increments) | (increments <= 0))
+    if len(bad):
+        return [], [], [(lo + int(index), lo + int(index) + 1) for index in bad]
     window = np.asarray(state[lo:hi + 1], dtype=bool)
     changes = np.flatnonzero(np.r_[True, window[1:] != window[:-1], True])
     complete, partial, invalid = [], [], []
@@ -394,28 +447,229 @@ def _json_sha(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def _validate_v2_registration(repo: Path, output: Path) -> dict:
-    registration = json.loads((output / "registration.json").read_text())
-    if registration.get("schema") != VALIDATION_SCHEMA or registration.get("identity") != "contract-01":
-        raise ValueError("independent verifier requires v2 validation identity")
-    for relative, expected in registration["validation_source_seal"].items():
-        if file_sha(repo / relative) != expected:
-            raise ValueError(f"v2 executed source seal mismatch: {relative}")
-    for relative, expected in registration["sealed_source_snapshots"].items():
-        snapshot = output / relative
-        if not snapshot.is_file() or snapshot.is_symlink() or file_sha(snapshot) != expected:
-            raise ValueError(f"v2 sealed source snapshot mismatch: {relative}")
-    for record in registration["legacy_input_seal"].values():
-        path = Path(record["path"])
-        if (not path.is_file() or path.is_symlink() or path.stat().st_size != record["bytes"]
-                or file_sha(path) != record["sha256"]):
-            raise ValueError(f"v2 legacy input seal mismatch: {path}")
-    legacy_registration = json.loads((Path(registration["legacy_analysis"]) / "registration.json").read_text())
-    if legacy_registration.get("schema") != "behavior-v12-correction-registration/v1":
-        raise ValueError("legacy v1 identity changed")
+def _is_sha256(value: object) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+
+
+def _validate_digest_document(document: object, checkpoint_cache: dict, label: str) -> None:
+    if not isinstance(document, dict) or set(document) != {"cache", "controller_state_sha256"}:
+        raise ValueError(f"independent {label} digest document schema mismatch")
+    cache, controllers = document["cache"], document["controller_state_sha256"]
+    if (not isinstance(cache, list) or len(cache) != 100
+            or not isinstance(controllers, list) or len(controllers) != 100):
+        raise ValueError(f"independent {label} digest horizon mismatch")
+    for entry in cache:
+        if not isinstance(entry, dict) or set(entry) != set(checkpoint_cache):
+            raise ValueError(f"independent {label} cache keys mismatch")
+        for name, record in entry.items():
+            template = checkpoint_cache[name]
+            if not isinstance(record, dict) or not isinstance(template, dict):
+                raise ValueError(f"independent {label} cache record mismatch: {name}")
+            if set(template) == {"value"}:
+                value = record.get("value")
+                if (set(record) != {"value"} or not isinstance(value, (int, float))
+                        or isinstance(value, bool) or not np.isfinite(value)):
+                    raise ValueError(f"independent {label} scalar record mismatch: {name}")
+            else:
+                if set(record) != {"dtype", "shape", "finite", "sha256"}:
+                    raise ValueError(f"independent {label} array record keys mismatch: {name}")
+                shape = record["shape"]
+                if (not isinstance(record["dtype"], str) or not record["dtype"]
+                        or not isinstance(shape, list)
+                        or any(not isinstance(size, int) or isinstance(size, bool) or size < 0 for size in shape)
+                        or record["finite"] is not True or not _is_sha256(record["sha256"])):
+                    raise ValueError(f"independent {label} array record mismatch: {name}")
+                try:
+                    np.dtype(record["dtype"])
+                except (TypeError, ValueError) as exc:
+                    raise ValueError(f"independent {label} dtype mismatch: {name}") from exc
+    if not all(_is_sha256(value) for value in controllers):
+        raise ValueError(f"independent {label} controller digest mismatch")
+
+
+def _independent_file_record(path: Path) -> dict:
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(f"independent sealed path is not regular: {path}")
+    return {"path": str(path.resolve()), "bytes": path.stat().st_size, "sha256": file_sha(path)}
+
+
+def _independent_legacy_input_seal(legacy_analysis: Path, original_root: Path) -> dict:
+    names = (
+        "analysis.json", "independent-verification.json", "preregistration.json", "raw-closure.json",
+        "registration.json", "resource-receipt.json", "test-receipt.json",
+    )
+    restoration = (
+        "actual-digests.json", "actual.npz", "checkpoint.json", "expected-digests.json",
+        "expected.npz", "result.json",
+    )
+    paths = [legacy_analysis / name for name in names]
+    paths += sorted((legacy_analysis / "derived").glob("*"))
+    paths += [original_root.parent / "evidence-index.json"]
+    paths += [original_root / name for name in ("model.mjb", "registration.json", "sources.json")]
+    paths += [original_root / "restoration" / name for name in restoration]
+    return {str(index): _independent_file_record(path) for index, path in enumerate(paths)}
+
+
+def _independent_junit_counts(path: Path) -> tuple[int, int, int, int]:
+    root = ET.parse(path).getroot()
+    suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+    return tuple(sum(int(suite.attrib.get(name, 0)) for suite in suites) for name in (
+        "tests", "failures", "errors", "skipped",
+    ))
+
+
+def _validate_prior_failed_attempt(output: Path, registered: object) -> None:
+    if not isinstance(registered, dict) or set(registered) != {
+        "status", "registration_sha256", "source_identity_sha256", "test_invocations", "artifacts",
+    }:
+        raise ValueError("independent prior failed-attempt record mismatch")
+    if (registered["status"] != "preserved failed contract-02 attempt; not current successful evidence"
+            or registered["registration_sha256"] != FAILED_ATTEMPT_REGISTRATION_SHA256
+            or registered["source_identity_sha256"] != FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256
+            or registered["test_invocations"] != {
+                "passed": {"invocation": 1, "tests": 31, "passed": 31, "failed": 0, "process_exit": 0},
+                "failed": {"invocation": 2, "tests": 76, "passed": 75, "failed": 1, "process_exit": 1},
+            }):
+        raise ValueError("independent prior failed-attempt identity mismatch")
+    expected_paths = {
+        "attempts/registration-01.json",
+        "attempts/sealed-sources-01/behavior_v12_correction.py",
+        "attempts/sealed-sources-01/test_behavior_v12_correction.py",
+        "attempts/sealed-sources-01/verify_behavior_v12_correction.py",
+        "attempts/tests/test-invocation-01.json", "attempts/tests/test-invocation-01.junit.xml",
+        "attempts/tests/test-invocation-02.json", "attempts/tests/test-invocation-02.junit.xml",
+    }
+    if not isinstance(registered["artifacts"], dict) or set(registered["artifacts"]) != expected_paths:
+        raise ValueError("independent prior failed-attempt artifact set mismatch")
+    for relative, record in registered["artifacts"].items():
+        path = output / relative
+        if (not isinstance(record, dict) or set(record) != {"bytes", "sha256"}
+                or not isinstance(record["bytes"], int) or isinstance(record["bytes"], bool)
+                or not _is_sha256(record["sha256"]) or not path.is_file() or path.is_symlink()
+                or path.stat().st_size != record["bytes"] or file_sha(path) != record["sha256"]):
+            raise ValueError(f"independent prior failed-attempt artifact mismatch: {relative}")
+    old_registration_path = output / "attempts/registration-01.json"
+    if file_sha(old_registration_path) != FAILED_ATTEMPT_REGISTRATION_SHA256:
+        raise ValueError("independent prior failed-attempt registration hash mismatch")
+    old_registration = json.loads(old_registration_path.read_text())
+    if (old_registration.get("source_identity_sha256") != FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256
+            or old_registration.get("validation_source_seal") != FAILED_ATTEMPT_SOURCE_SEAL):
+        raise ValueError("independent prior failed-attempt source seal mismatch")
+    for relative, record in FAILED_ATTEMPT_SOURCE_SEAL.items():
+        snapshot = output / "attempts/sealed-sources-01" / Path(relative).name
+        if (snapshot.stat().st_size != record["bytes"] or file_sha(snapshot) != record["sha256"]):
+            raise ValueError(f"independent prior failed-attempt snapshot mismatch: {relative}")
+    for invocation, status, exit_code, counts in (
+        (1, "passed", 0, (31, 31, 0, 0, 0)),
+        (2, "failed", 1, (76, 75, 1, 0, 0)),
+    ):
+        receipt = json.loads((output / f"attempts/tests/test-invocation-{invocation:02d}.json").read_text())
+        junit = output / "attempts" / receipt.get("junit", "")
+        if (receipt.get("schema") != "behavior-v12-correction-validation-test-run/v3"
+                or receipt.get("invocation") != invocation or receipt.get("status") != status
+                or receipt.get("process_exit") != exit_code
+                or tuple(receipt.get(key) for key in ("tests", "passed", "failed", "errors", "skipped")) != counts
+                or receipt.get("registration_sha256") != FAILED_ATTEMPT_REGISTRATION_SHA256
+                or receipt.get("trusted_registration_sha256") != FAILED_ATTEMPT_REGISTRATION_SHA256
+                or receipt.get("source_identity_sha256") != FAILED_ATTEMPT_SOURCE_IDENTITY_SHA256
+                or receipt.get("executed_source_seal") != FAILED_ATTEMPT_SOURCE_SEAL
+                or receipt.get("junit_sha256") != file_sha(junit)
+                or _independent_junit_counts(junit) != (counts[0], counts[2], counts[3], counts[4])):
+            raise ValueError(f"independent prior failed-attempt receipt mismatch: {invocation}")
+
+
+def _validate_v3_registration(repo: Path, output: Path, trusted_registration_sha256: str) -> dict:
+    path = output / "registration.json"
+    if not _is_sha256(trusted_registration_sha256) or file_sha(path) != trusted_registration_sha256:
+        raise ValueError("independent trusted registration digest mismatch")
+    registration = json.loads(path.read_text())
+    required = {
+        "schema", "identity", "purpose", "registered_utc", "repo", "output", "legacy_repo",
+        "legacy_analysis", "original_experiment", "legacy_v1_registration_sha256",
+        "legacy_v1_analysis_sha256", "legacy_v1_source_seal", "validation_source_seal",
+        "sealed_source_snapshots", "source_identity_sha256", "legacy_input_seal",
+        "rejected_parent_contract", "prior_failed_attempt", "eligibility", "active_window", "restoration", "legacy_status",
+        "future_positive_policy", "scientific_admission", "scope_stop", "payload_allowlist",
+        "inventory_self_exclusion", "test_plan", "limits",
+    }
+    if not isinstance(registration, dict) or set(registration) != required:
+        raise ValueError("independent v3 registration field set mismatch")
+    if (registration["schema"] != VALIDATION_SCHEMA or registration["identity"] != VALIDATION_IDENTITY
+            or registration["purpose"] != "targeted post-outcome boundary correction; retained-data validation only; no new science or admission"
+            or not isinstance(registration["registered_utc"], str)
+            or re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", registration["registered_utc"]) is None
+            or repo.resolve() != EXPECTED_VALIDATION_REPO
+            or output.resolve() != EXPECTED_VALIDATION_OUTPUT.resolve()
+            or registration["repo"] != str(EXPECTED_VALIDATION_REPO)
+            or registration["output"] != str(EXPECTED_VALIDATION_OUTPUT.resolve())):
+        raise ValueError("independent v3 identity/location mismatch")
+    exact_limits = {
+        "workers": 1, "wall_seconds": 2700, "peak_rss_bytes": 2147483648,
+        "new_output_scratch_bytes": 104857600, "physics_seconds": 0, "neural_seconds": 0,
+        "network": False, "installs": False, "gpu": False, "remote_operations": False,
+    }
+    if (registration["eligibility"] != "registered command common > silence_common_max; zero/silence controls are separate safety/stop controls"
+            or registration["active_window"] != {"ticks_inclusive": [6000, 25000], "required_increment": "finite and strictly positive"}
+            or registration["restoration"] != {"fields": sorted(RESTORATION_FIELDS), "ticks_inclusive": [10001, 10100], "ticks": 100, "seconds": 0.01, "integration_width": 752}
+            or registration["legacy_status"] != "rejected; this validation never upgrades v1 for positive admission"
+            or registration["future_positive_policy"] != "fresh preregistration and repaired producer/verifier seals required"
+            or registration["scientific_admission"] is not False
+            or registration["scope_stop"] != "no walking, held-out, neural, phenotype, ablation, Lab/API/replay, or product admission"
+            or registration["payload_allowlist"] != VALIDATION_PAYLOAD
+            or registration["inventory_self_exclusion"] != "output-inventory.json"
+            or registration["test_plan"] != {"invocations": [1, 2], "final_invocation": 2}
+            or registration["limits"] != exact_limits):
+        raise ValueError("independent v3 policy/limits mismatch")
+    if (set(registration["validation_source_seal"]) != set(VALIDATION_SOURCE_PATHS)
+            or set(registration["sealed_source_snapshots"]) != set(VALIDATION_SNAPSHOT_PATHS.values())):
+        raise ValueError("independent v3 source/snapshot set mismatch")
+    for relative in VALIDATION_SOURCE_PATHS:
+        source_record = registration["validation_source_seal"][relative]
+        snapshot_relative = VALIDATION_SNAPSHOT_PATHS[relative]
+        snapshot_record = registration["sealed_source_snapshots"][snapshot_relative]
+        for target, record in ((repo / relative, source_record), (output / snapshot_relative, snapshot_record)):
+            if (not isinstance(record, dict) or set(record) != {"bytes", "sha256"}
+                    or not isinstance(record["bytes"], int) or isinstance(record["bytes"], bool)
+                    or record["bytes"] < 0 or not _is_sha256(record["sha256"])
+                    or not target.is_file() or target.is_symlink()
+                    or target.stat().st_size != record["bytes"] or file_sha(target) != record["sha256"]):
+                raise ValueError(f"independent v3 source record mismatch: {target}")
+        if source_record != snapshot_record:
+            raise ValueError(f"independent source/snapshot identity mismatch: {relative}")
+    if registration["source_identity_sha256"] != _json_sha(registration["validation_source_seal"]):
+        raise ValueError("independent v3 source identity mismatch")
+    legacy_repo = Path(registration["legacy_repo"])
+    legacy_analysis = Path(registration["legacy_analysis"])
+    legacy_registration_path = legacy_analysis / "registration.json"
+    legacy_registration = json.loads(legacy_registration_path.read_text())
+    original_root = Path(legacy_registration["original_experiment"]).resolve()
+    if (legacy_registration.get("schema") != "behavior-v12-correction-registration/v1"
+            or legacy_repo.resolve() != EXPECTED_LEGACY_REPO
+            or legacy_analysis.resolve() != EXPECTED_LEGACY_ANALYSIS
+            or registration["legacy_repo"] != str(EXPECTED_LEGACY_REPO)
+            or registration["legacy_analysis"] != str(EXPECTED_LEGACY_ANALYSIS)
+            or registration["original_experiment"] != str(original_root)
+            or registration["legacy_v1_registration_sha256"] != file_sha(legacy_registration_path)
+            or registration["legacy_v1_analysis_sha256"] != file_sha(legacy_analysis / "analysis.json")
+            or registration["legacy_v1_source_seal"] != legacy_registration["computation_source_seal"]
+            or registration["legacy_input_seal"] != _independent_legacy_input_seal(legacy_analysis, original_root)):
+        raise ValueError("independent legacy identity mismatch")
+    if len(legacy_registration["computation_source_seal"]) != 5:
+        raise ValueError("independent legacy source set mismatch")
     for relative, expected in legacy_registration["computation_source_seal"].items():
-        if file_sha(Path(registration["legacy_repo"]) / relative) != expected:
-            raise ValueError(f"legacy v1 source changed: {relative}")
+        if file_sha(legacy_repo / relative) != expected:
+            raise ValueError(f"independent legacy source changed: {relative}")
+    if registration["rejected_parent_contract"] != PARENT_CONTRACT:
+        raise ValueError("independent rejected-parent identity mismatch")
+    _validate_prior_failed_attempt(output, registration["prior_failed_attempt"])
+    for kind in ("registration", "inventory"):
+        parent_path = Path(PARENT_CONTRACT[f"{kind}_path"])
+        if not parent_path.is_file() or file_sha(parent_path) != PARENT_CONTRACT[f"{kind}_sha256"]:
+            raise ValueError(f"independent rejected-parent {kind} mismatch")
+    parent_repo = Path("/tmp/fly-arena-behavior-v12-validation")
+    for relative, expected in PARENT_CONTRACT["source_sha256"].items():
+        if file_sha(parent_repo / relative) != expected:
+            raise ValueError(f"independent rejected-parent source mismatch: {relative}")
     return registration
 
 
@@ -498,14 +752,12 @@ def _verify_restoration_v2(original_root: Path, original_registration: dict) -> 
         raise ValueError("independent expected/actual restoration mismatch")
     expected_digests = json.loads((root / "expected-digests.json").read_text())
     actual_digests = json.loads((root / "actual-digests.json").read_text())
-    cache_digests = expected_digests.get("cache")
-    controller_digests = expected_digests.get("controller_state_sha256")
-    if (expected_digests != actual_digests
-            or not isinstance(cache_digests, list) or len(cache_digests) != 100
-            or not all(isinstance(value, dict) and set(value) == set(checkpoint.get("cache", {}))
-                       for value in cache_digests)
-            or not isinstance(controller_digests, list) or len(controller_digests) != 100
-            or not all(isinstance(value, str) and len(value) == 64 for value in controller_digests)):
+    checkpoint_cache = checkpoint.get("cache")
+    if not isinstance(checkpoint_cache, dict) or not checkpoint_cache:
+        raise ValueError("independent checkpoint cache schema missing")
+    _validate_digest_document(expected_digests, checkpoint_cache, "expected")
+    _validate_digest_document(actual_digests, checkpoint_cache, "actual")
+    if expected_digests != actual_digests:
         raise ValueError("independent restoration digest mismatch")
     trial = original_root / expected_binding["trial"]
     core_ticks, core = _read_stream(trial / "core", _width(CORE), ROWS)
@@ -534,16 +786,43 @@ def _verify_restoration_v2(original_root: Path, original_registration: dict) -> 
     }
 
 
-def verify_retained_v2(repo: Path, output: Path) -> dict:
+def verify_retained_v3(repo: Path, output: Path, trusted_registration_sha256: str) -> dict:
     started = time.monotonic()
     usage_start = resource.getrusage(resource.RUSAGE_SELF)
-    registration = _validate_v2_registration(repo, output)
+    registration = _validate_v3_registration(repo, output, trusted_registration_sha256)
     destination = output / "independent-verification.json"
     if destination.exists():
         raise FileExistsError(destination)
     producer = json.loads((output / "retained-validation.json").read_text())
-    if producer.get("passed") is not True or producer.get("schema") != "behavior-v12-correction-retained-validation/v2":
-        raise ValueError("producer v2 retained receipt missing or invalid")
+    expected_producer_keys = {
+        "schema", "passed", "terminal_state", "process_exit", "scientific_admission",
+        "legacy_v1_status", "future_positive_experiments", "registration_sha256",
+        "trusted_registration_sha256", "source_identity_sha256", "legacy_analysis_sha256",
+        "trial_count", "active_trial_count", "zero_control_count", "active_phase_increments_checked",
+        "complete_phase_runs_recalculated", "endpoint_next_cache_rows_checked",
+        "final_endpoints_without_next_cache", "stance_slip_formulas_checked", "raw_contact_rows_closed",
+        "index_closure", "restoration", "aggregate_gates", "trials", "scope", "scope_stop", "resources",
+    }
+    expected_coverage = {
+        "trial_count": 32, "active_trial_count": 28, "zero_control_count": 4,
+        "active_phase_increments_checked": 3192000, "complete_phase_runs_recalculated": 5008,
+        "endpoint_next_cache_rows_checked": 1280000, "final_endpoints_without_next_cache": 32,
+        "stance_slip_formulas_checked": 2768, "raw_contact_rows_closed": 9095759,
+    }
+    if (not isinstance(producer, dict) or set(producer) != expected_producer_keys
+            or producer["schema"] != "behavior-v12-correction-retained-validation/v3"
+            or producer["passed"] is not True or producer["terminal_state"] != "completed"
+            or producer["process_exit"] != 0 or producer["scientific_admission"] is not False
+            or producer["legacy_v1_status"] != "rejected"
+            or producer["registration_sha256"] != trusted_registration_sha256
+            or producer["trusted_registration_sha256"] != trusted_registration_sha256
+            or producer["source_identity_sha256"] != registration["source_identity_sha256"]
+            or producer["legacy_analysis_sha256"] != registration["legacy_v1_analysis_sha256"]
+            or any(producer[key] != value for key, value in expected_coverage.items())
+            or not isinstance(producer["trials"], dict) or len(producer["trials"]) != 32
+            or producer["scope_stop"] != registration["scope_stop"]
+            or producer["restoration"].get("passed") is not True):
+        raise ValueError("producer v3 retained receipt missing or invalid")
     legacy_analysis = Path(registration["legacy_analysis"])
     original_root = Path(registration["original_experiment"])
     legacy = json.loads((legacy_analysis / "analysis.json").read_text())
@@ -732,10 +1011,14 @@ def verify_retained_v2(repo: Path, output: Path) -> dict:
     if coverage != producer_coverage:
         raise ValueError("independent/producer coverage mismatch")
     result = {
-        "schema": "behavior-v12-correction-independent-verification/v2",
+        "schema": "behavior-v12-correction-independent-verification/v3",
         "passed": True,
+        "terminal_state": "completed",
+        "process_exit": 0,
         "scientific_admission": False,
-        "registration_sha256": file_sha(output / "registration.json"),
+        "registration_sha256": trusted_registration_sha256,
+        "trusted_registration_sha256": trusted_registration_sha256,
+        "source_identity_sha256": registration["source_identity_sha256"],
         "producer_receipt_sha256": file_sha(output / "retained-validation.json"),
         "legacy_v1_status": "rejected",
         "coverage": coverage,
@@ -763,10 +1046,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--validation-v2", action="store_true")
+    parser.add_argument("--validation-v3", action="store_true")
+    parser.add_argument("--trusted-registration-sha256")
     args = parser.parse_args()
-    result = (verify_retained_v2(args.repo.resolve(), args.output.resolve())
-              if args.validation_v2 else verify(args.repo.resolve(), args.output.resolve()))
+    if args.validation_v3 and args.trusted_registration_sha256 is None:
+        parser.error("--trusted-registration-sha256 is required with --validation-v3")
+    result = (verify_retained_v3(
+        args.repo.resolve(), args.output.resolve(), args.trusted_registration_sha256,
+    ) if args.validation_v3 else verify(args.repo.resolve(), args.output.resolve()))
     trial_count = result.get("trial_count", result.get("coverage", {}).get("trials"))
     if not isinstance(trial_count, int):
         raise ValueError("verification result is missing trial coverage")
