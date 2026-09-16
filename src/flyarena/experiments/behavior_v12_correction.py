@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 import resource
 import shutil
+import stat
 import sys
 import time
 import traceback
@@ -43,6 +44,47 @@ IMMUTABLE_SOURCE_HASHES = {
 }
 ORIGINAL_INDEX_SHA256 = "2feab6649e24a2b8d3dde616cdfd4ef0db13d723bd1b232aa7d631ecb7aeae1f"
 ORIGINAL_ARCHIVE_SHA256 = "b9f5921112812e23f7f581bbc24c776178946e9148bba10cba2e2f5830b53bf8"
+VALIDATION_SCHEMA = "behavior-v12-correction-validation/v2"
+VALIDATION_PAYLOAD = tuple(sorted((
+    "attempts/registration-01.json",
+    "attempts/registration-02.json",
+    "attempts/registration-03.json",
+    "attempts/independent-verification-01.json",
+    "attempts/retained-validation-01.json",
+    "attempts/sealed-sources/behavior_v12_correction.py",
+    "attempts/sealed-sources/test_behavior_v12_correction.py",
+    "attempts/sealed-sources/verify_behavior_v12_correction.py",
+    "attempts/sealed-sources-02/behavior_v12_correction.py",
+    "attempts/sealed-sources-02/test_behavior_v12_correction.py",
+    "attempts/sealed-sources-02/verify_behavior_v12_correction.py",
+    "attempts/sealed-sources-03/behavior_v12_correction.py",
+    "attempts/sealed-sources-03/test_behavior_v12_correction.py",
+    "attempts/sealed-sources-03/verify_behavior_v12_correction.py",
+    "chronology.json",
+    "independent-verification.json",
+    "registration.json",
+    "resource-receipt.json",
+    "retained-validation.json",
+    "sealed-sources/behavior_v12_correction.py",
+    "sealed-sources/test_behavior_v12_correction.py",
+    "sealed-sources/verify_behavior_v12_correction.py",
+    "tests/test-invocation-01.json",
+    "tests/test-invocation-01.junit.xml",
+    "tests/test-invocation-02.json",
+    "tests/test-invocation-02.junit.xml",
+    "tests/test-invocation-03.json",
+    "tests/test-invocation-03.junit.xml",
+    "tests/test-invocation-04.json",
+    "tests/test-invocation-04.junit.xml",
+)))
+RESTORATION_FIELDS = {"integration", "core", "dense", "contacts", "contact_offsets"}
+DERIVED_FIELDS = {
+    "ticks", "endpoint_source_core_row", "endpoint_thorax_ap",
+    "endpoint_whole_foot_min_height", "interval_contact_row_tick",
+    "interval_state_start_core_row", "interval_state_end_core_row",
+    "interval_summed_positive_normal", "interval_force_weighted_pre_tangent",
+    "interval_peak_pre_tangent_speed",
+}
 
 
 def _json_sha(value: object) -> str:
@@ -294,8 +336,55 @@ def _read_dense(path: Path, width: int) -> tuple[np.ndarray, np.ndarray, dict]:
     return ticks, values, terminal
 
 
+def _phase_increment_failures(phase: np.ndarray, lo: int, hi: int) -> list[dict]:
+    phase = np.asarray(phase)
+    if phase.ndim != 1 or phase.dtype != np.float64 or lo < 0 or hi >= len(phase) or lo >= hi:
+        raise ValueError("invalid phase window")
+    failures = []
+    for offset in np.flatnonzero(~np.isfinite(np.diff(phase[lo:hi + 1])) | (np.diff(phase[lo:hi + 1]) <= 0)):
+        tick = lo + int(offset)
+        left, right = phase[tick], phase[tick + 1]
+        failures.append({
+            "from_tick": tick,
+            "to_tick": tick + 1,
+            "phase_from": float(left) if np.isfinite(left) else None,
+            "phase_to": float(right) if np.isfinite(right) else None,
+            "reason": "nonfinite phase increment" if not (np.isfinite(left) and np.isfinite(right))
+            else "nonpositive phase increment",
+        })
+    return failures
+
+
+def _phase_window_contract(phases: np.ndarray, active: bool) -> dict:
+    phases = np.asarray(phases)
+    if (phases.ndim != 2 or phases.shape[1] != len(LEGS) or phases.dtype != np.float64
+            or len(phases) <= ANALYSIS_TICKS[1]
+            or not np.isfinite(phases[ANALYSIS_TICKS[0]:ANALYSIS_TICKS[1] + 1]).all()):
+        raise ValueError("invalid phase matrix/grid")
+    if not active:
+        return {
+            "classification": "registered zero/silence control",
+            "strict_increment_rule_applied": False,
+            "increments_checked": 0,
+            "failures": [],
+        }
+    failures = []
+    for leg in range(len(LEGS)):
+        failures.extend({"leg": LEGS[leg], **failure} for failure in _phase_increment_failures(
+            phases[:, leg], *ANALYSIS_TICKS
+        ))
+    return {
+        "classification": "eligible nonzero movement trial",
+        "strict_increment_rule_applied": True,
+        "increments_checked": len(LEGS) * (ANALYSIS_TICKS[1] - ANALYSIS_TICKS[0]),
+        "failures": failures,
+    }
+
+
 def _partition_true_runs(state: np.ndarray, phase: np.ndarray, lo: int, hi: int) -> dict:
-    if state.shape != phase.shape or not np.isfinite(phase[lo:hi + 1]).all():
+    state, phase = np.asarray(state), np.asarray(phase)
+    if (state.ndim != 1 or phase.ndim != 1 or state.shape != phase.shape
+            or phase.dtype != np.float64 or lo < 0 or hi >= len(phase) or lo > hi):
         raise ValueError("invalid phase/run inputs")
     window = np.asarray(state[lo:hi + 1], dtype=bool)
     changes = np.flatnonzero(np.r_[True, window[1:] != window[:-1], True])
@@ -306,16 +395,21 @@ def _partition_true_runs(state: np.ndarray, phase: np.ndarray, lo: int, hi: int)
         start = lo + int(left)
         end = lo + int(right)
         record = {"start_tick": start, "end_tick_exclusive": end}
-        if start == lo or end == hi + 1:
-            record["reason"] = "analysis-window boundary"
-            boundary.append(record)
-        elif phase[end - 1] <= phase[start]:
+        run_phase = phase[start:end]
+        bad = np.flatnonzero(~np.isfinite(np.diff(run_phase)) | (np.diff(run_phase) <= 0))
+        if len(bad):
+            tick = start + int(bad[0])
             record.update(
-                reason="nonincreasing interior phase",
-                phase_start=float(phase[start]),
-                phase_end=float(phase[end - 1]),
+                reason="nonincreasing phase within run",
+                invalid_from_tick=tick,
+                invalid_to_tick=tick + 1,
+                phase_start=float(phase[tick]) if np.isfinite(phase[tick]) else None,
+                phase_end=float(phase[tick + 1]) if np.isfinite(phase[tick + 1]) else None,
             )
             invalid.append(record)
+        elif start == lo or end == hi + 1:
+            record["reason"] = "analysis-window boundary"
+            boundary.append(record)
         else:
             complete.append((start, end))
     return {"complete": complete, "boundary_partials": boundary, "invalid_interior": invalid}
@@ -341,7 +435,19 @@ def _cycle_metrics(
     weighted_pre: np.ndarray,
     peak_pre: np.ndarray,
     periods: dict,
+    strict_active_window: bool = True,
 ) -> dict:
+    expected_shape = (len(phases), len(LEGS))
+    for name, value in {
+        "phases": phases,
+        "ap": ap,
+        "heights": heights,
+        "normal": normal,
+        "weighted_pre": weighted_pre,
+        "peak_pre": peak_pre,
+    }.items():
+        if value.shape != expected_shape or value.dtype != np.float64 or not np.isfinite(value).all():
+            raise ValueError(f"invalid cycle input: {name}")
     swings, stances, partitions = [], [], []
     all_swings = True
     all_stances = True
@@ -349,11 +455,13 @@ def _cycle_metrics(
     for leg, leg_name in enumerate(LEGS):
         start_phase, end_phase = periods[leg_name]
         phase = phases[:, leg]
+        full_window_invalid = _phase_increment_failures(phase, *ANALYSIS_TICKS) if strict_active_window else []
         mod = np.mod(phase, 2 * np.pi)
         commanded_swing = (mod > start_phase) & (mod < end_phase)
         swing_partition = _partition_true_runs(commanded_swing, phase, *ANALYSIS_TICKS)
         stance_partition = _partition_true_runs(~commanded_swing, phase, *ANALYSIS_TICKS)
-        invalid_count = len(swing_partition["invalid_interior"]) + len(stance_partition["invalid_interior"])
+        invalid_count = (len(full_window_invalid) + len(swing_partition["invalid_interior"])
+                         + len(stance_partition["invalid_interior"]))
         invalid_interior_total += invalid_count
         leg_swings = []
         for begin, end in swing_partition["complete"]:
@@ -411,7 +519,7 @@ def _cycle_metrics(
                     )
             all_swings &= passed
             leg_swings.append(record)
-        if not leg_swings or swing_partition["invalid_interior"]:
+        if not leg_swings or swing_partition["invalid_interior"] or full_window_invalid:
             all_swings = False
 
         leg_stances = []
@@ -439,12 +547,13 @@ def _cycle_metrics(
                 "peak_pre_state_contact_tangent_speed_mm_s": float(peak_pre[begin:end, leg].max(initial=0)),
             })
             all_stances &= passed
-        if not leg_stances or stance_partition["invalid_interior"]:
+        if not leg_stances or stance_partition["invalid_interior"] or full_window_invalid:
             all_stances = False
         swings.append(leg_swings)
         stances.append(leg_stances)
         partitions.append({
             "leg": leg_name,
+            "full_active_window_invalid_increments": full_window_invalid,
             "swing_boundary_partials": swing_partition["boundary_partials"],
             "stance_boundary_partials": stance_partition["boundary_partials"],
             "swing_invalid_interior": swing_partition["invalid_interior"],
@@ -455,6 +564,7 @@ def _cycle_metrics(
         "stance_cycles": stances,
         "phase_partitions": partitions,
         "invalid_interior_phase_episodes": invalid_interior_total,
+        "strict_active_window_applied": strict_active_window,
         "recovery_passed": bool(all_swings),
         "support_slip_passed": bool(all_stances),
     }
@@ -711,6 +821,7 @@ def _analyze_trial(
         interval_weighted_pre,
         interval_peak_pre,
         original_registration["controller"]["swing_periods_strict_modulo"],
+        strict_active_window=common > original_registration["controller"]["silence_common_max"],
     )
     position = core[:, cs["thorax_position"]]
     rotation = core[:, cs["thorax_rotation"]].reshape(-1, 3, 3)
@@ -1049,6 +1160,51 @@ def run_native_fixture(repo: Path, output: Path) -> dict:
     return result
 
 
+def _validate_restoration_arrays(arrays: dict[str, np.ndarray], integration_width: int) -> dict:
+    if set(arrays) != RESTORATION_FIELDS:
+        raise ValueError("restoration archive must contain exactly five registered fields")
+    contacts = arrays["contacts"]
+    expected = {
+        "core": ((100, _width(CORE)), np.dtype(np.float64)),
+        "dense": ((100, _width(DENSE)), np.dtype(np.float64)),
+        "integration": ((100, integration_width), np.dtype(np.float64)),
+        "contacts": ((len(contacts), _width(CONTACT)), np.dtype(np.float64)),
+        "contact_offsets": ((101,), np.dtype(np.int64)),
+    }
+    for name, (shape, dtype) in expected.items():
+        value = arrays[name]
+        if value.shape != shape or value.dtype != dtype:
+            raise ValueError(f"invalid restoration {name} shape/dtype")
+        if not np.isfinite(value).all():
+            raise ValueError(f"nonfinite restoration field: {name}")
+    offsets = arrays["contact_offsets"]
+    if (offsets[0] != 0 or offsets[-1] != len(contacts) or np.any(offsets < 0)
+            or np.any(offsets > len(contacts)) or np.any(np.diff(offsets) < 0)):
+        raise ValueError("invalid restoration contact offsets")
+    return {
+        "shapes": {name: list(arrays[name].shape) for name in sorted(arrays)},
+        "dtypes": {name: arrays[name].dtype.str for name in sorted(arrays)},
+        "contact_rows": int(len(contacts)),
+        "legal_repeated_offsets": int(np.count_nonzero(np.diff(offsets) == 0)),
+    }
+
+
+def _validate_restoration_digest_sequences(expected: dict, actual: dict, checkpoint: dict) -> dict:
+    cache_digests = expected.get("cache")
+    controller_digests = expected.get("controller_state_sha256")
+    valid = bool(
+        expected == actual
+        and isinstance(cache_digests, list) and len(cache_digests) == 100
+        and isinstance(controller_digests, list) and len(controller_digests) == 100
+        and all(isinstance(value, dict) and set(value) == set(checkpoint.get("cache", {}))
+                for value in cache_digests)
+        and all(isinstance(value, str) and len(value) == 64 for value in controller_digests)
+    )
+    if not valid:
+        raise ValueError("restoration digest sequence contract mismatch")
+    return {"ticks": 100, "cache_entries": 100, "controller_entries": 100, "expected_actual_exact": True}
+
+
 def verify_restoration_join(original_root: Path, original_registration: dict) -> dict:
     dest = original_root / "restoration"
     result = json.loads((dest / "result.json").read_text())
@@ -1069,6 +1225,16 @@ def verify_restoration_join(original_root: Path, original_registration: dict) ->
     }
     if binding != expected_binding or result["registration_sha256"] != expected_binding["registration_sha256"]:
         raise ValueError("restoration binding mismatch")
+    model = mj.MjModel.from_binary_path(str(original_root / "model.mjb"))
+    integration_width = int(mj.mj_stateSize(model, mj.mjtState.mjSTATE_INTEGRATION))
+    if (integration_width != 752 or checkpoint.get("integration_shape") != [integration_width]
+            or checkpoint.get("integration_dtype") != np.dtype(np.float64).str):
+        raise ValueError("restoration integration checkpoint contract mismatch")
+    if (result.get("ticks") != [10001, 10100]
+            or result.get("additional_physical_seconds") != 100 * DT
+            or result.get("passed") is not True
+            or result.get("corrupted_destination_before_restore") is not True):
+        raise ValueError("restoration result horizon/status mismatch")
     trial = original_root / binding["trial"]
     _, raw_core, _ = _read_dense(trial / "core", _width(CORE))
     _, raw_dense, _ = _read_dense(trial / "dense", _width(DENSE))
@@ -1079,26 +1245,28 @@ def verify_restoration_join(original_root: Path, original_registration: dict) ->
     with np.load(dest / "expected.npz", allow_pickle=False) as expected, np.load(
         dest / "actual.npz", allow_pickle=False
     ) as actual:
-        if set(expected.files) != set(actual.files) or not all(
-            np.array_equal(expected[name], actual[name]) for name in expected.files
-        ):
+        expected_arrays = {name: expected[name] for name in expected.files}
+        actual_arrays = {name: actual[name] for name in actual.files}
+        expected_contract = _validate_restoration_arrays(expected_arrays, integration_width)
+        actual_contract = _validate_restoration_arrays(actual_arrays, integration_width)
+        if not all(np.array_equal(expected_arrays[name], actual_arrays[name]) for name in RESTORATION_FIELDS):
             raise ValueError("expected/actual restoration streams differ")
         ticks = np.arange(10001, 10101, dtype=np.int64)
-        core_join = np.array_equal(expected["core"], raw_core[ticks])
-        dense_join = np.array_equal(expected["dense"], raw_dense[ticks])
+        core_join = np.array_equal(expected_arrays["core"], raw_core[ticks])
+        dense_join = np.array_equal(expected_arrays["dense"], raw_dense[ticks])
         contact_join = True
-        offsets = expected["contact_offsets"]
+        offsets = expected_arrays["contact_offsets"]
         for index, tick in enumerate(ticks):
             retained = raw_contacts[contact_ticks == tick]
-            replayed = expected["contacts"][offsets[index]:offsets[index + 1]]
+            replayed = expected_arrays["contacts"][offsets[index]:offsets[index + 1]]
             contact_join &= np.array_equal(retained, replayed)
-        shapes = {name: list(expected[name].shape) for name in expected.files}
-        dtypes = {name: expected[name].dtype.str for name in expected.files}
-    digest_equal = json.loads((dest / "expected-digests.json").read_text()) == json.loads(
-        (dest / "actual-digests.json").read_text()
-    )
+    expected_digests = json.loads((dest / "expected-digests.json").read_text())
+    actual_digests = json.loads((dest / "actual-digests.json").read_text())
+    digest_equal = expected_digests == actual_digests
+    digest_contract = _validate_restoration_digest_sequences(expected_digests, actual_digests, checkpoint)
+    digest_binding = True
     passed = bool(result["passed"] and result["corrupted_destination_before_restore"]
-                  and core_join and dense_join and contact_join and digest_equal)
+                  and core_join and dense_join and contact_join and digest_equal and digest_binding)
     if not passed:
         raise ValueError("restoration-to-retained-raw join failed")
     return {
@@ -1108,9 +1276,15 @@ def verify_restoration_join(original_root: Path, original_registration: dict) ->
         "raw_core_join": bool(core_join),
         "raw_dense_join": bool(dense_join),
         "raw_contact_join": bool(contact_join),
-        "cache_controller_digest_join": bool(digest_equal),
-        "shapes": shapes,
-        "dtypes": dtypes,
+        "cache_controller_digest_join": bool(digest_equal and digest_binding),
+        "digest_contract": digest_contract,
+        "integration_width_from_pinned_model": integration_width,
+        "native_horizon_ticks": 100,
+        "native_horizon_seconds": 100 * DT,
+        "expected_contract": expected_contract,
+        "actual_contract": actual_contract,
+        "shapes": expected_contract["shapes"],
+        "dtypes": expected_contract["dtypes"],
         "wrong_identity_policy": "exact dict equality; reject before any read-side comparison; verifier never mutates live state",
     }
 
@@ -1293,9 +1467,708 @@ def record_tests(
     return result
 
 
+def _sealed_file(path: Path) -> dict:
+    if not path.is_file() or path.is_symlink():
+        raise ValueError(f"sealed input is not a regular file: {path}")
+    return {"path": str(path.resolve()), "bytes": path.stat().st_size, "sha256": file_sha(path)}
+
+
+def _legacy_input_seal(legacy_analysis: Path, original_root: Path) -> dict[str, dict]:
+    analysis_names = (
+        "analysis.json", "independent-verification.json", "preregistration.json",
+        "raw-closure.json", "registration.json", "resource-receipt.json", "test-receipt.json",
+    )
+    restoration_names = (
+        "actual-digests.json", "actual.npz", "checkpoint.json", "expected-digests.json",
+        "expected.npz", "result.json",
+    )
+    paths = [legacy_analysis / name for name in analysis_names]
+    paths += sorted((legacy_analysis / "derived").glob("*"))
+    paths += [original_root.parent / "evidence-index.json"]
+    paths += [original_root / name for name in ("model.mjb", "registration.json", "sources.json")]
+    paths += [original_root / "restoration" / name for name in restoration_names]
+    return {str(index): _sealed_file(path) for index, path in enumerate(paths)}
+
+
+def _validate_legacy_v1_sources(legacy_repo: Path, legacy_analysis: Path) -> dict:
+    registration_path = legacy_analysis / "registration.json"
+    registration = json.loads(registration_path.read_text())
+    if registration.get("schema") != "behavior-v12-correction-registration/v1":
+        raise ValueError("legacy correction is not the rejected v1 identity")
+    checked = {}
+    for relative, expected in registration.get("computation_source_seal", {}).items():
+        actual = file_sha(legacy_repo / relative)
+        if actual != expected:
+            raise ValueError(f"legacy v1 source seal mismatch: {relative}")
+        checked[relative] = actual
+    if len(checked) != 5:
+        raise ValueError("legacy v1 source seal is incomplete")
+    return checked
+
+
+def register_validation(
+    repo: Path,
+    output: Path,
+    legacy_repo: Path,
+    legacy_analysis: Path,
+    source_paths: list[Path],
+) -> dict:
+    if output.exists():
+        raise FileExistsError(f"exclusive validation output already exists: {output}")
+    expected_sources = {
+        (repo / "src/flyarena/experiments/behavior_v12_correction.py").resolve(),
+        (repo / "src/flyarena/experiments/verify_behavior_v12_correction.py").resolve(),
+        (repo / "tests/test_behavior_v12_correction.py").resolve(),
+    }
+    actual_sources = {path.resolve() for path in source_paths}
+    if actual_sources != expected_sources:
+        raise ValueError("validation source seal must contain exactly producer, verifier, and focused tests")
+    legacy_registration = json.loads((legacy_analysis / "registration.json").read_text())
+    original_root = Path(legacy_registration["original_experiment"]).resolve()
+    legacy_v1_sources = _validate_legacy_v1_sources(legacy_repo, legacy_analysis)
+    input_seal = _legacy_input_seal(legacy_analysis, original_root)
+
+    output.mkdir(parents=True)
+    snapshot_dir = output / "sealed-sources"
+    snapshot_dir.mkdir()
+    source_seal, snapshot_seal = {}, {}
+    for source in sorted(actual_sources):
+        relative = str(source.relative_to(repo))
+        source_seal[relative] = file_sha(source)
+        snapshot = snapshot_dir / source.name
+        shutil.copyfile(source, snapshot)
+        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
+    registration = {
+        "schema": VALIDATION_SCHEMA,
+        "identity": "contract-01",
+        "purpose": "post-outcome retained-data contract repair; no new science or admission",
+        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "repo": str(repo.resolve()),
+        "legacy_repo": str(legacy_repo.resolve()),
+        "legacy_analysis": str(legacy_analysis.resolve()),
+        "original_experiment": str(original_root),
+        "legacy_v1_registration_sha256": file_sha(legacy_analysis / "registration.json"),
+        "legacy_v1_analysis_sha256": file_sha(legacy_analysis / "analysis.json"),
+        "legacy_v1_source_seal": legacy_v1_sources,
+        "validation_source_seal": source_seal,
+        "sealed_source_snapshots": snapshot_seal,
+        "legacy_input_seal": input_seal,
+        "eligibility": "registered command common > silence_common_max; zero/silence controls are separate safety/stop controls",
+        "active_window": {"ticks_inclusive": list(ANALYSIS_TICKS), "required_increment": "finite and strictly positive"},
+        "restoration": {
+            "fields": sorted(RESTORATION_FIELDS),
+            "ticks_inclusive": [10001, 10100],
+            "ticks": 100,
+            "seconds": 100 * DT,
+            "integration_width": 752,
+        },
+        "legacy_status": "rejected; this validation never upgrades v1 for positive admission",
+        "future_positive_policy": "fresh preregistration and repaired producer/verifier seals required",
+        "scientific_admission": False,
+        "payload_allowlist": list(VALIDATION_PAYLOAD),
+        "inventory_self_exclusion": "output-inventory.json",
+        "limits": {
+            "workers": 1,
+            "wall_seconds": 2700,
+            "peak_rss_bytes": 2147483648,
+            "new_output_scratch_bytes": 104857600,
+            "physics_seconds": 0,
+            "neural_seconds": 0,
+            "network": False,
+        },
+    }
+    _write_exclusive_json(output / "registration.json", registration)
+    _write_exclusive_json(output / "chronology.json", {
+        "schema": "behavior-v12-correction-validation-chronology/v2",
+        "initial": {"completed_trials": 0, "status": "failed before outcome", "cause": "one-column contact schema was not flattened"},
+        "revision_01": {"completed_trials": 16, "status": "partial outcomes observed before interruption"},
+        "revision_02": {"completed_trials": 32, "status": "unchanged-seal restart after revision-01 partial outcomes"},
+        "contract_01": {"known_outcomes_before_repair": 32, "status": "post-outcome contract validation"},
+        "historical_test_claim": {
+            "self_reported_runs": 3,
+            "distinct_retained_execution_receipts": 1,
+            "supported_distinct_run_count": 1,
+            "historical_tiny_physics_seconds_reported": 0.0068,
+            "status": "unsupported as three distinct executions; not reused as v2 evidence",
+        },
+        "blind_preregistration": False,
+        "scientific_admission": False,
+    })
+    return registration
+
+
+def _validate_validation_registration(repo: Path, output: Path) -> dict:
+    registration = json.loads((output / "registration.json").read_text())
+    if registration.get("schema") != VALIDATION_SCHEMA or registration.get("identity") != "contract-01":
+        raise ValueError("v2 validation registration required")
+    if registration.get("payload_allowlist") != list(VALIDATION_PAYLOAD):
+        raise ValueError("validation payload allowlist changed")
+    for relative, expected in registration["validation_source_seal"].items():
+        if file_sha(repo / relative) != expected:
+            raise ValueError(f"executed validation source changed: {relative}")
+    for relative, expected in registration["sealed_source_snapshots"].items():
+        if file_sha(output / relative) != expected:
+            raise ValueError(f"sealed validation snapshot changed: {relative}")
+    for record in registration["legacy_input_seal"].values():
+        path = Path(record["path"])
+        if path.stat().st_size != record["bytes"] or file_sha(path) != record["sha256"]:
+            raise ValueError(f"legacy input seal changed: {path}")
+    _validate_legacy_v1_sources(Path(registration["legacy_repo"]), Path(registration["legacy_analysis"]))
+    return registration
+
+
+def _verify_original_index_read_only(legacy_repo: Path, original_root: Path) -> dict:
+    index_path = original_root.parent / "evidence-index.json"
+    if file_sha(index_path) != ORIGINAL_INDEX_SHA256:
+        raise ValueError("original evidence index seal changed")
+    index = json.loads(index_path.read_text())
+    checked_bytes = 0
+    for relative, record in index["files"].items():
+        path = legacy_repo / relative
+        if (not path.is_file() or path.is_symlink() or path.stat().st_size != record["bytes"]
+                or file_sha(path) != record["sha256"]):
+            raise ValueError(f"original indexed file changed: {relative}")
+        checked_bytes += record["bytes"]
+    return {"files": len(index["files"]), "bytes": checked_bytes, "index_sha256": ORIGINAL_INDEX_SHA256}
+
+
+def _load_derived(path: Path) -> dict[str, np.ndarray]:
+    with np.load(path, allow_pickle=False) as archive:
+        if set(archive.files) != DERIVED_FIELDS:
+            raise ValueError("derived retained field set mismatch")
+        values = {name: archive[name] for name in archive.files}
+    index_fields = {
+        "ticks", "endpoint_source_core_row", "interval_contact_row_tick",
+        "interval_state_start_core_row", "interval_state_end_core_row",
+    }
+    for name, value in values.items():
+        shape = (ROWS,) if name in index_fields else (ROWS, 6)
+        dtype = np.dtype(np.int64) if name in index_fields else np.dtype(np.float64)
+        if value.shape != shape or value.dtype != dtype or not np.isfinite(value).all():
+            raise ValueError(f"derived retained contract mismatch: {name}")
+    grid = np.arange(ROWS, dtype=np.int64)
+    if (not np.array_equal(values["ticks"], grid)
+            or not np.array_equal(values["endpoint_source_core_row"], grid)
+            or not np.array_equal(values["interval_contact_row_tick"], grid)
+            or not np.array_equal(values["interval_state_end_core_row"], grid)
+            or not np.array_equal(values["interval_state_start_core_row"], np.r_[-1, grid[:-1]])):
+        raise ValueError("derived retained row binding mismatch")
+    return values
+
+
+def _reported_slip_checks(reported: dict, derived: dict[str, np.ndarray]) -> tuple[int, float]:
+    checked, maximum = 0, 0.0
+    normal = derived["interval_summed_positive_normal"]
+    weighted = derived["interval_force_weighted_pre_tangent"]
+    for leg, records in enumerate(reported["stance_cycles"]):
+        for record in records:
+            begin, end = record["start_tick"], record["end_tick_exclusive"]
+            loaded = normal[begin:end, leg] > 0
+            ratio = np.divide(
+                weighted[begin:end, leg], normal[begin:end, leg],
+                out=np.zeros(end - begin, dtype=np.float64), where=loaded,
+            )
+            actual = float(DT * ratio.sum())
+            maximum = max(maximum, abs(actual - record["slip_mm"]))
+            if actual != record["slip_mm"]:
+                raise ValueError("reported stance slip formula mismatch")
+            checked += 1
+    return checked, maximum
+
+
+def validate_retained(repo: Path, output: Path) -> dict:
+    started = time.monotonic()
+    usage_start = resource.getrusage(resource.RUSAGE_SELF)
+    registration = _validate_validation_registration(repo, output)
+    if (output / "retained-validation.json").exists():
+        raise FileExistsError(output / "retained-validation.json")
+    legacy_repo = Path(registration["legacy_repo"])
+    legacy_analysis = Path(registration["legacy_analysis"])
+    original_root = Path(registration["original_experiment"])
+    legacy = json.loads((legacy_analysis / "analysis.json").read_text())
+    original_registration = json.loads((original_root / "registration.json").read_text())
+    if legacy.get("status") != "complete" or legacy.get("scientific_admission") is not False:
+        raise ValueError("legacy analysis status/scope changed")
+    expected_trials = _expected_trials(original_registration)
+    if set(legacy["trials"]) != set(expected_trials) or len(legacy["trials"]) != 32:
+        raise ValueError("retained panel identity mismatch")
+    index_closure = _verify_original_index_read_only(legacy_repo, original_root)
+    cs, ds, es = _slices(CORE), _slices(DENSE), _slices(CONTACT)
+    foot = np.asarray(original_registration["measurement"]["foot_geom_ids"], dtype=np.int64)
+    leg_by_geom = {int(geom): index // 5 for index, geom in enumerate(foot)}
+    pinned_model = mj.MjModel.from_binary_path(str(original_root / "model.mjb"))
+    ground = int(mj.mj_name2id(pinned_model, mj.mjtObj.mjOBJ_GEOM, "ground_plane"))
+    receipts = {}
+    total_contacts = total_endpoints = total_slips = total_phase_increments = 0
+    active_trials = zero_controls = complete_runs = 0
+    for name, reported in sorted(legacy["trials"].items()):
+        expected = expected_trials[name]
+        trial = original_root / "development" / name
+        identity = _validate_trial_identity(original_root, trial, original_registration, expected)
+        ticks, core, _ = _read_dense(trial / "core", _width(CORE))
+        dense_ticks, dense, _ = _read_dense(trial / "dense", _width(DENSE))
+        terminal = json.loads((trial / "contacts/terminal.json").read_text())
+        contact_ticks, contacts, _ = _read_stream(trial / "contacts", int(terminal["initialized_rows"]), _width(CONTACT))
+        if not np.array_equal(ticks, dense_ticks):
+            raise ValueError("core/dense grid mismatch")
+        derived_path = legacy_analysis / "derived" / reported["derived_npz"]
+        if file_sha(derived_path) != reported["derived_npz_sha256"]:
+            raise ValueError("legacy derived hash mismatch")
+        derived = _load_derived(derived_path)
+        _, common, asymmetry = expected[2]
+        expected_input = np.zeros((ROWS, 2), dtype=np.float64)
+        expected_input[3001:25001] = [common * (1 - asymmetry), common * (1 + asymmetry)]
+        if not np.array_equal(core[:, cs["input"]], expected_input):
+            raise ValueError("registered command waveform mismatch")
+        active = common > original_registration["controller"]["silence_common_max"]
+        phase_contract = _phase_window_contract(core[:, cs["phases"]], active)
+        phase_failures = phase_contract["failures"]
+        if active:
+            active_trials += 1
+            total_phase_increments += phase_contract["increments_checked"]
+            if phase_failures:
+                raise ValueError(f"active-window phase invalidity: {name}")
+            cycle = _cycle_metrics(
+                core[:, cs["phases"]], derived["endpoint_thorax_ap"],
+                derived["endpoint_whole_foot_min_height"], derived["interval_summed_positive_normal"],
+                derived["interval_force_weighted_pre_tangent"], derived["interval_peak_pre_tangent_speed"],
+                original_registration["controller"]["swing_periods_strict_modulo"], True,
+            )
+            if (cycle["recovery_passed"] != reported["recovery_passed"]
+                    or cycle["support_slip_passed"] != reported["support_slip_passed"]
+                    or cycle["invalid_interior_phase_episodes"] != reported["invalid_interior_phase_episodes"]):
+                raise ValueError("producer cycle decision mismatch")
+            complete_runs += sum(len(value) for value in cycle["swing_cycles"] + cycle["stance_cycles"])
+        else:
+            zero_controls += 1
+
+        endpoint_error = float(max(
+            np.max(np.abs(derived["endpoint_thorax_ap"][:-1] - dense[1:, ds["thorax_ap"]])),
+            np.max(np.abs(derived["endpoint_whole_foot_min_height"][:-1] - dense[1:, ds["whole_foot_min_height"]])),
+        ))
+        if endpoint_error > TOLERANCE:
+            raise ValueError("endpoint-to-next-cache mismatch")
+        total_endpoints += ROWS - 1
+        normal = np.zeros((ROWS, 6), dtype=np.float64)
+        if len(contacts):
+            fg = _int_column(contacts, es["foot_geom"])
+            gg = _int_column(contacts, es["ground_geom"])
+            if np.any(gg != ground) or any(int(value) not in leg_by_geom for value in fg):
+                raise ValueError("raw contact identity mismatch")
+            force = contacts[:, es["wrench_contact_frame"]][:, 0]
+            loaded = (force > 0) & (contact_ticks > 0)
+            legs = np.asarray([leg_by_geom[int(value)] for value in fg[loaded]], dtype=np.int64)
+            np.add.at(normal, (contact_ticks[loaded], legs), force[loaded])
+        if not np.array_equal(normal, derived["interval_summed_positive_normal"]):
+            raise ValueError("full raw positive-normal-force closure mismatch")
+        slips, slip_error = _reported_slip_checks(reported, derived)
+        total_slips += slips
+
+        position = core[:, cs["thorax_position"]]
+        rotation = core[:, cs["thorax_rotation"]].reshape(-1, 3, 3)
+        yaw = np.unwrap(np.arctan2(rotation[:, 1, 0], rotation[:, 0, 0]))
+        velocity = np.diff(position, axis=0) / DT
+        recalculated = {
+            "forward_mean_mm_s": float(((velocity[6000:25000] * rotation[6000:25000, :, 0]).sum(axis=1)).mean()),
+            "mean_yaw_rate_rad_s": float((yaw[25000] - yaw[6000]) / 1.9),
+            "net_active_yaw_rad": float(yaw[25000] - yaw[3000]),
+            "min_upright_z": float(rotation[:, 2, 2].min()),
+            "stop_displacement_mm": float(np.linalg.norm(position[40000] - position[30000])),
+            "stop_mean_speed_mm_s": float(np.linalg.norm(velocity[30000:40000], axis=1).mean()),
+        }
+        if any(recalculated[key] != reported[key] for key in recalculated):
+            raise ValueError("reported kinematic quantity mismatch")
+        gates = {
+            "finite": True,
+            "upright": recalculated["min_upright_z"] > 0.8,
+            "stop": recalculated["stop_displacement_mm"] < 0.25 and recalculated["stop_mean_speed_mm_s"] < 0.1,
+        }
+        if active:
+            gates.update(recovery=cycle["recovery_passed"], support_slip=cycle["support_slip_passed"])
+            if asymmetry:
+                gates["turn"] = bool(np.sign(recalculated["net_active_yaw_rad"]) == np.sign(asymmetry)
+                                     and abs(recalculated["net_active_yaw_rad"]) > 0.1)
+            else:
+                gates["straight_yaw"] = abs(recalculated["mean_yaw_rate_rad_s"]) < 0.15
+        if gates != reported["gates"]:
+            raise ValueError("reported gate decision mismatch")
+        total_contacts += len(contacts)
+        receipts[name] = {
+            "eligible_active": active,
+            "zero_control": not active,
+            "identity_sha256": _json_sha(identity),
+            "derived_sha256": file_sha(derived_path),
+            "raw_contact_rows": len(contacts),
+            "active_phase_increments_checked": 6 * (ANALYSIS_TICKS[1] - ANALYSIS_TICKS[0]) if active else 0,
+            "phase_failures": phase_failures,
+            "phase_contract": phase_contract,
+            "endpoint_next_cache_rows": ROWS - 1,
+            "final_endpoint_policy": "core row 40000 has no next cache row and is explicitly excluded",
+            "stance_slips_checked": slips,
+            "max_endpoint_next_cache_error": endpoint_error,
+            "max_slip_formula_error": slip_error,
+            "raw_positive_normal_force_closed": True,
+            "gates": gates,
+        }
+    if total_contacts != legacy["raw_contact_rows"]:
+        raise ValueError("raw contact total changed")
+    restoration = verify_restoration_join(original_root, original_registration)
+    speed = {}
+    for seed in original_registration["development_seeds"]:
+        values = [receipts[f"source-native-excursion-v12--{seed}--{case}"]["gates"]
+                  for case in ("straight-008", "straight-02", "straight-04")]
+        reported_values = [legacy["trials"][f"source-native-excursion-v12--{seed}--{case}"]["forward_mean_mm_s"]
+                           for case in ("straight-008", "straight-02", "straight-04")]
+        values  # gate receipts are deliberately not used as speed evidence
+        speed[f"speed-{seed}"] = bool(reported_values[0] > 0.2 and all(
+            right - left > 0.2 for left, right in zip(reported_values, reported_values[1:])
+        ))
+    aggregate = {**speed, "active_restoration_raw_join": restoration["passed"]}
+    if aggregate != legacy["aggregate_gates"]:
+        raise ValueError("legacy aggregate decision mismatch")
+    result = {
+        "schema": "behavior-v12-correction-retained-validation/v2",
+        "passed": True,
+        "scientific_admission": False,
+        "legacy_v1_status": "rejected",
+        "future_positive_experiments": "require fresh repaired seals",
+        "registration_sha256": file_sha(output / "registration.json"),
+        "legacy_analysis_sha256": file_sha(legacy_analysis / "analysis.json"),
+        "trial_count": len(receipts),
+        "active_trial_count": active_trials,
+        "zero_control_count": zero_controls,
+        "active_phase_increments_checked": total_phase_increments,
+        "complete_phase_runs_recalculated": complete_runs,
+        "endpoint_next_cache_rows_checked": total_endpoints,
+        "final_endpoints_without_next_cache": len(receipts),
+        "stance_slip_formulas_checked": total_slips,
+        "raw_contact_rows_closed": total_contacts,
+        "index_closure": index_closure,
+        "restoration": restoration,
+        "aggregate_gates": aggregate,
+        "trials": receipts,
+        "scope": "retained byte/array/contract validation only; no Jacobian or wrench reconstruction",
+        "scope_stop": "no walking, held-out, neural, phenotype, ablation, Lab/API/replay, or product admission",
+        "resources": {
+            "wall_seconds": time.monotonic() - started,
+            "user_cpu_seconds": resource.getrusage(resource.RUSAGE_SELF).ru_utime - usage_start.ru_utime,
+            "system_cpu_seconds": resource.getrusage(resource.RUSAGE_SELF).ru_stime - usage_start.ru_stime,
+            "peak_rss_bytes": _peak_rss_bytes(),
+            "physics_seconds": 0,
+            "neural_seconds": 0,
+            "workers": 1,
+        },
+    }
+    _write_exclusive_json(output / "retained-validation.json", result)
+    return result
+
+
+def _junit_counts(junit: Path) -> tuple[int, int, int, int]:
+    root = ET.parse(junit).getroot()
+    suites = [root] if root.tag == "testsuite" else list(root.findall("testsuite"))
+    return (
+        sum(int(suite.attrib.get("tests", 0)) for suite in suites),
+        sum(int(suite.attrib.get("failures", 0)) for suite in suites),
+        sum(int(suite.attrib.get("errors", 0)) for suite in suites),
+        sum(int(suite.attrib.get("skipped", 0)) for suite in suites),
+    )
+
+
+def repair_validation_registration(repo: Path, output: Path, failed_command: str) -> dict:
+    old_registration_path = output / "registration.json"
+    old_registration = json.loads(old_registration_path.read_text())
+    failed_junit = output / "tests/test-invocation-01.junit.xml"
+    failed_receipt = output / "tests/test-invocation-01.json"
+    attempt_root = output / "attempts"
+    if (old_registration.get("schema") != VALIDATION_SCHEMA or not failed_junit.is_file()
+            or failed_receipt.exists() or attempt_root.exists()):
+        raise ValueError("validation repair requires exactly one unrecorded failed first invocation")
+    total, failures, errors, skipped = _junit_counts(failed_junit)
+    if total <= 0 or failures + errors <= 0:
+        raise ValueError("first invocation is not a retained failure")
+    attempt_sources = attempt_root / "sealed-sources"
+    attempt_sources.mkdir(parents=True)
+    shutil.copyfile(old_registration_path, attempt_root / "registration-01.json")
+    for relative in old_registration["sealed_source_snapshots"]:
+        source = output / relative
+        shutil.copyfile(source, attempt_sources / source.name)
+    _write_exclusive_json(failed_receipt, {
+        "schema": "behavior-v12-correction-validation-test-run/v2",
+        "invocation": 1,
+        "status": "failed",
+        "command": failed_command,
+        "tests": total,
+        "passed": total - failures - errors - skipped,
+        "failed": failures + errors,
+        "skipped": skipped,
+        "junit": str(failed_junit.relative_to(output)),
+        "junit_sha256": file_sha(failed_junit),
+        "registration_sha256": file_sha(attempt_root / "registration-01.json"),
+        "executed_source_seal": old_registration["validation_source_seal"],
+        "failure": "focused test harness omitted its synthetic registration file",
+        "physics_seconds": 0,
+        "neural_seconds": 0,
+    })
+    source_paths = [repo / relative for relative in old_registration["validation_source_seal"]]
+    source_seal = {str(path.relative_to(repo)): file_sha(path) for path in source_paths}
+    snapshot_seal = {}
+    for source in source_paths:
+        snapshot = output / "sealed-sources" / source.name
+        shutil.copyfile(source, snapshot)
+        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
+    old_registration.update({
+        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "validation_source_seal": source_seal,
+        "sealed_source_snapshots": snapshot_seal,
+        "payload_allowlist": list(VALIDATION_PAYLOAD),
+        "prior_failed_attempt": {
+            "registration": "attempts/registration-01.json",
+            "junit": "tests/test-invocation-01.junit.xml",
+            "receipt": "tests/test-invocation-01.json",
+            "status": "preserved failure",
+        },
+    })
+    write_json(old_registration_path, old_registration)
+    chronology_path = output / "chronology.json"
+    chronology = json.loads(chronology_path.read_text())
+    chronology["validation_test_attempt_01"] = {
+        "status": "failed",
+        "tests": total,
+        "passed": total - failures - errors - skipped,
+        "failed": failures + errors,
+        "cause": "test harness fixture omitted synthetic registration file",
+        "production_contract_failure": False,
+        "preserved": True,
+    }
+    write_json(chronology_path, chronology)
+    return old_registration
+
+
+def reseal_after_validation_failure(repo: Path, output: Path) -> dict:
+    registration_path = output / "registration.json"
+    registration = json.loads(registration_path.read_text())
+    attempt_registration = output / "attempts/registration-02.json"
+    attempt_sources = output / "attempts/sealed-sources-02"
+    invocation_two = json.loads((output / "tests/test-invocation-02.json").read_text())
+    if (registration.get("schema") != VALIDATION_SCHEMA or invocation_two.get("failed") != 0
+            or (output / "retained-validation.json").exists() or attempt_registration.exists()
+            or attempt_sources.exists()):
+        raise ValueError("validation-failure reseal preconditions are not met")
+    shutil.copyfile(registration_path, attempt_registration)
+    attempt_sources.mkdir()
+    for relative in registration["sealed_source_snapshots"]:
+        source = output / relative
+        shutil.copyfile(source, attempt_sources / source.name)
+    source_paths = [repo / relative for relative in registration["validation_source_seal"]]
+    source_seal = {str(path.relative_to(repo)): file_sha(path) for path in source_paths}
+    snapshot_seal = {}
+    for source in source_paths:
+        snapshot = output / "sealed-sources" / source.name
+        shutil.copyfile(source, snapshot)
+        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
+    registration.update({
+        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "validation_source_seal": source_seal,
+        "sealed_source_snapshots": snapshot_seal,
+        "payload_allowlist": list(VALIDATION_PAYLOAD),
+        "prior_validation_failure": {
+            "registration": "attempts/registration-02.json",
+            "status": "preserved in chronology; no producer validation receipt was written",
+            "failure": "historical per-tick digest sequences were incorrectly compared to the single pre-continuation checkpoint digest",
+        },
+    })
+    write_json(registration_path, registration)
+    chronology_path = output / "chronology.json"
+    chronology = json.loads(chronology_path.read_text())
+    chronology["retained_validation_attempt_01"] = {
+        "status": "failed before receipt",
+        "failure": "digest schema interpretation compared 100 post-tick digests with one tick-10000 checkpoint digest",
+        "actual_historical_schema": "100 expected/actual cache and controller digest entries for ticks 10001..10100",
+        "rule_after_correction": "expected and actual sequences must be exact, length 100, and schema-bound to the checkpoint cache keys",
+        "data_or_gate_inconsistency": False,
+        "preserved": True,
+    }
+    write_json(chronology_path, chronology)
+    return registration
+
+
+def reseal_after_verifier_cli_failure(repo: Path, output: Path) -> dict:
+    registration_path = output / "registration.json"
+    registration = json.loads(registration_path.read_text())
+    attempt_registration = output / "attempts/registration-03.json"
+    attempt_sources = output / "attempts/sealed-sources-03"
+    retained = output / "retained-validation.json"
+    independent = output / "independent-verification.json"
+    if (registration.get("schema") != VALIDATION_SCHEMA or not retained.is_file() or not independent.is_file()
+            or attempt_registration.exists() or attempt_sources.exists()):
+        raise ValueError("verifier CLI failure reseal preconditions are not met")
+    if (json.loads(retained.read_text()).get("passed") is not True
+            or json.loads(independent.read_text()).get("passed") is not True):
+        raise ValueError("failed verifier attempt did not complete internal checks")
+    shutil.copyfile(registration_path, attempt_registration)
+    attempt_sources.mkdir()
+    for relative in registration["sealed_source_snapshots"]:
+        source = output / relative
+        shutil.copyfile(source, attempt_sources / source.name)
+    retained.replace(output / "attempts/retained-validation-01.json")
+    independent.replace(output / "attempts/independent-verification-01.json")
+    source_paths = [repo / relative for relative in registration["validation_source_seal"]]
+    source_seal = {str(path.relative_to(repo)): file_sha(path) for path in source_paths}
+    snapshot_seal = {}
+    for source in source_paths:
+        snapshot = output / "sealed-sources" / source.name
+        shutil.copyfile(source, snapshot)
+        snapshot_seal[str(snapshot.relative_to(output))] = file_sha(snapshot)
+    registration.update({
+        "registered_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "validation_source_seal": source_seal,
+        "sealed_source_snapshots": snapshot_seal,
+        "payload_allowlist": list(VALIDATION_PAYLOAD),
+        "prior_verifier_cli_failure": {
+            "registration": "attempts/registration-03.json",
+            "producer_receipt": "attempts/retained-validation-01.json",
+            "independent_receipt": "attempts/independent-verification-01.json",
+            "status": "internal checks passed but process exit was nonzero; receipts not terminal evidence",
+        },
+    })
+    write_json(registration_path, registration)
+    chronology_path = output / "chronology.json"
+    chronology = json.loads(chronology_path.read_text())
+    chronology["independent_validation_attempt_01"] = {
+        "status": "internal validation passed; CLI exited nonzero",
+        "failure": "v2 summary accessed the legacy v1 trial_count field instead of coverage.trials",
+        "data_or_gate_inconsistency": False,
+        "receipts_preserved_but_not_terminal": True,
+    }
+    write_json(chronology_path, chronology)
+    return registration
+
+
+def record_validation_test(output: Path, repo: Path, junit: Path, command: str, invocation: int = 4) -> dict:
+    registration = _validate_validation_registration(repo, output)
+    if invocation not in (1, 2, 3, 4):
+        raise ValueError("unsupported validation test invocation")
+    target = output / f"tests/test-invocation-{invocation:02d}.json"
+    expected_junit = output / f"tests/test-invocation-{invocation:02d}.junit.xml"
+    if junit.resolve() != expected_junit.resolve() or target.exists() or not junit.is_file():
+        raise ValueError("unexpected or duplicate validation test invocation")
+    total, failures, errors, skipped = _junit_counts(junit)
+    if total <= 0 or failures or errors:
+        raise ValueError("validation tests did not pass")
+    result = {
+        "schema": "behavior-v12-correction-validation-test-run/v2",
+        "invocation": invocation,
+        "status": "passed",
+        "command": command,
+        "tests": total,
+        "passed": total - failures - errors - skipped,
+        "failed": failures + errors,
+        "skipped": skipped,
+        "junit": str(junit.relative_to(output)),
+        "junit_sha256": file_sha(junit),
+        "registration_sha256": file_sha(output / "registration.json"),
+        "executed_source_seal": registration["validation_source_seal"],
+        "physics_seconds": 0,
+        "neural_seconds": 0,
+    }
+    _write_exclusive_json(target, result)
+    return result
+
+
+def _inventory_payload(output: Path, expected_paths: tuple[str, ...]) -> dict[str, dict]:
+    expected = list(expected_paths)
+    if len(expected) != len(set(expected)) or expected != sorted(expected):
+        raise ValueError("inventory allowlist must be sorted and unique")
+    actual = []
+    for path in output.rglob("*"):
+        if path.is_dir() and not path.is_symlink():
+            continue
+        relative = path.relative_to(output)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("invalid inventory path")
+        if path.is_symlink() or not stat.S_ISREG(path.stat(follow_symlinks=False).st_mode):
+            raise ValueError(f"inventory contains nonregular file: {relative}")
+        actual.append(relative.as_posix())
+    if sorted(actual) != expected:
+        raise ValueError(f"inventory payload mismatch: missing={sorted(set(expected)-set(actual))} extra={sorted(set(actual)-set(expected))}")
+    return {
+        relative: {"bytes": (output / relative).stat().st_size, "sha256": file_sha(output / relative)}
+        for relative in expected
+    }
+
+
+def finalize_validation(output: Path, repo: Path) -> dict:
+    registration = _validate_validation_registration(repo, output)
+    if (output / "resource-receipt.json").exists() or (output / "output-inventory.json").exists():
+        raise FileExistsError("validation output is already finalized")
+    for required in (
+        "retained-validation.json", "independent-verification.json",
+        "tests/test-invocation-01.json", "tests/test-invocation-02.json", "tests/test-invocation-03.json",
+        "tests/test-invocation-04.json",
+    ):
+        if not (output / required).is_file():
+            raise ValueError(f"missing validation receipt: {required}")
+    retained = json.loads((output / "retained-validation.json").read_text())
+    independent = json.loads((output / "independent-verification.json").read_text())
+    failed_tests = json.loads((output / "tests/test-invocation-01.json").read_text())
+    prior_tests = json.loads((output / "tests/test-invocation-02.json").read_text())
+    prior_tests_two = json.loads((output / "tests/test-invocation-03.json").read_text())
+    tests = json.loads((output / "tests/test-invocation-04.json").read_text())
+    if (retained.get("passed") is not True or independent.get("passed") is not True
+            or failed_tests.get("failed", 0) <= 0 or prior_tests.get("failed") != 0
+            or prior_tests_two.get("failed") != 0 or tests.get("failed") != 0):
+        raise ValueError("validation receipts do not support finalization")
+    bytes_before_resource = sum(path.stat().st_size for path in output.rglob("*") if path.is_file())
+    _write_exclusive_json(output / "resource-receipt.json", {
+        "schema": "behavior-v12-correction-validation-resources/v2",
+        "measured_new_bytes_before_resource_and_inventory": bytes_before_resource,
+        "producer": retained["resources"],
+        "independent_verifier": independent["resources"],
+        "workers": 1,
+        "physics_seconds": 0,
+        "neural_seconds": 0,
+        "network": False,
+        "historical_counts_are_not_new_resource_usage": True,
+        "validation_test_invocations": {
+            "count": 4,
+            "failed_preserved": 1,
+            "passed": 3,
+            "final_tests": tests["tests"],
+        },
+        "within_limits": bool(
+            max(retained["resources"]["peak_rss_bytes"], independent["resources"]["peak_rss_bytes"])
+            <= registration["limits"]["peak_rss_bytes"]
+            and bytes_before_resource <= registration["limits"]["new_output_scratch_bytes"]
+        ),
+    })
+    payload = _inventory_payload(output, VALIDATION_PAYLOAD)
+    inventory = {
+        "schema": "behavior-v12-correction-validation-output-inventory/v2",
+        "payload": payload,
+        "payload_files": len(payload),
+        "payload_bytes": sum(record["bytes"] for record in payload.values()),
+        "self_exclusion": {
+            "path": "output-inventory.json",
+            "rule": "sole explicit self-exclusion; caller binds this file and closed-root size outside the root after terminal",
+        },
+        "no_files_may_be_added_after_inventory": True,
+    }
+    _write_exclusive_json(output / "output-inventory.json", inventory)
+    expected_final = tuple(sorted((*VALIDATION_PAYLOAD, "output-inventory.json")))
+    actual_final = tuple(sorted(path.relative_to(output).as_posix() for path in output.rglob("*") if path.is_file()))
+    if actual_final != expected_final:
+        raise ValueError("closed validation root changed during finalization")
+    return inventory
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("register", "raw-closure", "fixture", "record-tests", "analyze"))
+    parser.add_argument("command", choices=(
+        "register", "raw-closure", "fixture", "record-tests", "analyze",
+        "register-validation", "repair-validation-registration", "reseal-validation",
+        "reseal-verifier-cli", "validate-retained",
+        "record-validation-test", "finalize-validation",
+    ))
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source", type=Path, action="append", default=[])
@@ -1303,11 +2176,40 @@ def main() -> None:
     parser.add_argument("--test-runs", type=int, default=1)
     parser.add_argument("--test-physics-per-run", type=float, default=0.002)
     parser.add_argument("--other-tiny-physics-seconds", type=float, default=0.0)
+    parser.add_argument("--legacy-repo", type=Path)
+    parser.add_argument("--legacy-analysis", type=Path)
+    parser.add_argument("--command-text")
+    parser.add_argument("--test-invocation", type=int, default=4)
     args = parser.parse_args()
     repo = args.repo.resolve()
     output = args.output.resolve()
     if args.command == "register":
         result = register(repo, output, [path.resolve() for path in args.source])
+    elif args.command == "register-validation":
+        if args.legacy_repo is None or args.legacy_analysis is None:
+            parser.error("--legacy-repo and --legacy-analysis are required")
+        result = register_validation(
+            repo, output, args.legacy_repo.resolve(), args.legacy_analysis.resolve(),
+            [path.resolve() for path in args.source],
+        )
+    elif args.command == "repair-validation-registration":
+        if not args.command_text:
+            parser.error("--command-text is required")
+        result = repair_validation_registration(repo, output, args.command_text)
+    elif args.command == "reseal-validation":
+        result = reseal_after_validation_failure(repo, output)
+    elif args.command == "reseal-verifier-cli":
+        result = reseal_after_verifier_cli_failure(repo, output)
+    elif args.command == "validate-retained":
+        result = validate_retained(repo, output)
+    elif args.command == "record-validation-test":
+        if args.junit is None or not args.command_text:
+            parser.error("--junit and --command-text are required")
+        result = record_validation_test(
+            output, repo, args.junit.resolve(), args.command_text, args.test_invocation,
+        )
+    elif args.command == "finalize-validation":
+        result = finalize_validation(output, repo)
     elif args.command == "raw-closure":
         validate_registration(repo, output)
         result = verify_evidence_index(repo, output)
