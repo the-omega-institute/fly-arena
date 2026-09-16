@@ -1,0 +1,22 @@
+{
+  "commit": "312a71145ef3a813ec744e06226d941b210bcbbc",
+  "sha256": {
+    "src/flyarena/__init__.py": "68f50453d0c366c05d2d4d13cb49afff315f1c32a7d7b6fe885d181d1ade73ab",
+    "src/flyarena/common.py": "8f4aa781a867d30e5fb62e84e82cb55887f0ffa23867ec4fcc8dba747f06d6dc",
+    "src/flyarena/connectome.py": "8339e73ceb9923aa4671b7637bb3faf372fb7a20c5b4c1c79e8484b547ebe9c6",
+    "src/flyarena/neural.py": "3d5f08551e34a4429d8a2c542b6d1becb6e58e0de5b0922e1d9d5c78c9e46e7d",
+    "src/flyarena/optional_backend.py": "8120164da568719c62273d45817d238ccdb56742a2c74ec81e0bc7523615f414",
+    "src/flyarena/cuda_ordered.py": "de95cdc3e4af62768930f29252e8759531ba29b0f804e57210cf3088f57fd11c",
+    "src/flyarena/backend.py": "6f464e9c93d582526a4beef08f632ca7aef68d712468da8c3678a32ead688404",
+    "src/flyarena/research.py": "e7ee7cb1f65820a455a431c980145e1dfdd198ee3e379776738ea28b168deaf6",
+    "src/flyarena/contracts.py": "4fc226e3e946724c4bef14b4f7e0d7303a1029ca4577b0f3675d2ac596209382",
+    "scripts/cuda_fixtures.py": "58d6d065ecc97128443507dac48ca865ab5a5c3d946115bc759d6a823ce7da41",
+    "scripts/cuda_policy.json": "12376bc20ddac11795bd6233d74d66d1c4f0493a0da80fc234576ae29f459d59",
+    "scripts/run_cuda_differential.py": "dd86a4ac1d28145328d81ba5c1f04a1bbb8f279d65cff01eee28a32c2e0dd156",
+    "scripts/verify_cuda_differential.py": "2a4890e3b6f39d01a5958a737bd17a32ac41a5660b3cf09f8a7d720afc593a8f",
+    "tests/test_optional_backend.py": "315396b3a14f1e5a6aac4bed742f8d44f5aa94e5c10516995d1c7b8015f941fb",
+    "tests/test_cuda_evidence.py": "3ad95734985aaec75eb51c4c8cd740100620cb23de2a0136e67f1082c8a3bc34",
+    "docs/optional-cuda-backend.md": "a0c1103081905e42e1ba40b9c340effbce7d8e151f94fd7030a7e62581164c9d",
+    "pyproject.toml": "abcbc670c680329f3a7f896842acf53cf106f4b37602787ece4bee787c81bfee"
+  }
+}

@@ -1,5 +1,7 @@
 # Optional ordered CUDA neural backend (unqualified)
 
+**Device evidence update (2026-09-16):** the frozen tiny suite has now executed on an actual RTX 4060 and passed differential verification. See [CUDA_DEVICE_VALIDATION.md](CUDA_DEVICE_VALIDATION.md) for the source-bound receipts and exact limits. The implementation and historical diagnostic record below describe the earlier source milestone; full-graph, performance and embodied qualification remain NOT RUN.
+
 This isolated increment adds an opt-in neural backend, not application wiring or a
 scientific admission. The existing CPU backend, connectome, compiler, sensor,
 decoder, artifacts and public backend catalog remain unchanged. Real CUDA

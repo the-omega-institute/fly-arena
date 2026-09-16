@@ -1,0 +1,14 @@
+{
+  "utc": "2026-09-16T12:17:12.525066+00:00",
+  "source_commit": "312a71145ef3a813ec744e06226d941b210bcbbc",
+  "source_manifest_sha256": "ec778d8d5dee857456a54b3020d3e15c76498ec7301164a51bc0119d19f475cb",
+  "environment_manifest_sha256": "8cbd863eb3e57df435998ce4f96a2f8449611e8a2c5aeb70f5754ad027d091ea",
+  "wheel_manifest_sha256": "173ac0a5e9f0b0b544ab8ed77bc0dcc42bd8d416f63c95c57a0f57afbde87c58",
+  "candidate_count": 1,
+  "backend": "cuda",
+  "fixtures": 7,
+  "neurons": 4,
+  "ticks": 48,
+  "full_graph": "NOT RUN",
+  "speed_body_admission": "NOT RUN"
+}

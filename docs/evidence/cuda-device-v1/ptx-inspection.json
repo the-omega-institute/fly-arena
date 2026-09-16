@@ -1,0 +1,26 @@
+{
+  "_neurons-0.ptx": {
+    "signature": "(Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(float64, 1, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), int64, float64, float64, float64, float64)",
+    "sha256": "8000c05254d754a96931c468f4644b48b163a2b9c6a467815f5a5e27d2f5f1fe",
+    "add_rn_f64": 6,
+    "mul_rn_f64": 5,
+    "floating_fma_or_mad": [],
+    "target_sm_89": true
+  },
+  "_arrivals-0.ptx": {
+    "signature": "(Array(int64, 1, 'C', False, aligned=True), Array(int32, 1, 'A', False, aligned=True), Array(float32, 1, 'A', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), int64)",
+    "sha256": "4b62bc8067960a2ff04fe3f95f76d9a5c423791e59d5a911276c998b26da6305",
+    "add_rn_f64": 5,
+    "mul_rn_f64": 0,
+    "floating_fma_or_mad": [],
+    "target_sm_89": true
+  },
+  "_arrivals-1.ptx": {
+    "signature": "(Array(int64, 1, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(float32, 1, 'C', False, aligned=True), Array(int32, 1, 'C', False, aligned=True), Array(float64, 2, 'C', False, aligned=True), int64)",
+    "sha256": "3f33f95fea73cfca3543f170535a14487b594bc16f0838a86a5c70c56eef1796",
+    "add_rn_f64": 5,
+    "mul_rn_f64": 0,
+    "floating_fma_or_mad": [],
+    "target_sm_89": true
+  }
+}
