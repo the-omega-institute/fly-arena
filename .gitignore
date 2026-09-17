@@ -14,3 +14,4 @@ web/dist/
 artifacts/
 *.tsbuildinfo
 .env
+.validation/

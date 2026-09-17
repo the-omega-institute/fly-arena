@@ -68,6 +68,12 @@ def lab(tmp_path,monkeypatch):
     spec=FlySpec(name='Design',connectome_sha256='a'*64,edge_deltas=[{'edge':0,'log_delta':.01}])
     fly=s.add_fly(user['id'],spec.model_dump(),c.compile(spec,publish=True,root=s.root))
     monkeypatch.setattr('flyarena.api.Connectome',lambda:g)
+    # This fixture owns its graph; API runtime metadata must not read host datasets.
+    monkeypatch.setattr('flyarena.api.runtime_manifest', lambda **kwargs: {
+        'runtime': 'fixture-only', 'bridge_profile': kwargs.get('bridge_profile', 'legacy-v1')})
+    fixture_data = tmp_path / 'data'
+    write_json(fixture_data / 'connectome/readout.json', {'fixture': True})
+    monkeypatch.setattr('flyarena.api.DATA', fixture_data)
     app=create_app(with_worker=False,store=s,auth_config=AuthConfig(),research_service=service)
     client=TestClient(app);client.headers['Authorization']='Bearer '+user['token']
     return SimpleNamespace(store=s,service=service,executor=executor,probes=probes,user=user,fly=fly,client=client,compiler=c)

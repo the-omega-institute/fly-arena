@@ -32,3 +32,5 @@ packages = ["src/flyarena"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+markers = ["integration: requires a prepared full connectome or retained scientific experiment data"]
