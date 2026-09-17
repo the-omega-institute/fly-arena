@@ -98,6 +98,7 @@ def test_parent_absolute_lineage_and_graph_profile_match(tmp_path):
         s.add_fly('u',child.model_dump()|{'model_profile':'unknown'},c.compile(child))
 
 
+@pytest.mark.integration
 def test_full_graph_exact_id_intervention_roundtrip(tmp_path):
     from flyarena.connectome import Connectome
     g=Connectome();c=Compiler(g)

@@ -39,6 +39,7 @@ def test_transfer_neural_only_symmetry_bounds_and_stop():
     with pytest.raises(ValueError):a.advance([1,2,3])
 
 
+@pytest.mark.integration
 def test_full_source_version_and_training_identity_preserved():
     manifest=profile_manifest()
     assert manifest['ready'] and manifest['motor_id']==MOTOR['id']
