@@ -121,7 +121,7 @@ Ornn 的合适位置是分发 `fruit-fly-designer` 能力；用户自带任意 a
 
 通过 `nyxid node list` 和经过筛选的 `nyxid service list` 发现以下资源。下面只记录任务需要的节点名与状态，不保存原始账号、token、私钥或完整服务清单。
 
-> 2026-09-17 更新：已通过 NyxID 实测 RTX 4060 Laptop GPU，8188 MiB 显存、驱动 592.82；可用 SSH principal 为 `root`。Mac Studio 的 Heca 和现有 Arena 健康检查通过。详见 [最新节点检查](NODE_READINESS_20260917.md)。CUDA 仿真后端仍待实现和验证。
+> 2026-09-17 更新：已通过 NyxID 实测 RTX 4060 Laptop GPU，8188 MiB 显存、驱动 592.82；可用 SSH principal 为 `root`。Mac Studio 的 Heca 和现有 Arena 健康检查通过。详见 [最新节点检查](NODE_READINESS_20260917.md)。已有独立分支的 ordered Numba CUDA 后端及真实 4060 小型对照结果（[PR #8](https://github.com/the-omega-institute/fly-arena/pull/8)）；全图谱、性能与身体仿真接入仍待验证。
 
 以下保留初次核查记录；当前可用性以更新报告中的实际执行结果为准。
 

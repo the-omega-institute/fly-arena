@@ -305,16 +305,16 @@ C++20/CMake/pinned toolchain 足够。结构采用稀疏数组与 structure-of-a
 
 ## 12. 资源部署与容量
 
-> 2026-09-17 更新：已通过 NyxID 实测 RTX 4060 Laptop GPU，8188 MiB 显存、驱动 592.82；可用 SSH principal 为 `root`。Mac Studio 的 Heca 和现有 Arena 健康检查通过。详见 [最新节点检查](NODE_READINESS_20260917.md)。CUDA 仿真后端仍待实现和验证。
+> 2026-09-17 更新：已通过 NyxID 实测 RTX 4060 Laptop GPU，8188 MiB 显存、驱动 592.82；可用 SSH principal 为 `root`。Mac Studio 的 Heca 和现有 Arena 健康检查通过。详见 [最新节点检查](NODE_READINESS_20260917.md)。已有独立分支的 ordered Numba CUDA 后端及真实 4060 小型对照结果（[PR #8](https://github.com/the-omega-institute/fly-arena/pull/8)）；全图谱、性能与身体仿真接入仍待验证。
 
 
 
-Mac Studio 初次核实为 M3 Ultra、96 GiB 内存、28 CPU 核；本次复查 Heca relay 仍连接。4060 现已实测为 RTX 4060 Laptop GPU、8188 MiB 显存、WSL2，系统 Python 尚未发现仿真依赖。硬件访问可用，CUDA 后端仍需实现和对照验证；详见最新节点检查。
+Mac Studio 初次核实为 M3 Ultra、96 GiB 内存、28 CPU 核；本次复查 Heca relay 仍连接。4060 现已实测为 RTX 4060 Laptop GPU、8188 MiB 显存、WSL2，系统 Python 尚未发现仿真依赖，但已有独立 CUDA 任务环境并通过小型真实设备对照。硬件访问可用，后续复用已审查后端完成全图谱、性能和身体仿真验证；详见最新节点检查。
 
 | 资源 | 初期角色 | 注意事项 |
 |---|---|---|
 | Mac Studio | 导入、CPU 神经参考、单场物理、可信本地 worker、开发阶段 API/PG | 原生 macOS CPU 路径；统一内存不等于 CUDA 显存 |
-| RTX 4060 Laptop GPU | CUDA 单场/小 batch、视觉渲染、离线视频候选资源 | 已核实 8188 MiB / WSL2；运行环境、后端与吞吐尚待验证 |
+| RTX 4060 Laptop GPU | CUDA 单场/小 batch、视觉渲染、离线视频候选资源 | 已核实 8188 MiB / WSL2；独立环境及小型 CUDA 对照已通过，全图谱、吞吐和身体仿真待验证 |
 | 未来小型公网主机 | Web/API、数据库或托管 DB、队列入口、artifact 存储 | 暂未发现/部署；公众可用性不依赖家庭节点在线 |
 | 观众浏览器 | 3D 回放、脑区可视化 | 不消费服务器每观众一份视频渲染资源 |
 
