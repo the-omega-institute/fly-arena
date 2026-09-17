@@ -24,7 +24,7 @@ def main():
     p.add_argument('--founder', help='Starting fly ID; defaults to the canonical reference')
     p.add_argument('--run', help='Observe an existing session instead of starting another')
     p.add_argument('--strategy', choices=['evolution', 'random_search'], default='evolution')
-    p.add_argument('--map', choices=['orchard', 'maze', 'ring'], default='orchard')
+    p.add_argument('--map', choices=['orchard', 'maze', 'scarcity', 'ring'], default='orchard')
     p.add_argument('--opponent', help='Fixed opponent; enables mirrored food competition')
     p.add_argument('--circuits', nargs='+', default=['olfactory', 'projection', 'descending'])
     p.add_argument('--population', type=int, default=2)

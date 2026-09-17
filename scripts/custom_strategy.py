@@ -52,7 +52,7 @@ def main():
     parser.add_argument('--generations',type=int,default=2)
     parser.add_argument('--budget',type=int,default=4)
     parser.add_argument('--seconds',type=int,default=1)
-    parser.add_argument('--map',choices=['orchard','maze','ring'],default='orchard')
+    parser.add_argument('--map',choices=['orchard','maze','scarcity','ring'],default='orchard')
     parser.add_argument('--seed',type=int,default=42)
     parser.add_argument('--key',default=uuid.uuid4().hex)
     parser.add_argument('--save-best',action='store_true')
