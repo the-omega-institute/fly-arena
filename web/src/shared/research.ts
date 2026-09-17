@@ -2,7 +2,7 @@ import type {Fly} from '../types'
 export type CellSelector={class?:string;type?:string;side?:'L'|'R';ids?:string[]}
 export type InterventionSpec={selector:{pre?:CellSelector;post?:CellSelector};scale:number}
 export type SubjectRole='wildtype'|'official'|'design'
-export type ExperimentSubject={role:SubjectRole;fly_id:string;name:string;artifact_id:string;parent_id?:string|null;submission_channel?:'web'|'api'|'seed';release_id?:string|null}
+export type ExperimentSubject={role:SubjectRole;fly_id:string;name:string;artifact_id:string;parent_id?:string|null;reference_kind?:Fly['reference_kind'];submission_channel?:Fly['submission_channel'];release_id?:string|null}
 export type ScenarioSpec={id?:string;geometry?:{size?:number;bounds?:number[];obstacles?:{position:number[];size:number[]}[]};stimulus?:unknown;task?:unknown;probe?:unknown;[key:string]:unknown}
 export type BackendProfile={id:string;backend_id:string;model_id:string;sensor_id:string;readout_id:string;embodiment_id:string;ready:boolean;reason?:string;reduced_mode?:boolean;limitations?:string[];unavailable?:string[];motor_id?:string;protocol_id?:string;hashes:Record<string,string>;capabilities:Record<string,unknown>|string[]}
 export type Probe={id:string;name:string;description:string;capabilities:Record<string,unknown>|string[];scenario?:ScenarioSpec;scenario_spec?:ScenarioSpec;[key:string]:unknown}

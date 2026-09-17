@@ -1,7 +1,9 @@
+import {SavedFlyCard} from './features/design/SavedFlyCard'
 import {AuthDialogs} from './features/auth/AuthDialogs'
 import {DevelopersFeature} from './features/developers/DevelopersFeature'
 import {ArenaFeature} from './features/arena/ArenaFeature'
 import {useReplay} from './features/arena/useReplay'
+import {selectReplayFrames} from './features/arena/replayFrames'
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react'
 import {ArrowDownToLine,ArrowRight,ArrowUpRight,AudioLines,Beaker,Bug,Check,ChevronDown,Code2,Copy,Dna,ExternalLink,FlaskConical,GitBranch,Leaf,Loader2,Pause,Play,Plus,RotateCcw,Settings2,ShieldCheck,Sparkles,Swords,Terminal,Trophy,UserRound,X} from 'lucide-react'
 import {api,setCsrfToken} from './api'
@@ -159,11 +161,7 @@ export default function App(){
     return Object.entries(scales).reduce((s,[k,v])=>s+(season.connectome.circuits.find(c=>c.id===k)?.edge_count||0)/e*Math.abs(Math.log(v))/.08*100,0)+100*Math.abs(Math.log(tau))+20*Math.abs(threshold)
   },[scales,tau,threshold,season])
   const used=report?.budget_used??estimated
-  const frameIndex=frames.length?Math.max(0,frames.findIndex(f=>f.time>playtime)-1):0
-  const index=frames.length&&playtime>=frames[frames.length-1].time?frames.length-1:frameIndex
-  const frame=frames[index]
-  const next=frames[Math.min(index+1,frames.length-1)]
-  const alpha=frame&&next&&next.time>frame.time?(playtime-frame.time)/(next.time-frame.time):0
+  const {frame,next,alpha}=selectReplayFrames(frames,playtime)
 
   return <div className="app-shell">
     <header className="header">
@@ -180,7 +178,7 @@ export default function App(){
       {tab==='design'&&<>
         <div className="design-workspace">
           <aside className="collection panel"><div className="panel-heading"><span>{t("我的果蝇库")}</span><span className="count">{flies.length.toString().padStart(2,'0')}</span></div><div className="tiny-label">{t("SELECT A STARTING POINT")}</div><p className="draft-status">{parentId?t('Unsaved draft from parent')+': '+parentId:t('Unsaved canonical draft')}</p>
-            <div className="fly-list">{flies.slice(0,12).map(f=><button key={f.id} className={'fly-card '+(parentId===f.id?'selected':'')} onClick={()=>clone(f)}><div className="fly-avatar" style={{'--fly-color':colors[f.color]} as React.CSSProperties}><Bug size={27} strokeWidth={1.1}/></div><div><strong>{f.name.split(' / ')[0]}</strong><small>{f.reference_kind==='wildtype'?t('Trusted Wild Type'):f.reference_kind==='official'?t('Trusted official release'):f.owner===identity?.id?t('Your design'):f.designer}</small></div>{parentId===f.id&&<span className="selected-dot"/>}</button>)}</div>
+            <div className="fly-list">{flies.slice(0,12).map(f=><SavedFlyCard key={f.id} fly={f} viewer={identity?.id} selected={parentId===f.id} onClone={clone}/>)}</div>
             <button className="new-fly" onClick={()=>{setScales(defaultScales());setTau(1);setThreshold(0);setName('Untitled 01');setSelected('');setParentId(null);setBaseSpec({});setInterventions([]);setEdgeDeltas([]);setReport(null);setToast(t("已恢复基线参数，为新设计取个名字吧。"))}}><Plus size={15}/>{t("从原型开始设计")}</button>
             <div className="collection-footer"><GitBranch size={18}/><strong>{t("进化，有迹可循")}</strong><p>{t("每个设计都保留图谱来源、父代和不可变的权重版本。")}</p><button onClick={()=>setTab('lab')}>{t("查看实验记录")}<ArrowRight size={14}/></button></div>
           </aside>

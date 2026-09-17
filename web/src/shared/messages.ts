@@ -1,4 +1,9 @@
 export const catalog = {
+  "Unknown": {"en": "Unknown", "zh-CN": "未知"},
+  "Reference kind": {"en": "Reference kind", "zh-CN": "参考类型"},
+  "Not recorded in this experiment": {"en": "Not recorded in this experiment", "zh-CN": "本实验未记录"},
+  "Provenance not recorded": {"en": "Provenance not recorded", "zh-CN": "来源未记录"},
+  "Your saved design": {"en": "Your saved design", "zh-CN": "你保存的设计"},
   "Loading replay…": {"en":"Loading replay…","zh-CN":"正在加载回放…"},
   "Replay unavailable": {"en":"Replay unavailable","zh-CN":"回放不可用"},
   "Replay data is empty.": {"en":"Replay data is empty.","zh-CN":"回放数据为空。"},

@@ -16,6 +16,7 @@ from .connectome import Connectome
 from .contracts import MatchRequest
 from .neural import Brain, PROFILE
 from .scenarios import RULES, arena_scene
+from .replay import POLICY, REPLAY_RECEIPT
 
 
 def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> dict:
@@ -26,13 +27,15 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
             raise ValueError(f"Research bridge unavailable: {profile.get('reason')}")
         return {"schema": "arena-runtime/v2", "bridge_profile": bridge_profile,
                 "profile": profile, "closure": runtime_closure(), "rules": RULES,
+                "replay_policy": dict(POLICY),
                 "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba"}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
-    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py"]
+    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "rules": RULES,
+            "replay_policy": dict(POLICY),
             "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
             "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
             "mujoco": mujoco.__version__, "python": platform.python_version(),
@@ -79,6 +82,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             backends.append(backend)
             motors.append(MotorTransfer())
     scene = arena_scene(request.map_id, request.seed, request.bridge_profile)
+    scene["replay_policy"] = dict(POLICY)
     bodies = Bodies(scene, len(flies), request.seed)
     scene["body"] = bodies.rendering_manifest()
     scene["flies"] = [{k: f[k] for k in ["id", "name", "color", "artifact_id"]} for f in flies]
@@ -170,6 +174,12 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             if touching and not last_contact:
                 events.append({"type": "contact", "tick": bodies.tick, "slots": [0, 1]})
             last_contact = touching
+        # Intake/progress retain their historical 20 Hz clock. Pose recording
+        # is independent and samples the already-stepped MuJoCo state at 100 Hz.
+        if (bodies.tick % POLICY["pose_ticks"] == 0 and
+                bodies.tick % RULES["snapshot_ticks"] != 0 and
+                (not frames or frames[-1]["tick"] != bodies.tick)):
+            snapshot()
         if bodies.tick % RULES["snapshot_ticks"] == 0:
             for slot in range(len(flies)):
                 for food in range(len(remaining)):
@@ -182,12 +192,13 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 progress(bodies.tick / duration_ticks)
         if request.mode == "sumo" and eliminated.any():
             break
+    # Flush accounting independently: the terminal pose may already be recorded.
+    for slot in range(len(flies)):
+        for food in range(len(remaining)):
+            if consumption[slot, food] > 0:
+                events.append({"type": "intake", "tick": bodies.tick, "slot": slot,
+                               "food": food, "amount": float(consumption[slot, food])})
     if frames[-1]["tick"] != bodies.tick:
-        for slot in range(len(flies)):
-            for food in range(len(remaining)):
-                if consumption[slot, food] > 0:
-                    events.append({"type": "intake", "tick": bodies.tick, "slot": slot,
-                                   "food": food, "amount": float(consumption[slot, food])})
         snapshot()
     for slot, brain in enumerate(brains):
         np.savez_compressed(output / f"brain-{slot}.npz", **brain.checkpoint())
@@ -196,7 +207,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     write_json(output / "events.json", events)
     write_json(output / "result.json", {"scores": scores.tolist(), "exit_ticks": exit_ticks,
                "final_tick": bodies.tick, "food_remaining": remaining.tolist(), "contact_ticks": contact_ticks})
-    receipt = {"schema": "run-receipt/v2" if v2 else "run-receipt/v1", "request": request.model_dump(),
+    receipt = {"schema": REPLAY_RECEIPT, "replay_policy": dict(POLICY), "request": request.model_dump(),
                "flies": scene["flies"], "connectome_sha256": graph.manifest["sha256"],
                "neuron_count": graph.n, "edge_count": graph.e,
                "readout_sha256": readout["sha256"], "runtime": frozen_runtime,
