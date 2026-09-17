@@ -55,6 +55,14 @@ Advanced interventions support exact pre/post **class, type, side (`L`/`R`) and 
 
 The MVP workspace publishes designs, research reports and verified replays. Default local mode uses a designer bearer token; the optional NyxID adapter supports browser sessions or separate Arena agent tokens, but **no live NyxID integration has been activated for this research preview**. Optional local registration gating uses `ARENA_INVITE_CODE`. Per designer there are limits of 100 designs, 12 pending matches and 12 unfinished research experiments. These are beta controls, not a complete production anti-abuse system.
 
+## Training sandbox
+
+Open **Train / 训练沙箱** to evolve a chosen fly or compare random search. Configure circuits, scene, objective, population, generations and an evaluation budget. Sessions persist across reloads, support pause/resume/stop, and show actual scores, parents and neural/behavior replays. Save an evaluated descendant and send it to the Arena. Training evaluations do not affect the public leaderboard.
+
+Start small: 2 individuals × 2 generations × 1 second, with a budget of 4 solo evaluations. Mirrored competition requires twice as many evaluations. These searches make no promise of improvement.
+
+[Training contracts and limits](docs/TRAINING.md) describe the shared browser/AI API. Run `uv run python scripts/train.py --save-best` with `ARENA_URL` and `ARENA_TOKEN` set to try the same bounded flow from your own agent or terminal.
+
 ## Scientific status and competition limits
 
 **Existing `legacy-v1` competitions remain available; `sensorimotor-research-v2` competition is unqualified and unavailable.** Match and tournament requests carry a bridge profile; omitted historical fields retain legacy-v1 semantics. An unavailable v2 request returns HTTP 422 without falling back to v1. The Arena displays server readiness and reasons, and rankings keep bridge/runtime/scenario/mode scopes separate.

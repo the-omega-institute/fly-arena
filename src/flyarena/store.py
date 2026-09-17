@@ -31,6 +31,8 @@ class Store:
 
             from .services.experiments import initialize
             initialize(db)
+            from .services.training import initialize as initialize_training
+            initialize_training(db)
 
     @contextmanager
     def db(self):
@@ -58,7 +60,7 @@ class Store:
             row = db.execute("SELECT id,name FROM identities WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
         return dict(row) if row else None
 
-    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False) -> dict:
+    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False, training: tuple | None = None) -> dict:
         if any(k in spec for k in ('provenance','scientific_version','reference_kind','release_id','submission_channel')):
             raise ValueError('Provenance is server-owned')
         if submission_channel not in {'web','api'}:
@@ -66,17 +68,21 @@ class Store:
         ident = uuid.uuid4().hex
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            if training:
+                old=db.execute('SELECT fly_id FROM training_members WHERE run_id=? AND generation=? AND slot=?',training).fetchone()
+                if old:return self.fly(old[0])
             if spec.get("parent_id") and not db.execute("SELECT 1 FROM flies WHERE id=?", (spec["parent_id"],)).fetchone():
                 raise ValueError("Parent fly does not exist")
             if spec.get('parent_id'):
                 parent = json.loads(db.execute('SELECT spec FROM flies WHERE id=?', (spec['parent_id'],)).fetchone()[0])
                 if any(parent.get(k) != spec.get(k) for k in ('connectome_sha256','model_profile')):
                     raise ValueError('Parent must use the same graph and model profile')
-            if db.execute("SELECT count(*) FROM flies WHERE owner=?", (owner,)).fetchone()[0] >= 100:
+            if not training and db.execute("SELECT count(*) FROM flies f WHERE owner=? AND NOT EXISTS(SELECT 1 FROM training_members m WHERE m.fly_id=f.id AND m.saved=0)", (owner,)).fetchone()[0] >= 100:
                 raise ValueError("This workspace allows 100 published flies per designer")
             db.execute("INSERT INTO flies VALUES(?,?,?,?,?,?,?,?)", (ident, owner, spec["name"], spec["color"], canonical(spec).decode(),
                         report["artifact_id"], canonical(report).decode(), time.time()))
             db.execute('INSERT INTO fly_provenance VALUES(?,?,?,?,NULL)', (ident,'ai' if agent_channel else 'user',None,submission_channel))
+            if training:db.execute('INSERT INTO training_members(run_id,generation,slot,fly_id) VALUES(?,?,?,?)',(*training,ident))
         return self.fly(ident)
 
     def fly(self, ident: str) -> dict | None:
@@ -102,7 +108,7 @@ class Store:
 
     def flies(self) -> list[dict]:
         with self.db() as db:
-            ids = [r[0] for r in db.execute("SELECT id FROM flies ORDER BY created DESC LIMIT 200")]
+            ids = [r[0] for r in db.execute("SELECT id FROM flies f WHERE NOT EXISTS(SELECT 1 FROM training_members m WHERE m.fly_id=f.id AND m.saved=0) ORDER BY created DESC LIMIT 200")]
         return [self.fly(i) for i in ids]
 
     def prior_submission(self, owner: str, key: str | None, request: dict, *, tournament: bool = False):
@@ -125,16 +131,22 @@ class Store:
             raise ValueError("Idempotency key already used for a different request")
         return prior
 
-    def add_match(self, owner: str, request: dict, runtime_hash: str, *, key: str | None = None, tournament: str | None = None) -> dict:
+    def add_match(self, owner: str, request: dict, runtime_hash: str, *, key: str | None = None, tournament: str | None = None, training: tuple | None = None) -> dict | None:
         ident, now = uuid.uuid4().hex, time.time()
         with self.db() as db:
             db.execute("BEGIN IMMEDIATE")
+            if training:
+                old=db.execute('SELECT match_id FROM training_evaluations WHERE run_id=? AND generation=? AND slot=? AND trial=?',training).fetchone()
+                if old:return self.match(old[0])
+                run=db.execute('SELECT control,status FROM training_runs WHERE id=?',(training[0],)).fetchone()
+                if run is None or run['control']!='run' or run['status'] in {'complete','failed','stopped'}:return None
             payload = digest(request)
             if key:
                 existing = db.execute("SELECT payload,resource FROM idempotency WHERE owner=? AND key=?", (owner, key)).fetchone()
                 if existing:
                     return self.prior_submission(owner, key, request)
             if db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')", (owner,)).fetchone()[0] >= 12:
+                if training:return None
                 raise ValueError("Queue quota reached: at most 12 unfinished matches per designer")
             artifacts = []
             for fly_id in request["fly_ids"]:
@@ -144,6 +156,7 @@ class Store:
                 artifacts.append(fly[0])
             db.execute("INSERT INTO matches(id,owner,request,artifacts,runtime_hash,status,created,updated,tournament) VALUES(?,?,?,?,?,'queued',?,?,?)",
                        (ident, owner, canonical(request).decode(), canonical(artifacts).decode(), runtime_hash, now, now, tournament))
+            if training:db.execute("INSERT INTO training_evaluations VALUES(?,?,?,?,?)",(*training,ident))
             if key:
                 db.execute("INSERT INTO idempotency VALUES(?,?,?,?)", (owner, key, payload, ident))
         return self.match(ident)
@@ -208,7 +221,7 @@ class Store:
     def leaderboard(self, *, runtime_hash=None, scenario_id=None, mode=None, season_id='genesis-alpha', bridge_profile=None) -> list[dict]:
         from .services.ranking import rank
         with self.db() as db:
-            ids = [r[0] for r in db.execute("SELECT id FROM matches WHERE status='verified'")]
+            ids = [r[0] for r in db.execute("SELECT id FROM matches WHERE status='verified' AND id NOT IN (SELECT match_id FROM training_evaluations)")]
         return rank(self.flies(), [self.match(i) for i in ids], runtime_hash=runtime_hash,
                     scenario_id=scenario_id, mode=mode, season_id=season_id, bridge_profile=bridge_profile)
 

@@ -1,3 +1,4 @@
+import {TrainingSandbox} from './features/training/TrainingSandbox'
 import {SavedFlyCard} from './features/design/SavedFlyCard'
 import {AuthDialogs} from './features/auth/AuthDialogs'
 import {DevelopersFeature} from './features/developers/DevelopersFeature'
@@ -166,12 +167,12 @@ export default function App(){
   return <div className="app-shell">
     <header className="header">
       <button className="brand" onClick={()=>setTab('design')} aria-label={t("Fly Arena 首页")}><span className="brand-mark"><Bug size={22} strokeWidth={1.6}/></span><span>fly<span className="brand-light">arena</span><sup>α</sup></span></button>
-      <nav>{([['design',t("设计工坊"),Dna],['lab',t("表型实验室"),FlaskConical],['arena',t("竞技场"),Swords],['code','AI / API',Code2]] as const).map(([id,label,Icon])=><button className={tab===id?'active':''} key={id} onClick={()=>setTab(id)}><Icon size={15}/>{label}</button>)}</nav>
+      <nav>{([['design',t("设计工坊"),Dna],['train',t('Training sandbox'),GitBranch],['lab',t("表型实验室"),FlaskConical],['arena',t("竞技场"),Swords],['code','AI / API',Code2]] as const).map(([id,label,Icon])=><button className={tab===id?'active':''} key={id} onClick={()=>setTab(id)}><Icon size={15}/>{label}</button>)}</nav>
       <div className="header-right"><Preferences/><span className="season-badge"><span className="live-dot"/>{t("GENESIS SEASON")}</span><button className="identity-button" onClick={()=>identity?setShowToken(true):setLogin(true)}><UserRound size={16}/><span>{identity?.name||t("加入实验")}</span></button></div>
     </header>
 
     <main>
-      <div className="page-heading"><div><div className="eyebrow"><span/> {t("AN OPEN EVOLUTIONARY PLAYGROUND")}</div><h1>{tab==='design'?<>{t("小小生命，")}<em>{t("无限可能。")}</em></>:tab==='arena'?<>{t("让你的设计，")}<em>{t("接受挑战。")}</em></>:tab==='lab'?<>{t("每次进化，")}<em>{t("都有迹可循。")}</em></>:<>{t("你的 AI，")}<em>{t("也是设计师。")}</em></>}</h1><p>{tab==='design'?t("从真实果蝇神经图谱出发。改变连接，塑造本能，创造属于你的数字果蝇。"):tab==='arena'?t("同一身体，同一世界。让不同的神经设计，在食物与空间的竞争中相遇。"):tab==='lab'?t("比较设计、回看行为、追踪神经活动。让下一次修改有据可依。"):t("一份 FlySpec，一套开放接口。让任何 AI 设计、评测并提交自己的果蝇。")}</p></div><div className="science-stamp"><span>{t("BUILT ON REAL BIOLOGY")}</span><strong>MaleCNS <i>v1.0</i></strong><small>{season?num(season.connectome.neuron_count):'—'} {t("neurons · Full retained graph")}<ArrowUpRight size={12}/></small></div></div>
+      <div className="page-heading"><div><div className="eyebrow"><span/> {t("AN OPEN EVOLUTIONARY PLAYGROUND")}</div><h1>{tab==='design'?<>{t("小小生命，")}<em>{t("无限可能。")}</em></>:tab==='train'?<>{t('Train a fly,')}<em>{t('grow a lineage.')}</em></>:tab==='arena'?<>{t("让你的设计，")}<em>{t("接受挑战。")}</em></>:tab==='lab'?<>{t("每次进化，")}<em>{t("都有迹可循。")}</em></>:<>{t("你的 AI，")}<em>{t("也是设计师。")}</em></>}</h1><p>{tab==='design'?t("从真实果蝇神经图谱出发。改变连接，塑造本能，创造属于你的数字果蝇。"):tab==='train'?t('Choose a strategy, set a budget, and explore generations through actual competition.'):tab==='arena'?t("同一身体，同一世界。让不同的神经设计，在食物与空间的竞争中相遇。"):tab==='lab'?t("比较设计、回看行为、追踪神经活动。让下一次修改有据可依。"):t("一份 FlySpec，一套开放接口。让任何 AI 设计、评测并提交自己的果蝇。")}</p></div><div className="science-stamp"><span>{t("BUILT ON REAL BIOLOGY")}</span><strong>MaleCNS <i>v1.0</i></strong><small>{season?num(season.connectome.neuron_count):'—'} {t("neurons · Full retained graph")}<ArrowUpRight size={12}/></small></div></div>
 
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label={t("关闭错误")}><X size={16}/></button></div>}
 
@@ -180,7 +181,7 @@ export default function App(){
           <aside className="collection panel"><div className="panel-heading"><span>{t("我的果蝇库")}</span><span className="count">{flies.length.toString().padStart(2,'0')}</span></div><div className="tiny-label">{t("SELECT A STARTING POINT")}</div><p className="draft-status">{parentId?t('Unsaved draft from parent')+': '+parentId:t('Unsaved canonical draft')}</p>
             <div className="fly-list">{flies.slice(0,12).map(f=><SavedFlyCard key={f.id} fly={f} viewer={identity?.id} selected={parentId===f.id} onClone={clone}/>)}</div>
             <button className="new-fly" onClick={()=>{setScales(defaultScales());setTau(1);setThreshold(0);setName('Untitled 01');setSelected('');setParentId(null);setBaseSpec({});setInterventions([]);setEdgeDeltas([]);setReport(null);setToast(t("已恢复基线参数，为新设计取个名字吧。"))}}><Plus size={15}/>{t("从原型开始设计")}</button>
-            <div className="collection-footer"><GitBranch size={18}/><strong>{t("进化，有迹可循")}</strong><p>{t("每个设计都保留图谱来源、父代和不可变的权重版本。")}</p><button onClick={()=>setTab('lab')}>{t("查看实验记录")}<ArrowRight size={14}/></button></div>
+            <div className="collection-footer"><GitBranch size={18}/><strong>{t("进化，有迹可循")}</strong><p>{t("每个设计都保留图谱来源、父代和不可变的权重版本。")}</p><button onClick={()=>setTab('train')}>{t("Training sandbox")}<ArrowRight size={14}/></button></div>
           </aside>
 
           <section className="specimen-panel"><div className="specimen-top"><span><span className="live-dot"/> {t("SPECIMEN /")}{name||t('NEW DESIGN')}</span><span>NEUROMECHFLY</span></div>
@@ -207,6 +208,8 @@ export default function App(){
       </>}
 
       {tab==='arena'&&<ArenaFeature replayStatus={replay.status} replayError={replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={flies} frames={frames} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy||(replay.status==='loading'?'replay':'')} startMatch={startMatch} startSeries={startSeries}/>}
+
+      {tab==='train'&&<TrainingSandbox flies={flies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={fly=>{setSelected(fly.id);setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
       {tab==='lab'&&<PhenotypeLab flies={flies} identity={identity} selected={selected} experimentId={experimentId} onExperiment={openExperiment} onLogin={()=>setLogin(true)}/>}
 

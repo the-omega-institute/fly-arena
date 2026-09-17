@@ -29,6 +29,7 @@ from .store import Store
 from .worker import Worker
 from .research import ExperimentSpec
 from .services.research_service import ResearchService
+from .services.training import TrainingService, TrainingSpec
 
 
 def create_app(*, with_worker: bool = True, store: Store | None = None, auth_config: AuthConfig | None = None, oidc_client: NyxIDClient | None = None, research_service: ResearchService | None = None) -> FastAPI:
@@ -58,6 +59,8 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     app = FastAPI(title="Fly Arena API", version="0.1.0", lifespan=lifespan,
                   description="Published connectome designs and trusted embodied matches. All submitted flies and match replays are public in this MVP workspace.")
     app.state.research = research
+    training = TrainingService(store, compiler)
+    app.state.training = training
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.include_router(auth.router())
 
@@ -190,6 +193,46 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if result is None:
             raise HTTPException(404,'Experiment not found')
         return result
+
+    @app.post("/api/v1/training", status_code=202)
+    def training_create(body: TrainingSpec, owner: dict = Depends(identity), idempotency_key: str | None = Header(default=None)):
+        require_bridge(body.bridge_profile)
+        with compile_lock:
+            ids = [body.founder_id] + ([body.opponent_id] if body.mode == 'contest' else [])
+            for fly_id in ids:
+                fly = store.fly(fly_id)
+                if fly is None:
+                    raise ValueError("Starting fly or opponent does not exist")
+                compiler().compile(FlySpec.model_validate(fly['spec']))
+        return training.create(owner['id'], body, digest(runtime_manifest(bridge_profile=body.bridge_profile)), idempotency_key)
+
+    @app.get("/api/v1/training")
+    def training_list(owner: dict = Depends(identity)):
+        return training.list(owner['id'])
+
+    def owned_training(ident, owner):
+        session = training.get(ident)
+        if session is None or session['owner'] != owner['id']:
+            raise HTTPException(404, "Training session not found")
+        return session
+
+    @app.get("/api/v1/training/{ident}")
+    def training_get(ident: str, owner: dict = Depends(identity)):
+        return owned_training(ident, owner)
+
+    @app.post("/api/v1/training/{ident}/control")
+    def training_control(ident: str, body: dict, owner: dict = Depends(identity)):
+        owned_training(ident, owner)
+        if set(body) != {'action'} or body['action'] not in ('pause','resume','stop'):
+            raise ValueError("Provide action: pause, resume or stop")
+        return training.control(ident, owner['id'], body['action'])
+
+    @app.post("/api/v1/training/{ident}/save")
+    def training_save(ident: str, body: dict, owner: dict = Depends(identity)):
+        owned_training(ident, owner)
+        if set(body) != {'fly_id'} or not isinstance(body['fly_id'], str):
+            raise ValueError("Provide a training fly_id")
+        return training.save(ident, owner['id'], body['fly_id'])
 
     @app.get("/api/v1/matches")
     def matches():

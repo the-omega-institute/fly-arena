@@ -1,0 +1,113 @@
+import {useEffect,useRef,useState} from 'react'
+import {ArrowRight,Check,Dna,GitBranch,Loader2,Pause,Play,Save,Square,TrendingUp} from 'lucide-react'
+import {api} from '../../api'
+import type {ArenaMap,Fly,Identity,Match,Season} from '../../types'
+import {useI18n} from '../../shared/i18n'
+import {MapPreview} from '../arena/MapPreview'
+import {planProblem} from './plan'
+
+type Plan={name:string;founder_id:string;opponent_id:string|null;strategy:'evolution'|'random_search';circuits:string[];mutation_strength:number;population:number;generations:number;max_evaluations:number;map_id:string;mode:'forage'|'contest';duration_seconds:number;seed:number;bridge_profile:string}
+type Member={generation:number;slot:number;fly_id:string;saved:number;fitness:number|null;fly:Fly;matches:Match[]}
+type Training={id:string;spec:Plan;status:string;control:string;error:string|null;members:Member[];evaluations_total:number;evaluations_started:number;evaluations_completed:number;progress:number;best_fly_id:string|null;baseline_fitness:number|null}
+type Props={flies:Fly[];identity:Identity|null;selected:string;season:Season|null;maps:ArenaMap[];onLogin:()=>void;onSaved:(fly:Fly)=>Promise<void>;onCompete:(fly:Fly)=>void;onReplay:(match:Match)=>void}
+const terminal=(status:string)=>['complete','failed','stopped'].includes(status)
+const statusKey:Record<string,string>={queued:'Queued',running:'Training',paused:'Paused',pausing:'Pausing after evaluation',stopping:'Stopping after evaluation',stopped:'Stopped',complete:'Complete',failed:'Failed'}
+
+export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onSaved,onCompete,onReplay}:Props){
+  const {t,locale}=useI18n()
+  const [founder,setFounder]=useState(selected||flies[0]?.id||'')
+  const [opponent,setOpponent]=useState(flies.find(f=>f.id!==founder)?.id||'')
+  const [name,setName]=useState('Evolution 01')
+  const [map,setMap]=useState('orchard')
+  const [mode,setMode]=useState<'forage'|'contest'>('forage')
+  const [strategy,setStrategy]=useState<'evolution'|'random_search'>('evolution')
+  const [circuits,setCircuits]=useState(['olfactory','projection','descending'])
+  const [strength,setStrength]=useState(.08)
+  const [population,setPopulation]=useState(3)
+  const [generations,setGenerations]=useState(3)
+  const [duration,setDuration]=useState(2)
+  const [seed,setSeed]=useState(42)
+  const [budget,setBudget]=useState(24)
+  const [runs,setRuns]=useState<Training[]>([])
+  const [focus,setFocus]=useState('')
+  const [busy,setBusy]=useState('')
+  const [error,setError]=useState('')
+  const [message,setMessage]=useState('')
+  const [loadedOwner,setLoadedOwner]=useState<string|null>(null)
+  const revision=useRef(0)
+  const [generation,setGeneration]=useState<number|null>(null)
+  const profile=season?.match_profiles?.find(p=>p.id==='legacy-v1'&&p.ready)
+  const selectedFly=flies.find(f=>f.id===founder)
+  const needed=population*generations*(mode==='contest'?2:1)
+  const problem=planProblem({population,generations,budget,duration,seed,circuits,name,mode,founder,opponent})
+  const visibleRuns=loadedOwner===identity?.id?runs:[]
+  const current=visibleRuns.find(r=>r.id===focus)
+  const shownGeneration=generation??Math.max(0,...(current?.members.map(m=>m.generation)||[]))
+  const members=current?.members.filter(m=>m.generation===shownGeneration)||[]
+  useEffect(()=>{if(!founder&&flies.length)setFounder(selected||flies[0].id)},[flies,selected,founder])
+  useEffect(()=>{
+    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>
+    async function poll(){
+      if(!identity){setRuns([]);setLoadedOwner(null);return}
+      try{
+        const observedRevision=revision.current
+        const next=await api<Training[]>('/training',{signal:controller.signal},identity)
+        if(!controller.signal.aborted&&observedRevision===revision.current){setRuns(next);setLoadedOwner(identity.id)}
+      }catch(e){if(!controller.signal.aborted)setError(String(e))}
+      if(!controller.signal.aborted)timer=setTimeout(poll,3000)
+    }
+    void poll()
+    return()=>{controller.abort();clearTimeout(timer)}
+  },[identity?.id,identity?.token])
+  async function act(key:string,fn:()=>Promise<void>){setBusy(key);setError('');setMessage('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
+  function accept(run:Training){revision.current++;setRuns(old=>[run,...old.filter(r=>r.id!==run.id)]);setLoadedOwner(identity?.id||null);setFocus(run.id)}
+  async function start(){
+    if(!identity){onLogin();return}
+    await act('create',async()=>{
+      const run=await api<Training>('/training',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({name,founder_id:founder,opponent_id:mode==='contest'?opponent:null,strategy,circuits,mutation_strength:strength,population,generations,max_evaluations:budget,map_id:map,mode,duration_seconds:duration,seed,bridge_profile:'legacy-v1'})},identity)
+      accept(run);setGeneration(null)
+    })
+  }
+  async function control(action:string){if(current)await act(action,async()=>accept(await api<Training>(`/training/${current.id}/control`,{method:'POST',body:JSON.stringify({action})},identity)))}
+  async function save(member:Member,compete=false){if(current)await act(member.fly_id,async()=>{
+    const fly=await api<Fly>(`/training/${current.id}/save`,{method:'POST',body:JSON.stringify({fly_id:member.fly_id})},identity)
+    await onSaved(fly);accept(await api<Training>(`/training/${current.id}`,{},identity));setMessage(t('Individual saved to your library.'))
+    if(compete)onCompete(fly)
+  })}
+  const history=current?Array.from({length:current.spec.generations},(_,i)=>{
+    const group=current.members.filter(m=>m.generation===i),scored=group.filter(m=>m.fitness!==null)
+    return {generation:i,complete:scored.length===current.spec.population,best:scored.length?Math.max(...scored.map(m=>m.fitness!)):null,count:scored.length}
+  }):[]
+  const best=current?.members.find(m=>m.fly_id===current.best_fly_id)?.fitness
+  return <div className={"training-layout "+(current?"has-session":"new-session")}>
+    <aside className="panel training-setup">
+      <div className="panel-heading"><span><Dna size={17}/>{t('Start a training session')}</span><span className="tiny-label">SANDBOX</span></div>
+      <label>{t('Session name')}<input value={name} maxLength={64} onChange={e=>setName(e.target.value)}/></label>
+      <label>{t('Starting fly')}<select value={founder} onChange={e=>setFounder(e.target.value)}><option value="">{t('Choose a fly')}</option>{flies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>
+      <label>{t('Training strategy')}<select value={strategy} onChange={e=>setStrategy(e.target.value as typeof strategy)}><option value="evolution">{t('Evolution · select and mutate')}</option><option value="random_search">{t('Random search · explore from founder')}</option></select></label>
+      <p className="training-hint">{t(strategy==='evolution'?'Each generation retains its best parent and explores mutations around it.':'Each generation explores mutations around the original founder.')}</p>
+      <div className="training-pair"><label>{t('Environment')}<select value={map} onChange={e=>setMap(e.target.value)}>{maps.map(m=><option key={m.id} value={m.id}>{locale==='en'?m.english:m.name}</option>)}</select></label><label>{t('Objective')}<select value={mode} onChange={e=>setMode(e.target.value as typeof mode)}><option value="forage">{t('Collect food')}</option><option value="contest">{t('Compete for food')}</option></select></label></div>
+      {mode==='contest'&&<label>{t('Fixed opponent')}<select value={opponent} onChange={e=>setOpponent(e.target.value)}><option value="">{t('Choose a fly')}</option>{flies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>}
+      <fieldset className="training-circuits"><legend>{t('Allow mutations in')}</legend>{season?.connectome.circuits.map(c=><label key={c.id}><input type="checkbox" checked={circuits.includes(c.id)} onChange={e=>setCircuits(old=>e.target.checked?[...old,c.id]:old.filter(id=>id!==c.id))}/><span style={{color:c.color}}/> {t(c.label)}</label>)}</fieldset>
+      <label>{t('Mutation strength')} <b>{(strength*100).toFixed(0)}%</b><input type="range" min=".01" max=".3" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label>
+      <div className="training-pair"><label>{t('Population')}<input type="number" min="2" max="6" value={population} onChange={e=>setPopulation(+e.target.value)}/></label><label>{t('Generations')}<input type="number" min="1" max="8" value={generations} onChange={e=>setGenerations(+e.target.value)}/></label></div>
+      <div className="training-pair"><label>{t('Seconds per evaluation')}<select value={duration} onChange={e=>setDuration(+e.target.value)}>{[1,2,3,5,10].map(n=><option key={n}>{n}</option>)}</select></label><label>{t('Seed')}<input type="number" min="0" max="2147483647" value={seed} onChange={e=>setSeed(+e.target.value)}/></label></div>
+      <label>{t('Evaluation budget')}<input type="number" min="2" max="96" value={budget} onChange={e=>setBudget(+e.target.value)}/></label>
+      <div className={'training-budget '+(needed>budget?'over':'')}><strong>{needed} / {budget}</strong><span>{t('evaluations planned / limit')}</span><small>{population} × {generations}{mode==='contest'?' × 2':''} · {t(mode==='contest'?'Both spawn positions are evaluated.':'One solo evaluation per individual.')}</small></div>
+      <p className="training-hint">{t('Simulations run in a queue and may take minutes. Closing this page does not stop training.')}</p>
+      <button className="primary wide" disabled={!!busy||!profile||!!problem} onClick={start}>{busy==='create'?<Loader2 size={16} className="spin"/>:<Play size={16}/>} {t('Start training')}<ArrowRight size={16}/></button>
+      {problem&&<p className="training-hint" role="status">{t(problem)}</p>}
+      {!profile&&<p className="training-hint">{t('Training simulation is unavailable on this server.')}</p>}
+    </aside>
+    <div className="training-main">
+      {error&&<p className="training-error" role="alert">{error}</p>}{message&&<p className="training-message" role="status"><Check size={16}/>{message}</p>}
+      <div className="training-tabs"><button className={!current?'active':''} onClick={()=>setFocus('')}>{t('New session')}</button>{visibleRuns.map(r=><button key={r.id} className={current?.id===r.id?'active':''} onClick={()=>{setFocus(r.id);setGeneration(null)}}>{r.spec.name}<small>{t(statusKey[r.status]||r.status)}</small></button>)}</div>
+      {!current?<><div className="arena-stage training-map"><div className="stage-heading"><span>{t('YOUR TRAINING GROUND')}</span><span>{t('Seed')} {seed}</span></div><div className="arena-canvas"><MapPreview mapId={map} seed={seed} bridgeProfile="legacy-v1" participants={mode==='forage'?[selectedFly]:[selectedFly,flies.find(f=>f.id===opponent)]}/></div></div><div className="panel training-welcome"><GitBranch size={28}/><h2>{t('Give your fly a few generations.')}</h2><p>{t('Choose a strategy and a small budget. Compare descendants through actual matches, inspect their behavior, and keep the ones you want to compete with.')}</p><div><span>01 · {t('Design')}</span><ArrowRight size={16}/><span>02 · {t('Train')}</span><ArrowRight size={16}/><span>03 · {t('Compete')}</span></div></div></>:<>
+        <section className="panel training-overview"><div className="panel-heading"><span><GitBranch size={17}/>{current.spec.name}</span><span className="training-status">{t(statusKey[current.status]||current.status)}</span></div><div className="training-summary"><div><span>{t('Evaluations completed')}</span><strong>{current.evaluations_completed}<small> / {current.evaluations_total}</small></strong></div><div><span>{t('Best food score')}</span><strong>{best==null?'—':best.toFixed(2)}</strong></div><div><span>{t('Starting food score')}</span><strong>{current.baseline_fitness===null?'—':current.baseline_fitness.toFixed(2)}</strong></div></div><div className="training-progress"><span style={{width:current.progress*100+'%'}}/></div><div className="training-controls"><small>{t(current.spec.mode==='contest'?'Fitness is mean food margin across swapped positions.':'Fitness is food consumed in the solo evaluation.')} {t('Training results do not affect the public leaderboard.')}</small>{!terminal(current.status)&&<>{current.control==='pause'?<button className="secondary" disabled={!!busy} onClick={()=>control('resume')}><Play size={14}/>{t('Resume')}</button>:<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('pause')}><Pause size={14}/>{t('Pause')}</button>}<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('stop')}><Square size={13}/>{t('Stop')}</button></>}</div>{current.error&&<p className="training-error">{current.error}</p>}</section>
+        <section className="panel training-history"><div className="panel-heading"><span><TrendingUp size={16}/>{t('Generations')}</span><small>{t('Select a generation to inspect its individuals.')}</small></div><div className="generation-list">{history.map(h=><button key={h.generation} className={shownGeneration===h.generation?'active':''} onClick={()=>setGeneration(h.generation)}><span>G{h.generation+1}</span><strong>{h.best===null?'—':h.best.toFixed(2)}</strong><small>{h.count}/{current.spec.population} {t('evaluated')}{!h.complete&&h.count>0?' · '+t('Partial'):''}</small></button>)}</div></section>
+        <div className="training-individuals">{members.map(m=><article className="panel training-individual" key={m.fly_id}><div className="individual-title"><span className="tiny-label">G{m.generation+1} · {m.slot===0?t('Retained parent'):t('Mutation')}</span>{m.fly_id===current.best_fly_id&&<span className="best-label">{t('Best so far')}</span>}</div><h3>{m.fly.name}</h3><code>{m.fly_id.slice(0,8)}</code><div className="individual-score"><span>{t('Food score')}</span><strong>{m.fitness===null?'—':m.fitness.toFixed(2)}</strong></div><p><GitBranch size={13}/>{t('Parent')} · {m.fly.spec.parent_id?.slice(0,8)||'—'}</p><p>{t('Mutation budget')} · {m.fly.report.budget_used.toFixed(2)} / {m.fly.report.budget_limit}</p><div className="individual-genes">{m.fly.spec.weight_mutations.map(g=><span key={g.selector}>{t(season?.connectome.circuits.find(c=>c.id===g.selector)?.label||g.selector)} ×{g.scale.toFixed(3)}</span>)}</div><div className="individual-matches">{m.matches.map((match,i)=><button className="text-link" key={match.id} disabled={match.status!=='verified'} onClick={()=>onReplay(match)}>{match.status==='verified'?<Play size={13}/>:<Loader2 size={13} className={match.status==='running'?'spin':''}/>} {t('Evaluation')} {i+1} · {match.status==='running'?`${Math.round(match.progress*100)}%`:t(match.status==='verified'?'Replay':match.status==='queued'?'Queued':'Failed')}</button>)}</div><div className="individual-actions"><button className="secondary" disabled={!!busy||m.fitness===null||!!m.saved} onClick={()=>save(m)}>{m.saved?<Check size={14}/>:<Save size={14}/>} {t(m.saved?'Saved':'Save')}</button><button className="primary" disabled={!!busy||m.fitness===null} onClick={()=>save(m,true)}>{t('Compete')}<ArrowRight size={14}/></button></div></article>)}</div>
+        {!members.length&&<div className="panel training-welcome"><Loader2 className="spin"/><p>{t('Preparing the first generation. Actual evaluations will appear here.')}</p></div>}
+      </>}
+    </div>
+  </div>
+}

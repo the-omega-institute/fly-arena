@@ -24,3 +24,15 @@ test('editing retains advanced interventions, legacy extras, canonical IDs and n
 test('old specs without interventions remain supported; malformed imports rejected',()=>{assert.doesNotThrow(()=>assertSpec({schema_version:'flyspec/v1',name:'old',weight_mutations:[],neuron_parameters:{}}));assert.throws(()=>assertSpec({schema_version:'bad'}));assert.throws(()=>assertSpec({schema_version:'flyspec/v1',name:'bad',weight_mutations:[],neuron_parameters:{},interventions:[{scale:1}]}))});
 test('all static translated call keys have complete en and zh-CN catalogs',()=>{let keys=[];function scan(path){for(const f of fs.readdirSync(path,{withFileTypes:true})){const full=path+'/'+f.name;if(f.isDirectory())scan(full);else if(/\.tsx$/.test(f.name)){const sf=ts.createSourceFile(full,fs.readFileSync(full,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);function visit(n){if(ts.isCallExpression(n)&&n.expression.getText(sf)==='t'&&ts.isStringLiteral(n.arguments[0]))keys.push(n.arguments[0].text);ts.forEachChild(n,visit)}visit(sf)}}}scan(new URL('../src',import.meta.url).pathname);for(const key of keys){assert.ok(catalog[key]?.en,`Missing en: ${key}`);assert.ok(catalog[key]?.['zh-CN'],`Missing zh: ${key}`)}assert.ok(Object.keys(catalog).length>300)});
 test('API retains credential cookies, Bearer auth, CSRF and expiration signal',async()=>{const original=globalThis.fetch;let options;globalThis.fetch=async(url,opts)=>{options=opts;return {ok:true,json:async()=>({ok:true})}};const {api,setCsrfToken}=await moduleAt('../src/api.ts');setCsrfToken('csrf-test');await api('/test',{method:'POST'});assert.equal(options.credentials,'same-origin');assert.equal(options.headers['X-Arena-CSRF'],'csrf-test');await api('/test',{}, {id:'test',name:'test',token:'bearer-test'});assert.equal(options.headers.Authorization,'Bearer bearer-test');assert.equal(options.headers['X-Arena-CSRF'],undefined);let event;globalThis.window={dispatchEvent:e=>event=e.type};globalThis.fetch=async()=>({ok:false,status:401,json:async()=>({detail:'Expired'})});await assert.rejects(()=>api('/test'),/Expired/);assert.equal(event,'arena:session-expired');globalThis.fetch=original;delete globalThis.window});
+
+const {planProblem}=await moduleAt('../src/features/training/plan.ts');
+const trainingPlan={population:2,generations:2,budget:4,duration:1,seed:42,circuits:['olfactory'],name:'First generations',mode:'forage',founder:'fly',opponent:''};
+test('training plan admits finite solo work and charges both mirrored positions',()=>{
+ assert.equal(planProblem(trainingPlan),null);
+ assert.ok(planProblem({...trainingPlan,mode:'contest',opponent:'rival'}));
+ assert.equal(planProblem({...trainingPlan,mode:'contest',opponent:'rival',budget:8}),null);
+ for(const edit of [{population:0},{population:2.5},{generations:9},{budget:97},{duration:NaN},{seed:Infinity},{seed:-1},{circuits:[]},{name:'  '},{founder:''},{mode:'contest'}])assert.ok(planProblem({...trainingPlan,...edit}),JSON.stringify(edit));
+});
+test('training navigation can be bookmarked without becoming a lab or match route',()=>{
+ assert.equal(readRoute(routeHash('train')).tab,'train');
+});
