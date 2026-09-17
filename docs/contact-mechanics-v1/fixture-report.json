@@ -1,0 +1,14 @@
+{
+  "tests": 77,
+  "failures": 0,
+  "errors": 0,
+  "passed": true,
+  "elapsed_s": 11.923593044281006,
+  "rss_bytes": 94142464,
+  "interpreter": "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python",
+  "bytecode_disabled": true,
+  "native": 0,
+  "production_intent": 0,
+  "forbidden_reads": 0,
+  "native_modules": []
+}

@@ -1,0 +1,1149 @@
+{
+  "body_bound_provenance": "compact accepted model locator body_mass shape69, one world body; actual fly body count B must be positive<=68 and sealed at preflight; nbody69 checked",
+  "composition_bound_provenance": "compact original metadata mesh_count69, geom_count70, nq73/nv72 and67 joints; fixed source one fly/one plane; no cameras/colorization/obstacles",
+  "constants": {
+    "AC": 638100,
+    "AV": 308000,
+    "B": 68,
+    "CONTROL_ENDPOINTS": 640016,
+    "CONTROL_OBSERVATIONS": 948016,
+    "E": 1003571200,
+    "L": 3828606,
+    "N": 1960100,
+    "R": 1960149
+  },
+  "data_allocation_provenance": {
+    "MJDATA_POINTERS_arrays": 92,
+    "element_multipliers": {
+      "nC": 3,
+      "nD": 2,
+      "nJfe": 1,
+      "nJfv": 2,
+      "nJmom": 2,
+      "nJten": 1,
+      "nM": 1,
+      "na": 2,
+      "nbody": 90,
+      "nbvh": 1,
+      "nbvhdynamic": 6,
+      "ncam": 12,
+      "neq": 1,
+      "nflexedge": 2,
+      "nflexelem": 6,
+      "nflexvert": 5,
+      "ngeom": 12,
+      "nhistory": 1,
+      "njnt": 6,
+      "nlight": 6,
+      "nmocap": 7,
+      "nplugin": 2,
+      "npluginstate": 1,
+      "nq": 1,
+      "nsensordata": 1,
+      "nsite": 12,
+      "ntendon": 4,
+      "ntree": 2,
+      "nu": 6,
+      "nuserdata": 1,
+      "nv": 30,
+      "nwrap": 8
+    },
+    "header": "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/mujoco/include/mujoco/mjxmacro.h",
+    "header_sha256": "fd07efa3527b5b2d09f4ebf694a94797cff9c4b259d7ab544293b33b2b09a633",
+    "reservation": "2*(8*sum(model_dimension*multiplier)+92*64+1MiB+model.narena), before MjData constructor; all types <=8bytes; no native plugins"
+  },
+  "instrumentation": {
+    "composition_methods": "named MjSpec/MjsBody methods wrapped directly",
+    "control_observation": "classmethod descriptor preserved; each source reader reserved and owned ground contacts capped before native call",
+    "field_reads_writes": "frozen source array/property accesses; not additional native dynamics operations",
+    "mj_and_mju": "all module functions wrapped; any absent allowlist name stops before invocation",
+    "model_binary_load": "only explicit budget.call model_load site",
+    "spec_copy_compile_construct": "exact immutable Python boundaries reserve before native constructor/copy/compile; failed boundary remains attempted and incomplete"
+  },
+  "leaves": {
+    "MjData": {
+      "derivation": "4*Ac + 4*L +512 constructor/static/checkpoint/verifier allowance",
+      "maximum_attempts": 17867336
+    },
+    "MjSpec.add_actuator": {
+      "derivation": "53*48; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 2544
+    },
+    "MjSpec.add_key": {
+      "derivation": "53*2; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 106
+    },
+    "MjSpec.add_material": {
+      "derivation": "53*1; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 53
+    },
+    "MjSpec.add_mesh": {
+      "derivation": "53*69; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 3657
+    },
+    "MjSpec.add_pair": {
+      "derivation": "53*69; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 3657
+    },
+    "MjSpec.add_sensor": {
+      "derivation": "53*6; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 318
+    },
+    "MjSpec.add_texture": {
+      "derivation": "53*2; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 106
+    },
+    "MjSpec.attach": {
+      "derivation": "53*1; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 53
+    },
+    "MjSpec.compile": {
+      "derivation": "4*53: fly.add_joints keyframe + fly.add_actuators keyframe + world.add_fly keyframe + Simulation.__init__",
+      "maximum_attempts": 212
+    },
+    "MjSpec.construct": {
+      "derivation": "2*53: BaseWorld and BaseFly",
+      "maximum_attempts": 106
+    },
+    "MjSpec.copy": {
+      "derivation": "one per source compile boundary, charged before boundary invocation",
+      "maximum_attempts": 212
+    },
+    "MjSpec.delete": {
+      "derivation": "53*1; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 53
+    },
+    "MjsBody.add_body": {
+      "derivation": "53*69; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 3657
+    },
+    "MjsBody.add_freejoint": {
+      "derivation": "53*1; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 53
+    },
+    "MjsBody.add_geom": {
+      "derivation": "53*70; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 3710
+    },
+    "MjsBody.add_joint": {
+      "derivation": "53*66; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 3498
+    },
+    "MjsBody.add_site": {
+      "derivation": "53*2; source frozen one-fly flat-ground composition; method wrapper charges actual invocation before call",
+      "maximum_attempts": 106
+    },
+    "bind_native": {
+      "derivation": "4 preflight + 33 candidate trials",
+      "maximum_attempts": 37
+    },
+    "candidate_active": {
+      "derivation": "Ac runtime attempted active steps",
+      "maximum_attempts": 638100
+    },
+    "candidate_propose": {
+      "derivation": "Ac runtime prepare/propose reservation",
+      "maximum_attempts": 638100
+    },
+    "candidate_shared_fit": {
+      "derivation": "Ac production shared_twist boundary",
+      "maximum_attempts": 638100
+    },
+    "candidate_solve": {
+      "derivation": "6 Ac production regularized_velocity boundary",
+      "maximum_attempts": 3828600
+    },
+    "checkpoint": {
+      "derivation": "initial seed42 + development candidate42 straight02 poststep10000",
+      "maximum_attempts": 2
+    },
+    "control_active": {
+      "derivation": "Av runtime active actions",
+      "maximum_attempts": 308000
+    },
+    "control_observation": {
+      "derivation": "CONTROL_ENDPOINTS + Av =16*40001+308000; each from_sim invocation charged before its reader, <=512 ground contacts checked before leaf calls",
+      "maximum_attempts": 948016
+    },
+    "cpg_init_reset": {
+      "derivation": "8*53 upper bound including __init__ nested reset and two controller constructions/resets",
+      "maximum_attempts": 424
+    },
+    "cpg_step": {
+      "derivation": "Av; observed CPGNetwork.step, never during preflight",
+      "maximum_attempts": 308000
+    },
+    "get_joint_angles": {
+      "derivation": "24 Ac + 4 L + 24 Av + 48*53 +24; conservative scalar/batch API invocation bound including two candidate references, independent references, excursion, initialization and unchanged v16 verification",
+      "maximum_attempts": 38023392
+    },
+    "independent_candidate": {
+      "derivation": "Ac complete independent transitions including100 restore actions",
+      "maximum_attempts": 638100
+    },
+    "mj_comPos": {
+      "derivation": "same as mj_kinematics",
+      "maximum_attempts": 20134989
+    },
+    "mj_contactForce": {
+      "derivation": "E + 512*(CONTROL_ENDPOINTS + Av): recorded owned completed contacts once;16*(40000+1) row0/endpoint control observations;Av active pre-action observations. from_sim selects ground contacts through get_bodysegment_contact_forces. Constructors and failure exports do not call from_sim; native control step path does not use Bodies.step or old NativeRecorder.row.",
+      "maximum_attempts": 1488955392
+    },
+    "mj_copyData": {
+      "derivation": "32 fixed cap:2 checkpoints +2 restores staging/backup/commit/possible rollback <=10; unused allowance does not permit extra scientific calls",
+      "maximum_attempts": 32
+    },
+    "mj_forward": {
+      "derivation": "53 constructor-only Bodies forwards; forbidden in runtime loops",
+      "maximum_attempts": 53
+    },
+    "mj_fwdVelocity": {
+      "derivation": "R endpoint traversal + 2 static + 2 restoration setup",
+      "maximum_attempts": 1960153
+    },
+    "mj_getState": {
+      "derivation": "512 fixed cap for reset snapshots, checkpoints, restore stages,200 samples and bounded failure exports",
+      "maximum_attempts": 512
+    },
+    "mj_id2name": {
+      "derivation": "250000 hard bound; frozen69 bodies/70 geoms, constructor and adapter maps",
+      "maximum_attempts": 250000
+    },
+    "mj_jac": {
+      "derivation": "2*(36+2*512)*Ac + 12*Av + 2*E + 72; producer+independent candidate, both control sensor/verifier, per-contact material velocities, static reserve",
+      "maximum_attempts": 3363610472
+    },
+    "mj_jacBody": {
+      "derivation": "2*Ac + 1 static",
+      "maximum_attempts": 1276201
+    },
+    "mj_jacBodyCom": {
+      "derivation": "2*B*Ac + B static",
+      "maximum_attempts": 86781668
+    },
+    "mj_kinematics": {
+      "derivation": "4 Ac + 4 L + R + Av + 16; conservative shared runtime/reconstruction bound, static14 plus restoration setup2",
+      "maximum_attempts": 20134989
+    },
+    "mj_name2id": {
+      "derivation": "250000 hard bound; bounded constructors/name maps <=53*(model lookup capacity)+37 adapter maps",
+      "maximum_attempts": 250000
+    },
+    "mj_objectVelocity": {
+      "derivation": "2*E + 36 static foot + B static COM + 1 static thorax",
+      "maximum_attempts": 2007142505
+    },
+    "mj_resetDataKeyframe": {
+      "derivation": "53 Simulation constructor resets",
+      "maximum_attempts": 53
+    },
+    "mj_saveModel": {
+      "derivation": "1 at seed42 preflight",
+      "maximum_attempts": 1
+    },
+    "mj_stateSize": {
+      "derivation": "512 same call sites as mj_getState",
+      "maximum_attempts": 512
+    },
+    "mj_step": {
+      "derivation": "N = 32*40000 + 16*40000 + 40000 + 100",
+      "maximum_attempts": 1960100
+    },
+    "model_build": {
+      "derivation": "4 static preflight +49 scheduled trial factories; never a restoration factory",
+      "maximum_attempts": 53
+    },
+    "model_load": {
+      "derivation": "one reusable binary verification model",
+      "maximum_attempts": 1
+    },
+    "native_cache_manifest": {
+      "derivation": "512 fixed cap, initial/captured cache checks,2 restores,200 samples and bounded failure exports",
+      "maximum_attempts": 512
+    },
+    "reference_construct": {
+      "derivation": "2*53 factory controllers +1 shared verifier +16 unchanged v16 full-trial verifier constructors",
+      "maximum_attempts": 123
+    },
+    "restore": {
+      "derivation": "initial same-state + conditional cross-seed destination",
+      "maximum_attempts": 2
+    },
+    "static_excursion": {
+      "derivation": "6 accepted native calls =12 detached poses only at seed42",
+      "maximum_attempts": 6
+    },
+    "static_neutral": {
+      "derivation": "one6-leg angle conversion at each of4 seeds",
+      "maximum_attempts": 4
+    },
+    "static_prepare": {
+      "derivation": "2 actual-reset detached preparations only at seed42",
+      "maximum_attempts": 2
+    }
+  },
+  "no_extra_allowance": "Hard maxima do not authorize additional calls/trials or retries; scheduled count remains1960100, emergency2600000 never used as allowance.",
+  "ready": false,
+  "schema": "contact-mechanics-source-leaf-ledger/v1",
+  "scientific_calls_to_generate": 0,
+  "source_files": {
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/compose/base.py": {
+      "bytes": 4206,
+      "sha256": "de307140820365ee47e9391ad96e3750640f40f2673d61d66b3fd75cec795ebe",
+      "source_call_sites": [
+        {
+          "callee": "self.mjcf_root.copy().compile",
+          "line": 34
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 35
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/compose/fly/base_fly.py": {
+      "bytes": 37477,
+      "sha256": "9f7ec2c3786972467085cf6a92363cc72a95551226151ff1941fd96800ec677f",
+      "source_call_sites": [
+        {
+          "callee": "mj.MjSpec",
+          "line": 190
+        },
+        {
+          "callee": "spec.compile",
+          "line": 262
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 263
+        },
+        {
+          "callee": "self.compile",
+          "line": 848
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 856
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 867
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/compose/fly/neuromechfly.py": {
+      "bytes": 5164,
+      "sha256": "c47f422e5719f712b3f8b60913a22ce9d89d3943c81a8433549a129197ed50e3",
+      "source_call_sites": []
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/compose/world/base_world.py": {
+      "bytes": 15896,
+      "sha256": "cff1a5d0ec8781d2099e72f9eb6452706f7d5a3ba9016ef004343359aa9b2fca",
+      "source_call_sites": [
+        {
+          "callee": "mj.MjSpec",
+          "line": 66
+        },
+        {
+          "callee": "self.compile",
+          "line": 188
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 206
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/compose/world/flat_ground.py": {
+      "bytes": 1934,
+      "sha256": "a1ed5add63ad316f0c4dbf3b02e169b79490bafb85a0d8763e9963ac701e9ba4",
+      "source_call_sites": []
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/simulation.py": {
+      "bytes": 31165,
+      "sha256": "c2a6fded0ccedb2124c1ac421e1b52cb2c087bfa40fcb38f8a32722d21c012d2",
+      "source_call_sites": [
+        {
+          "callee": "world.compile",
+          "line": 39
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 42
+        },
+        {
+          "callee": "mj.mj_resetDataKeyframe",
+          "line": 45
+        },
+        {
+          "callee": "mj.mj_resetDataKeyframe",
+          "line": 73
+        },
+        {
+          "callee": "mj.mj_step",
+          "line": 89
+        },
+        {
+          "callee": "mj.mj_contactForce",
+          "line": 316
+        },
+        {
+          "callee": "mj.Renderer",
+          "line": 439
+        },
+        {
+          "callee": "mj.MjvOption",
+          "line": 448
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 505
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 523
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 538
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 553
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 570
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 593
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 618
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 636
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 665
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 684
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 700
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym/utils/mjcf.py": {
+      "bytes": 14383,
+      "sha256": "376a34852461e516e76c16ee2d4ef2348d84dd7c4988f9f30a2824405a1b868d",
+      "source_call_sites": [
+        {
+          "callee": "_apply_compiler",
+          "line": 290
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym_demo/complex_terrain/common.py": {
+      "bytes": 3407,
+      "sha256": "306b5a287de6aa26a3de110dbe16f706b9df8c592386b6fdc770d6724d38ffd8",
+      "source_call_sites": []
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym_demo/complex_terrain/cpg_controller.py": {
+      "bytes": 6342,
+      "sha256": "86804054621f35e28c74f0a88db6a73faa17db586f5554db00674c9851eab592",
+      "source_call_sites": [
+        {
+          "callee": "self.preprogrammed_steps.get_joint_angles_by_dof_order",
+          "line": 107
+        },
+        {
+          "callee": "CPGNetwork",
+          "line": 178
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym_demo/complex_terrain/hybrid_controller.py": {
+      "bytes": 11839,
+      "sha256": "a29b189e2e2310acedceae993f67f93e8697e954e91326163cf92d1e078e2608",
+      "source_call_sites": [
+        {
+          "callee": "sim.get_bodysegment_contact_forces(fly_name, detected_segments, ground_only=True).reshape",
+          "line": 87
+        },
+        {
+          "callee": "sim.get_bodysegment_contact_forces",
+          "line": 87
+        },
+        {
+          "callee": "self.preprogrammed_steps.get_joint_angles",
+          "line": 186
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym_demo/complex_terrain/preprogrammed.py": {
+      "bytes": 12597,
+      "sha256": "ad945cee5af607e24f1a17ada0b8becd622c1fabebbb9f4f35e49dc7fd69e97f",
+      "source_call_sites": [
+        {
+          "callee": "self.get_joint_angles",
+          "line": 163
+        },
+        {
+          "callee": "self.get_joint_angles_by_dof_order",
+          "line": 186
+        }
+      ]
+    },
+    "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/lib/python3.12/site-packages/flygym_demo/complex_terrain/turning_controller.py": {
+      "bytes": 1159,
+      "sha256": "385f1b0169c60f0f241a63e0b4f4112aa1c4e65e4b9aec7e5b38cee8cdc6b1b7",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/body.py": {
+      "bytes": 8000,
+      "sha256": "020d689b9936f0ed441f7633dfb584cdb456364d843055b240313ce990a176d5",
+      "source_call_sites": [
+        {
+          "callee": "mj.mj_name2id",
+          "line": 56
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 57
+        },
+        {
+          "callee": "mj.mj_id2name",
+          "line": 59
+        },
+        {
+          "callee": "mj.mj_forward",
+          "line": 65
+        },
+        {
+          "callee": "HybridControllerObservation.from_sim",
+          "line": 86
+        },
+        {
+          "callee": "mj.mj_id2name",
+          "line": 118
+        },
+        {
+          "callee": "mj.mju_mat2Quat",
+          "line": 128
+        },
+        {
+          "callee": "mj.mj_stateSize",
+          "line": 135
+        },
+        {
+          "callee": "mj.mj_getState",
+          "line": 136
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/cadence_v16.py": {
+      "bytes": 14946,
+      "sha256": "6f158daa9ca8f6fc5ed0c09ce3eb177a0d0db5cae9f3452a3fad825f84cb7d7a",
+      "source_call_sites": [
+        {
+          "callee": "self.preprogrammed_steps.get_joint_angles",
+          "line": 206
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/__init__.py": {
+      "bytes": 217,
+      "sha256": "0e3b40d2b18aac7862b7efb9774a170b446aa20f4a666a281e5f389eeacf1c30",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/__main__.py": {
+      "bytes": 1615,
+      "sha256": "db2e3135adcd67ecb357dba7281ac1ac8b4131b6b6964cf0879ef1abd57b4330",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/budget.py": {
+      "bytes": 12737,
+      "sha256": "4ef683d009fa192e6278f3de6859c2ca94231005d1a247956ac7f39466c66308",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/control_evidence.py": {
+      "bytes": 3668,
+      "sha256": "424ce880b8f855710e2c0040844380737a6dd72c83cde0ed597674bc4c357f84",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/geometry.py": {
+      "bytes": 8915,
+      "sha256": "86a4420f8fb4f1c5aba27364667d0c5d59c4d0ae60709a1e04309f5c5cfc8253",
+      "source_call_sites": [
+        {
+          "callee": "mj.mj_kinematics",
+          "line": 9
+        },
+        {
+          "callee": "mj.mj_comPos",
+          "line": 9
+        },
+        {
+          "callee": "mj.mj_fwdVelocity",
+          "line": 9
+        },
+        {
+          "callee": "mj.mj_jac",
+          "line": 12
+        },
+        {
+          "callee": "mj.mj_objectVelocity",
+          "line": 16
+        },
+        {
+          "callee": "mj.mj_jacBody",
+          "line": 50
+        },
+        {
+          "callee": "mj.mj_jacBodyCom",
+          "line": 55
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 82
+        },
+        {
+          "callee": "steps.get_joint_angles",
+          "line": 84
+        },
+        {
+          "callee": "mj.mj_kinematics",
+          "line": 85
+        },
+        {
+          "callee": "mj.mj_comPos",
+          "line": 85
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 94
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 94
+        },
+        {
+          "callee": "mj.mj_objectVelocity",
+          "line": 103
+        },
+        {
+          "callee": "mj.mj_objectVelocity",
+          "line": 108
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/io.py": {
+      "bytes": 9347,
+      "sha256": "d037d127b04603281bb1fd90a288065db5f2ec8fea25ca0d4f3d364c870d1d32",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/metrics.py": {
+      "bytes": 8944,
+      "sha256": "31ce83e887ec89a0122c1e94a428e99d51152b020cfbbdb2d5d010a14fc1f12a",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/oracle.py": {
+      "bytes": 11466,
+      "sha256": "3ebe7954f115775dad2631cf3302c2fcaa35235c889eed0ffa7d5b5449b298db",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/original_metrics.py": {
+      "bytes": 1762,
+      "sha256": "d9ce08703cefcf492c26b59d557e9a15daccee37a846a1abb93d35a6f22825ad",
+      "source_call_sites": [
+        {
+          "callee": "compile",
+          "line": 26
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/proof.py": {
+      "bytes": 12679,
+      "sha256": "20748c3afe32a3370ef3bf5b304190f9856f9cc17b11496ee83e16fd96b226b7",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/registration.py": {
+      "bytes": 5771,
+      "sha256": "9e323680d13d65cbfbccbf0deb4aa3d8bcf3222dda60701bcf86d9052cea477e",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/runtime.py": {
+      "bytes": 31039,
+      "sha256": "b24f33106a8a5c472a67a0b26be6b9a012b8d41a6d16e615796ce61e1c85455d",
+      "source_call_sites": [
+        {
+          "callee": "mj.mj_getState",
+          "line": 17
+        },
+        {
+          "callee": "mj.mj_stateSize",
+          "line": 17
+        },
+        {
+          "callee": "port.controller.checkpoint",
+          "line": 21
+        },
+        {
+          "callee": "checkpoint.items",
+          "line": 64
+        },
+        {
+          "callee": "mj.mj_saveModel",
+          "line": 105
+        },
+        {
+          "callee": "export_checkpoint",
+          "line": 120
+        },
+        {
+          "callee": "mj.mj_contactForce",
+          "line": 146
+        },
+        {
+          "callee": "HybridControllerObservation.from_sim",
+          "line": 158
+        },
+        {
+          "callee": "port.controller.checkpoint",
+          "line": 216
+        },
+        {
+          "callee": "export_checkpoint",
+          "line": 227
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 289
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 289
+        },
+        {
+          "callee": "restore_test",
+          "line": 366
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/schema.py": {
+      "bytes": 7539,
+      "sha256": "1778d3f3ffc7bedfee66f42c38513a2ad035b2134ab26b46c833d9ac31973631",
+      "source_call_sites": []
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/verify.py": {
+      "bytes": 25987,
+      "sha256": "0f2d4e2acbb9313cbd696c704e864aacea944d67b153ee37c9f8bcaed7fba2c8",
+      "source_call_sites": [
+        {
+          "callee": "self.steps.get_joint_angles",
+          "line": 17
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 83
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 83
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_v1/law.py": {
+      "bytes": 33838,
+      "sha256": "2a69e4b7165f38d5a55b5227fa6eb7cd1d4b8218592e11ce892c57e159998c44",
+      "source_call_sites": [
+        {
+          "callee": "self.checkpoint_json",
+          "line": 254
+        },
+        {
+          "callee": "shared_twist",
+          "line": 342
+        },
+        {
+          "callee": "regularized_velocity",
+          "line": 346
+        },
+        {
+          "callee": "hashlib.sha256(self.checkpoint_json().encode()).hexdigest",
+          "line": 376
+        },
+        {
+          "callee": "self.checkpoint_json().encode",
+          "line": 376
+        },
+        {
+          "callee": "self.checkpoint_json",
+          "line": 376
+        },
+        {
+          "callee": "self.restored_state",
+          "line": 553
+        },
+        {
+          "callee": "self.checkpoint",
+          "line": 558
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_v1/native.py": {
+      "bytes": 29961,
+      "sha256": "4eed8623a7e882f6e7d0f26654624b0bd72198bb7231936e9a7113a57250b7ac",
+      "source_call_sites": [
+        {
+          "callee": "mj.mj_name2id",
+          "line": 167
+        },
+        {
+          "callee": "(mj.mj_id2name(model, mj.mjtObj.mjOBJ_GEOM, i) or '').startswith",
+          "line": 177
+        },
+        {
+          "callee": "mj.mj_id2name",
+          "line": 177
+        },
+        {
+          "callee": "(mj.mj_id2name(model, mj.mjtObj.mjOBJ_BODY, i) or '').startswith",
+          "line": 178
+        },
+        {
+          "callee": "mj.mj_id2name",
+          "line": 178
+        },
+        {
+          "callee": "mj.mj_contactForce",
+          "line": 232
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 240
+        },
+        {
+          "callee": "mj.mj_kinematics",
+          "line": 241
+        },
+        {
+          "callee": "mj.mj_comPos",
+          "line": 241
+        },
+        {
+          "callee": "_mj().mj_jac",
+          "line": 245
+        },
+        {
+          "callee": "mj.mj_jacBody",
+          "line": 274
+        },
+        {
+          "callee": "mj.mj_jacBodyCom",
+          "line": 279
+        },
+        {
+          "callee": "self.steps.get_joint_angles",
+          "line": 287
+        },
+        {
+          "callee": "self.steps.get_joint_angles",
+          "line": 295
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 405
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 406
+        },
+        {
+          "callee": "mj.mj_stateSize",
+          "line": 408
+        },
+        {
+          "callee": "mj.mj_getState",
+          "line": 409
+        },
+        {
+          "callee": "self.controller.checkpoint",
+          "line": 413
+        },
+        {
+          "callee": "self.controller.restored_state",
+          "line": 423
+        },
+        {
+          "callee": "self.restored_payload",
+          "line": 455
+        },
+        {
+          "callee": "mj.mj_stateSize",
+          "line": 458
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 460
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 460
+        },
+        {
+          "callee": "mj.mj_getState",
+          "line": 461
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 463
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 463
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 467
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 473
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/mechanical_v10.py": {
+      "bytes": 23442,
+      "sha256": "7734d1bb493aac6795bba7ceb7ad1a43de8a912a7176e621bffc4230afa1807f",
+      "source_call_sites": [
+        {
+          "callee": "mj.mj_name2id",
+          "line": 60
+        },
+        {
+          "callee": "mj.mj_saveModel",
+          "line": 94
+        },
+        {
+          "callee": "mj.mj_id2name",
+          "line": 112
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 175
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 177
+        },
+        {
+          "callee": "mj.mj_forward",
+          "line": 183
+        },
+        {
+          "callee": "mj.mj_getState",
+          "line": 200
+        },
+        {
+          "callee": "mj.mj_stateSize",
+          "line": 200
+        },
+        {
+          "callee": "HybridControllerObservation.from_sim",
+          "line": 204
+        },
+        {
+          "callee": "reg['compiled_arrays'].items",
+          "line": 280
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 302
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 302
+        },
+        {
+          "callee": "b.controllers[0].checkpoint",
+          "line": 303
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 309
+        },
+        {
+          "callee": "b.controllers[0].restore",
+          "line": 310
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/mechanical_v16.py": {
+      "bytes": 51879,
+      "sha256": "051327a80af44c7a043a5a165395358b4ba013c68f61ce6548d12782240e0e5d",
+      "source_call_sites": [
+        {
+          "callee": "mj.MjData",
+          "line": 107
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 112
+        },
+        {
+          "callee": "mj.mj_kinematics",
+          "line": 123
+        },
+        {
+          "callee": "_compiled_arrays",
+          "line": 155
+        },
+        {
+          "callee": "mj.mj_comPos",
+          "line": 161
+        },
+        {
+          "callee": "mj.mj_jac",
+          "line": 167
+        },
+        {
+          "callee": "controller.preprogrammed_steps.get_joint_angles_by_dof_order",
+          "line": 180
+        },
+        {
+          "callee": "mj.mj_saveModel",
+          "line": 327
+        },
+        {
+          "callee": "_compiled_arrays(model).items",
+          "line": 335
+        },
+        {
+          "callee": "_compiled_arrays",
+          "line": 335
+        },
+        {
+          "callee": "mj.mj_id2name",
+          "line": 339
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 475
+        },
+        {
+          "callee": "HybridControllerObservation.from_sim",
+          "line": 487
+        },
+        {
+          "callee": "mj.mj_contactForce",
+          "line": 534
+        },
+        {
+          "callee": "mj.mj_jac",
+          "line": 540
+        },
+        {
+          "callee": "mj.mj_jac",
+          "line": 541
+        },
+        {
+          "callee": "HybridControllerObservation.from_sim",
+          "line": 564
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 589
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 590
+        },
+        {
+          "callee": "body.controllers[0].checkpoint",
+          "line": 591
+        },
+        {
+          "callee": "mj.mj_stateSize",
+          "line": 606
+        },
+        {
+          "callee": "shadow.restore",
+          "line": 624
+        },
+        {
+          "callee": "validate_active_checkpoint",
+          "line": 630
+        },
+        {
+          "callee": "mj.mj_copyData",
+          "line": 632
+        },
+        {
+          "callee": "body.controllers[0].restore",
+          "line": 633
+        },
+        {
+          "callee": "capture_active_checkpoint",
+          "line": 757
+        },
+        {
+          "callee": "restoration['checkpoint']['expected'].append",
+          "line": 759
+        },
+        {
+          "callee": "restore_active_checkpoint",
+          "line": 833
+        }
+      ]
+    },
+    "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/verify_v16.py": {
+      "bytes": 28243,
+      "sha256": "902f40231fc5f845d57cb260e33fdaa4b75f91523a0dd1df3231ce85c34b4e97",
+      "source_call_sites": [
+        {
+          "callee": "source.get_joint_angles",
+          "line": 87
+        },
+        {
+          "callee": "mj.mj_jac",
+          "line": 132
+        },
+        {
+          "callee": "mj.MjModel.from_binary_path",
+          "line": 181
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 193
+        },
+        {
+          "callee": "mj.mj_name2id",
+          "line": 194
+        },
+        {
+          "callee": "mj.MjData",
+          "line": 238
+        },
+        {
+          "callee": "(dest / 'checkpoint.json').read_text",
+          "line": 325
+        }
+      ]
+    }
+  },
+  "unknown_costs": [
+    "active proposals/solves until first prescribed100 active ticks",
+    "native compilation until static preflight",
+    "chunk byte rate until actual retained data",
+    "class monkeypatch compatibility until finite preflight"
+  ]
+}

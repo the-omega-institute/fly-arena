@@ -1,0 +1,259 @@
+{
+  "kind": "source-only compact registration/model locator intake",
+  "observed_utc": "2026-09-17T10:10:46.768876+00:00",
+  "registration_path": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/delivery/behavior-v16/retained/mechanical-01/registration.json",
+  "registration_sha256": "ab7cc4d82e091f640d0a550e6569f894c5deac8e91673f00bdf008c37a06f26c",
+  "registration_bytes": 25735,
+  "model_asset_path": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/delivery/behavior-v16/retained/mechanical-01/model.mjb",
+  "model_bytes_observed_by_stat_only": 23217906,
+  "registered_model_mjb_sha256": "c84909b93a562b21c045466499187b964af92530c88ac9e627867a689d7819d2",
+  "model_payload_read_or_hashed": false,
+  "compiled_array_metadata": {
+    "actuator_biasprm": {
+      "dtype": "float64",
+      "sha256": "b711255acfe71137f129a9ff1f3bfec052525a62340f32882d268ada27dc1f33",
+      "shape": [
+        48,
+        10
+      ]
+    },
+    "actuator_ctrllimited": {
+      "dtype": "bool",
+      "sha256": "965a7806c8bbc12c2be6cb0d6b7bf32d91d0590c54e5adffacaee6ef0aa2730a",
+      "shape": [
+        48
+      ]
+    },
+    "actuator_ctrlrange": {
+      "dtype": "float64",
+      "sha256": "e60f490b7db2a7f1cbcf13bd92f66850085facab09a92585af11e3efa6dfe7d2",
+      "shape": [
+        48,
+        2
+      ]
+    },
+    "actuator_forcelimited": {
+      "dtype": "bool",
+      "sha256": "118096114aab65e45098313a38e040c9fdc0a2e5db882f475c81ae13daa80c6c",
+      "shape": [
+        48
+      ]
+    },
+    "actuator_forcerange": {
+      "dtype": "float64",
+      "sha256": "1e92cc01024995e6ad2f891b85ad16bb24284980db26322dc979cbb063974373",
+      "shape": [
+        48,
+        2
+      ]
+    },
+    "actuator_gainprm": {
+      "dtype": "float64",
+      "sha256": "d9ad55adf26e72a43de0d83f835fcbbae1f3d00242e988073d4178641251ed64",
+      "shape": [
+        48,
+        10
+      ]
+    },
+    "actuator_gear": {
+      "dtype": "float64",
+      "sha256": "dd0dbea4479b4bde32de0110a18568dc8ca2b8bd7ecd948bbee026e13598958e",
+      "shape": [
+        48,
+        6
+      ]
+    },
+    "actuator_trnid": {
+      "dtype": "int32",
+      "sha256": "f2780f69b7c63c291361263a7ea264ba9162aedad748360db75e2f779bc5d18f",
+      "shape": [
+        48,
+        2
+      ]
+    },
+    "actuator_trntype": {
+      "dtype": "int32",
+      "sha256": "37b78ab8cd4877c5138a75579746f2c1903a229eabd136b7ee27633029c2ff7e",
+      "shape": [
+        48
+      ]
+    },
+    "body_inertia": {
+      "dtype": "float64",
+      "sha256": "7526e3b88aeeb0f05cfbdf265ebe7686b689607713ecf59ded02eedafba81b37",
+      "shape": [
+        69,
+        3
+      ]
+    },
+    "body_mass": {
+      "dtype": "float64",
+      "sha256": "5998a0f1939f469a894252f006a343c7c50002efb58f37f7cff982f21c8263a7",
+      "shape": [
+        69
+      ]
+    },
+    "dof_damping": {
+      "dtype": "float64",
+      "sha256": "4d7501f43d466152c74d3e0189ee521c568d6994671f7ce074b9b790ff88c825",
+      "shape": [
+        72
+      ]
+    },
+    "geom_bodyid": {
+      "dtype": "int32",
+      "sha256": "c0c2a1fe562f8ef12b6d72a61e553e295b6824a6d7bacee1edb97029d9313585",
+      "shape": [
+        70
+      ]
+    },
+    "geom_conaffinity": {
+      "dtype": "int32",
+      "sha256": "b05731eba7fce77f00f95d6d6b54519301391728afd7840066d8cc9a4b346ce0",
+      "shape": [
+        70
+      ]
+    },
+    "geom_contype": {
+      "dtype": "int32",
+      "sha256": "d09daa159f7ea15ea69694de9360b3530f936002503337742b9ddaa186021836",
+      "shape": [
+        70
+      ]
+    },
+    "geom_dataid": {
+      "dtype": "int32",
+      "sha256": "8ce202c48195296e1cfadbf9d1ce6071977717a37c0655403147bcd4f760f3e7",
+      "shape": [
+        70
+      ]
+    },
+    "geom_friction": {
+      "dtype": "float64",
+      "sha256": "84f146674d32060fb60684b981210498e3807f46ec73858cd9861ea5a2b492a3",
+      "shape": [
+        70,
+        3
+      ]
+    },
+    "geom_type": {
+      "dtype": "int32",
+      "sha256": "e8f1c538a988d8f8d8c7dbbc06fc663aad7dd106115cc46580cd5974bd03f69c",
+      "shape": [
+        70
+      ]
+    },
+    "jnt_axis": {
+      "dtype": "float64",
+      "sha256": "be8f6a7ba9a034cf361b56d4623c106d9a2b38ea759c1c31dc3caaf981abeae8",
+      "shape": [
+        67,
+        3
+      ]
+    },
+    "jnt_dofadr": {
+      "dtype": "int32",
+      "sha256": "75a1aba12f7863e07180008bac97e5431a3170fead880fb7922ad2cad80ab28d",
+      "shape": [
+        67
+      ]
+    },
+    "jnt_limited": {
+      "dtype": "bool",
+      "sha256": "9abe7069ccbcb949e27a1fad66f436392c1030c09a66a90af8d12c7ab2b7199f",
+      "shape": [
+        67
+      ]
+    },
+    "jnt_pos": {
+      "dtype": "float64",
+      "sha256": "64d94ebafe966a47f48ea89f5b9ec482436ae3b12be46ae73577098ca6742cc0",
+      "shape": [
+        67,
+        3
+      ]
+    },
+    "jnt_qposadr": {
+      "dtype": "int32",
+      "sha256": "03fddd4ab45eada2f12a6bce600aea125003d9cffa125aca3709f694abb5a742",
+      "shape": [
+        67
+      ]
+    },
+    "jnt_range": {
+      "dtype": "float64",
+      "sha256": "2aba8fa35cf81112a697a05ab0c045e66259c8557ca2c8d5c1813b2d57d01199",
+      "shape": [
+        67,
+        2
+      ]
+    },
+    "jnt_type": {
+      "dtype": "int32",
+      "sha256": "b69300a5dd15c1c102badb85f13d0d3d3845c734e996d1101a58dc1ebe7d7f5e",
+      "shape": [
+        67
+      ]
+    },
+    "mesh_face": {
+      "dtype": "int32",
+      "sha256": "680e3d38f839d4e399a026e8b78e167e6593a92fcbc20646f54098d01c91f1f0",
+      "shape": [
+        115158,
+        3
+      ]
+    },
+    "mesh_faceadr": {
+      "dtype": "int32",
+      "sha256": "ad84731c0a2eebc2481dbd392e48d1c9a4ede8a8aa545be560f0c28af8d33d03",
+      "shape": [
+        69
+      ]
+    },
+    "mesh_facenum": {
+      "dtype": "int32",
+      "sha256": "431cfe75d300279f4745ddbcb989f7e2ca0fc4419825b1d24db3fb809972ef80",
+      "shape": [
+        69
+      ]
+    },
+    "mesh_vert": {
+      "dtype": "float32",
+      "sha256": "92e2bebb6a00d9c80d9230b1835cebd80a2770533b6aa31f4369f06ec04bee0e",
+      "shape": [
+        54905,
+        3
+      ]
+    },
+    "mesh_vertadr": {
+      "dtype": "int32",
+      "sha256": "76db910bb393c7c1934c3fd3cd107bf28c563ecde880a4562607a9c21334e437",
+      "shape": [
+        69
+      ]
+    },
+    "mesh_vertnum": {
+      "dtype": "int32",
+      "sha256": "7a5dcffab92f354bd45486a2c508e369835a6ab464b7ab503de883aa933f754f",
+      "shape": [
+        69
+      ]
+    },
+    "qpos0": {
+      "dtype": "float64",
+      "sha256": "c8f4731b1a662c60b436f4829fa5fb62aaaabb1e3730bc9c6b3bedbb18dc0c42",
+      "shape": [
+        73
+      ]
+    }
+  },
+  "dependencies": {
+    "flygym": "2.1.0",
+    "mujoco": "3.9.0",
+    "numpy": "2.5.3",
+    "scipy": "1.18.1"
+  },
+  "native_model_loads": 0,
+  "scientific_calls": 0,
+  "meaning": "Exact MJB locator and expected identity resolved from compact accepted registration; actual file hashing/load remains for registered preflight, not done in intake."
+}

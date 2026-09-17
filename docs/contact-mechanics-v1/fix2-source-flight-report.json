@@ -1,0 +1,72 @@
+{
+  "accepted_advance_intent_calls": 0,
+  "accepted_bytes": 2291210,
+  "accepted_files_preserved": 195,
+  "accepted_manifest_sha256": "deedf2b0062ad4a551e04c110891d4ef7af8c961ef2528bf52c83d357924d234",
+  "accepted_mismatches": [],
+  "approved_plan_sha256": "e2c1423ddfc78ca39cd626dc927b1b1f86c1e8eb2a1d48fc8be1d27fea679872",
+  "broad_FIX1_suite_rerun": false,
+  "changed_existing_payloads": [
+    "docs/contact-mechanics-v1/HANDOFF.md",
+    "docs/contact-mechanics-v1/leaf-call-table.json",
+    "src/flyarena/experiments/contact_mechanics_v1/verify.py"
+  ],
+  "changed_source_hashes": {
+    "src/flyarena/experiments/contact_mechanics_v1/verify.py": "0f2d4e2acbb9313cbd696c704e864aacea944d67b153ee37c9f8bcaed7fba2c8",
+    "tests/contact_mechanics_v1/run_fix2_fixtures.py": "594fde00623d5573605bd54687f1f11047206f95de1ef7d416fa6ff75db8065e",
+    "tests/contact_mechanics_v1/test_fix2.py": "6c6ec75cd1d2937a15f3237ae29b4896eb1ef9e1676779dbd9135bf048356eac"
+  },
+  "findings": [
+    "FIX1-Q-ADMISSION",
+    "FIX1-T2-remaining"
+  ],
+  "fixture_report": {
+    "bytecode_disabled": true,
+    "elapsed_s": 1.2915558815002441,
+    "errors": 0,
+    "failures": 0,
+    "forbidden_reads": 0,
+    "interpreter": "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python",
+    "native": 0,
+    "native_modules": [],
+    "passed": true,
+    "preserved_regression_tests": 9,
+    "production_intent": 0,
+    "rss_bytes": 61145088,
+    "scope": "FIX2 targeted and selected guarded regression fixtures",
+    "targeted_tests": 5,
+    "tests": 14
+  },
+  "frozen_FIX1_archive_sha256": "c34ca75a0993fbb3fefe5732dc84c44869ae3e543969b35fbb6d8e33994d37ce",
+  "frozen_FIX1_archive_touched": false,
+  "frozen_FIX1_manifest_sha256": "f762dd98460bcc0a0bbbb5c68646757fb673a83175d2afb1111aa028bc52718a",
+  "full_goal_complete": false,
+  "implementation": "Two-line active-report consistency guard: positive primary invalid phase episode count cannot coexist with both original physical gates passing. Honest candidate failures and ordinary comparator failures remain reportable.",
+  "kind": "Registered FIX2 source correction author receipt",
+  "ledger_capacities_unchanged": true,
+  "ledger_categories": 55,
+  "ledger_sha256": "03a99556762dc12d454a354e4274ab39a6e13ffa859817f6ccaba0f4264c2600",
+  "ledger_source_files_verified": 33,
+  "native_model_payload_reads": 0,
+  "native_scientific_calls": 0,
+  "network_git_service_install_gpu_deploy_calls": 0,
+  "neural_physics_graph_calls": 0,
+  "normalized_goal": "Audit and improve Fly Arena research MVP: correct sensorimotor behavior, distinguish user/Wild Type/official designs and matched phenotypes, improve scenarios and engineering boundaries using trureturing, research reusable Chrono projects and reserve integration ports, addressing user PR comments.",
+  "opaque_log_ref_reads_or_hashes": 0,
+  "ready": false,
+  "required_next_step": "Full independent FIX2 architecture/quality/tests review triplet. No native execution or scientific retry authority is granted by the author.",
+  "resources": {
+    "elapsed_minutes_at_closure": 4.319266617298126,
+    "limit_minutes": 30,
+    "numeric_threads": 1,
+    "observed_fixture_rss_bytes": 61145088,
+    "own_scratch_bytes_at_closure": 43733,
+    "rss_limit_bytes": 1073741824,
+    "scratch_limit_bytes": 134217728,
+    "started_unix": 1789650188.0
+  },
+  "scientific_imports": 0,
+  "status": "implemented; independent FIX2 reviews pending",
+  "subagents_spawned": 0,
+  "unresolved_known_source_gaps": []
+}

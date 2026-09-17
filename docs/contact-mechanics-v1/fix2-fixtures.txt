@@ -1,0 +1,19 @@
+test_candidate_positive_phase_count_with_both_gates_passing_rejects (mechanics_fix2_tests.PrimaryPhaseReportContracts.test_candidate_positive_phase_count_with_both_gates_passing_rejects) ... ok
+test_candidate_with_either_original_gate_failed_remains_honest_failure (mechanics_fix2_tests.PrimaryPhaseReportContracts.test_candidate_with_either_original_gate_failed_remains_honest_failure) ... ok
+test_comparator_positive_phase_count_with_both_gates_passing_rejects (mechanics_fix2_tests.PrimaryPhaseReportContracts.test_comparator_positive_phase_count_with_both_gates_passing_rejects) ... ok
+test_comparator_with_either_original_gate_failed_does_not_veto_candidate (mechanics_fix2_tests.PrimaryPhaseReportContracts.test_comparator_with_either_original_gate_failed_does_not_veto_candidate) ... ok
+test_zero_invalid_phase_full_panel_still_passes (mechanics_fix2_tests.PrimaryPhaseReportContracts.test_zero_invalid_phase_full_panel_still_passes) ... ok
+test_legal_release_hold_not_intent_strict_increase (mechanics_source_tests.Contracts.test_legal_release_hold_not_intent_strict_increase) ... ok
+test_illegal_interior_hold (mechanics_source_tests.Contracts.test_illegal_interior_hold) ... ok
+test_original_strict_phase_rejects_hold_while_event_partition_keeps_it (mechanics_source_tests.AdditionalContracts.test_original_strict_phase_rejects_hold_while_event_partition_keeps_it) ... ok
+test_failed_remainder_blocks_heldout (mechanics_source_tests.Contracts.test_failed_remainder_blocks_heldout) ... ok
+test_unverified_comparator_rejected (mechanics_fix1_tests.ReviewContracts.test_unverified_comparator_rejected) ... ok
+test_failed_dose_rejected (mechanics_fix1_tests.ReviewContracts.test_failed_dose_rejected) ... ok
+test_compound_release_reached_by_accepted_proposals (mechanics_fix1_tests.CorrectionContracts.test_compound_release_reached_by_accepted_proposals) ... ok
+test_flush_failure_retains_checked_emergency_prefix (mechanics_fix1_tests.CorrectionContracts.test_flush_failure_retains_checked_emergency_prefix) ... ok
+test_missing_exact_panel_condition_rejected (mechanics_fix1_tests.ReviewContracts.test_missing_exact_panel_condition_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.987s
+
+OK

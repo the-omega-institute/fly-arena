@@ -1,0 +1,147 @@
+{
+  "full_goal_complete": false,
+  "groups": [
+    {
+      "changes": [
+        "explicit numeric control/RNG/config/spline identity",
+        "factory/writer/initial serialization retention boundary"
+      ],
+      "findings": [
+        "ARCH-1"
+      ],
+      "group": 1,
+      "regressions": [
+        "test_control_objects_have_complete_numeric_adapter",
+        "test_factory_and_initial_serialization_failures_finalize"
+      ]
+    },
+    {
+      "changes": [
+        "exact versioned six-file/four-start native traversal closure",
+        "registration/reset/source/initial-state/clock/domain/coverage consistency",
+        "actual source inventory includes all195 accepted files"
+      ],
+      "findings": [
+        "ARCH-2",
+        "T1"
+      ],
+      "group": 2,
+      "regressions": [
+        "test_mutated_closure_components_rejected",
+        "test_changed_core_with_unchanged_derived_rejected",
+        "test_registration_plan_source_reset_binding_mutations_rejected",
+        "test_inventory_contains_all_195_accepted_payloads",
+        "ported seal/start/time negative cases"
+      ]
+    },
+    {
+      "changes": [
+        "validate every comparator/candidate report",
+        "consistent complete original/realized/aggregate gates and dose",
+        "ordinary comparator physical failure remains reportable"
+      ],
+      "findings": [
+        "T2"
+      ],
+      "group": 3,
+      "regressions": [
+        "ported admission negatives and controls",
+        "test_inconsistent_original_and_realized_gate_evidence_rejected"
+      ]
+    },
+    {
+      "changes": [
+        "exact lawful compound REACQUIRE-to-LIFT release",
+        "separate phase validity and physical arithmetic agreement"
+      ],
+      "findings": [
+        "Q1"
+      ],
+      "group": 4,
+      "regressions": [
+        "test_compound_release_reached_by_accepted_proposals",
+        "test_phase_failure_separate_from_physical_agreement"
+      ]
+    },
+    {
+      "changes": [
+        "aggregate returned child and required snapshot errors before terminal",
+        "checked emergency/orphan evidence and initialized row accounting",
+        "explicit retention failure classification"
+      ],
+      "findings": [
+        "Q2"
+      ],
+      "group": 5,
+      "regressions": [
+        "test_flush_failure_retains_checked_emergency_prefix",
+        "test_required_secondary_snapshot_failure_is_retention_failure",
+        "test_partial_writer_initialization_finalizes_opened_streams"
+      ]
+    },
+    {
+      "changes": [
+        "persist and sum disjoint conservative remaining costs",
+        "measure finalization reserve",
+        "separate pending memory/disk/resident buffers",
+        "source-derived MjData allocation reservation"
+      ],
+      "findings": [
+        "Q3",
+        "T3"
+      ],
+      "group": 6,
+      "regressions": [
+        "test_forecast_sums_disjoint_remaining_work",
+        "test_pending_allocation_respects_remaining_rss",
+        "test_disk_buffer_reserve_does_not_count_as_new_memory",
+        "test_projection_unknowns_maxima_reserve_and_stop_receipt",
+        "test_native_data_pending_allocation_stops_before_authored_constructor"
+      ]
+    },
+    {
+      "changes": [
+        "original and realized prefix complete-cycle/partial classification",
+        "actual retained active intersection and full failed denominator"
+      ],
+      "findings": [
+        "T4"
+      ],
+      "group": 7,
+      "regressions": [
+        "test_completed_prefix_cycles_remain_analyzed_on_late_failure",
+        "test_phase_failure_separate_from_physical_agreement"
+      ]
+    },
+    {
+      "changes": [
+        "reject negative contact index; retain sparse nonnegative zero-force/nonfoot order"
+      ],
+      "findings": [
+        "contact native identity domain"
+      ],
+      "group": 8,
+      "regressions": [
+        "all9ported grid/contact/prefix cases"
+      ]
+    },
+    {
+      "changes": [
+        "raw-contact plus control row0/endpoint plus active pre-action contactForce bound",
+        "observation classmethod instrumentation and capacity check",
+        "refreshed source-derived ledger"
+      ],
+      "findings": [
+        "ARCH-3"
+      ],
+      "group": 9,
+      "regressions": [
+        "test_control_observation_accounting_uses_all_three_families",
+        "test_ledger_caps_hashes_and_data_array_coefficients"
+      ]
+    }
+  ],
+  "independent_correction_reviews_required": true,
+  "kind": "author finding-to-change/regression map",
+  "ready": false
+}
