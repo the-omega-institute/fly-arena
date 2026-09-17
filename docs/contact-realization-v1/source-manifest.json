@@ -1,0 +1,109 @@
+{
+  "schema": "contact-realization-source-manifest/fix1",
+  "target": "/tmp/fly-arena-contact-realization-design-v1",
+  "base": "/tmp/fly-arena-behavior-v16",
+  "declared_base_commit": "21b976f1560cea10b8352dc70b3a21e7e124c034",
+  "baseline_source_files_verified": 180,
+  "baseline_source_bytes": 2088562,
+  "baseline_source_unchanged": true,
+  "new_files": {
+    "docs/CONTACT_REALIZATION_V1.md": {
+      "sha256": "9386317887842fd8ab30801d41635e27e33b78c9992cf627590c7754e9ea8675",
+      "bytes": 18539
+    },
+    "docs/contact-realization-v1/approved-plan.json": {
+      "sha256": "4cdc55681be3e4a8cb45d25795b8e2e8bc57012d1923ab4efbf8c9c5bd118ae1",
+      "bytes": 5949
+    },
+    "docs/contact-realization-v1/baseline-source-manifest.json": {
+      "sha256": "dc85dbd9f92947dd0e6652c7e1e15bf883c18baac42a243c791867e022377599",
+      "bytes": 27164
+    },
+    "docs/contact-realization-v1/fix1-fixture-report.json": {
+      "sha256": "e322a1f4552f4fbd8d9873897eb1fab435009b5b5cc79ebdd5b32dd17a60c97f",
+      "bytes": 4110
+    },
+    "docs/contact-realization-v1/fixture-report.json": {
+      "sha256": "6fb897ddd2b134f6306ab2af1d39bf8c8f89110367d17643f3b5af2c3a2064cb",
+      "bytes": 683
+    },
+    "docs/contact-realization-v1/selected-law.json": {
+      "sha256": "ac8f95db80fd74242dfe926393538db3de6d44e47adfb300ff2a1154b98ce4a5",
+      "bytes": 24795
+    },
+    "src/flyarena/experiments/contact_v1/__init__.py": {
+      "sha256": "74316be2b6e9ab99f354cb2208f1093df17bcae83fb47fde30db9a48fae436bd",
+      "bytes": 190
+    },
+    "src/flyarena/experiments/contact_v1/contracts.py": {
+      "sha256": "1f5c5982005ca7c9af225afc3a8b225286e5445899fe6e69edcc02006318acfa",
+      "bytes": 11524
+    },
+    "src/flyarena/experiments/contact_v1/law.py": {
+      "sha256": "2a69e4b7165f38d5a55b5227fa6eb7cd1d4b8218592e11ce892c57e159998c44",
+      "bytes": 33838
+    },
+    "src/flyarena/experiments/contact_v1/native.py": {
+      "sha256": "4eed8623a7e882f6e7d0f26654624b0bd72198bb7231936e9a7113a57250b7ac",
+      "bytes": 29961
+    },
+    "src/flyarena/experiments/contact_v1/prospective.py": {
+      "sha256": "17dbcccc1c579b8c3d0180343e96be3a6cdf9b262b4f089390e883d59d16fdd9",
+      "bytes": 3963
+    },
+    "tests/contact_v1/run_source_fixtures.py": {
+      "sha256": "15c479d95662bf820d7d9abec7c6ab277b41f73c15ffa7943508dccd075f4810",
+      "bytes": 4258
+    },
+    "tests/contact_v1/test_contract.py": {
+      "sha256": "609591231425a7ef82cbf215c2b80c13456411d9529b340c384c1e9884d3bcd3",
+      "bytes": 17685
+    },
+    "tests/contact_v1/test_fix1.py": {
+      "sha256": "17657be24801bbeb319af5e9497571ad743a4da15007288b831b44272db2d6c3",
+      "bytes": 15378
+    }
+  },
+  "excluded_self": "docs/contact-realization-v1/source-manifest.json",
+  "no_git_access": true,
+  "ready": false,
+  "previous_manifest_sha256": "9e02f908884cde4aeaa39150d69c7f18a8cc401ae3de858c2d00104e8291b5b9",
+  "fix1_changes": {
+    "docs/CONTACT_REALIZATION_V1.md": {
+      "before_sha256": "7ec184412512214cc30962e442e0eeb036bf2b372a1ec8e298f52411732beaf5",
+      "after_sha256": "9386317887842fd8ab30801d41635e27e33b78c9992cf627590c7754e9ea8675",
+      "bytes": 18539
+    },
+    "docs/contact-realization-v1/fix1-fixture-report.json": {
+      "before_sha256": null,
+      "after_sha256": "e322a1f4552f4fbd8d9873897eb1fab435009b5b5cc79ebdd5b32dd17a60c97f",
+      "bytes": 4110
+    },
+    "src/flyarena/experiments/contact_v1/law.py": {
+      "before_sha256": "7786bd87396162714b93f60d9294575c20bb03532b01085a1e807a896c51231c",
+      "after_sha256": "2a69e4b7165f38d5a55b5227fa6eb7cd1d4b8218592e11ce892c57e159998c44",
+      "bytes": 33838
+    },
+    "src/flyarena/experiments/contact_v1/native.py": {
+      "before_sha256": "5d5f599b74d6dc35895126bb9706c0176a72ca8133c66c491f8b4f235afa930b",
+      "after_sha256": "4eed8623a7e882f6e7d0f26654624b0bd72198bb7231936e9a7113a57250b7ac",
+      "bytes": 29961
+    },
+    "tests/contact_v1/run_source_fixtures.py": {
+      "before_sha256": "e88306d5789d4dd0bc67f98ebaca45859a930f0da9b8b9fc2e33ff4e5fee7520",
+      "after_sha256": "15c479d95662bf820d7d9abec7c6ab277b41f73c15ffa7943508dccd075f4810",
+      "bytes": 4258
+    },
+    "tests/contact_v1/test_contract.py": {
+      "before_sha256": "41dacaab7815141aa75c51f1e56b9c0b93a042d0181a7c4c40d9280e556e7871",
+      "after_sha256": "609591231425a7ef82cbf215c2b80c13456411d9529b340c384c1e9884d3bcd3",
+      "bytes": 17685
+    },
+    "tests/contact_v1/test_fix1.py": {
+      "before_sha256": null,
+      "after_sha256": "17657be24801bbeb319af5e9497571ad743a4da15007288b831b44272db2d6c3",
+      "bytes": 15378
+    }
+  },
+  "source_only": true
+}

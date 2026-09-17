@@ -1,0 +1,72 @@
+{
+  "candidate": "acquire-lift-transfer-v1",
+  "selected_contract": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/delivery/contact-realization-design-v1/selected-law.json",
+  "scope": "Source-only implementation and prospective experiment preparation. No actual scientific execution authorized by this plan.",
+  "target": "/tmp/fly-arena-contact-realization-design-v1",
+  "base_source": "/tmp/fly-arena-behavior-v16",
+  "base_commit": "21b976f1560cea10b8352dc70b3a21e7e124c034",
+  "selection": "Adopt the minimal proposal as one complete law. Do not blend the competing position objectives, preload law, 64-phase calibration, different lag limits or target slew schemes.",
+  "contract_refinements": [
+    "From structural ownership conclusions: observe positive nonfoot fly-ground contacts and disable new releases while any exists. Do not count those contacts as supporting feet. Existing all-foot/all-leg acceptance unchanged.",
+    "Finite implementation capacities from structural proposal: nq,nv<=1024, owned interval contacts<=512, total compiled foot mesh vertices<=100000. Reject overflow before controller/sensor/action mutation; never truncate. These are capacity bounds, not new mechanical pass gates.",
+    "Use source-only observed fixture tests first. Native model creation, geometry binding/FK/Jacobian/CPG/neural/physics calls remain zero in this implementation flight. Prospective per-release two-pose geometry and runtime observation APIs are code to review, not permission to execute.",
+    "Preserve exact original intent-window analysis; add explicitly distinct realized-window diagnostics and enforce both for later candidate admission. No partial, stall or bound failure disappears from outcome denominators."
+  ],
+  "conflict_resolutions": [
+    {
+      "conflict": "Six 7x7 shared-feedback solves vs 48-variable virtual-body optimizer vs direct Cartesian correction",
+      "resolution": "Select minimal six 7x7 velocity solves plus <=3x3 native-derived planar twist. All plans identify body/contact coupling; shared twist and release arbitration cover that boundary without introducing a virtual-body prediction optimizer. Efficacy remains falsifiable."
+    },
+    {
+      "conflict": "Distal force acquisition mandatory vs stable proximal support sufficient",
+      "resolution": "Keep selected law distal30 controller transition, never scientific acceptance substitution. Delete correctly notes distal force is not universal support; conservative refusal is a declared stall failure, not exclusion or successful gait."
+    },
+    {
+      "conflict": "Phase trajectories, catch-up and deadlines differ",
+      "resolution": "Keep selected three equal swing segments, 2x catch-up, pi/2 maximum debt, 500 active-tick wait and reacquisition. No averaging of constants or cycle skipping."
+    },
+    {
+      "conflict": "Native excursion derivation differs",
+      "resolution": "Keep selected two per-release native phase endpoint poses with fixed actual root/passives, unit magnitude and latched r scale; no384-call calibration or outcome fitting. Zero excursion remains a measured failure possibility."
+    },
+    {
+      "conflict": "Capture point vs fixed-horizon COM screen and extra body predicates",
+      "resolution": "Keep selected capture-point hull with .02mm margin and up>.8; add only positive nonfoot release veto from structural observation ownership. This is explicitly a conservative heuristic, not a support wrench proof."
+    },
+    {
+      "conflict": "Position bounds, correction gain and native preload strategy differ",
+      "resolution": "Keep exact minimal rate800*C and radius80*C corrections, compiled range intersection and velocity landing law. No structural2200 or deleteB/T slew, no ground clipping, gain45/force65 unchanged."
+    }
+  ],
+  "implementation_deliverables": [
+    "Fresh isolated source copy of accepted v16 application source, excluding .git/.venv/data/var and bulk artifacts. Retain baseline hashes and do not edit old versioned files.",
+    "New versioned pure controller math/state machine and native observation/body adapter with explicit clock/contact ownership, exact silence and atomic complete restore contract. Research-only and not connected to production admission.",
+    "Meaningful source-only synthetic tests for independent contact packet timing/material transport, all-foot rows, support release arbitration, phase/event/deadline semantics, actual correction bounds, malformed late-leg rollback, silence and checkpoint serialization/validation. No fake-test claim of physical restoration.",
+    "Prospective matched v16 runner/registration/analyzer/verifier seams or exact source plan for them; no actual registration execution/model call. Original32x4s128development, conditional196.01s max/260hard and original259s remain intact.",
+    "Reviewable design/API document, changed-file manifest and source test evidence. Preserve full user gaps and explicit ready=false."
+  ],
+  "resource_bounds": {
+    "workers": 1,
+    "numerical_threads": 1,
+    "wall_minutes": 60,
+    "observed_rss_bytes": 1073741824,
+    "scratch_bytes": 134217728,
+    "new_evidence_bytes": 134217728,
+    "scientific_calls": 0,
+    "new_diagnostic_calls": 0
+  },
+  "prohibitions": [
+    "No raw evidence or log_ref contents reads/hashes, no graph loading, no native controller/CPG/model/kinematic/neural/physics calls, no network/install/GPU/Git mutation/service/deploy/subagents.",
+    "No new scientific run, production profile switch, body/gain/force mutation, sensory/motor retuning, scene shortcut or threshold relaxation.",
+    "Any necessary algorithm deviation must be surfaced before change; do not choose a new controller in implementation."
+  ],
+  "bounded_passes": {
+    "meta_convergence_used": 1,
+    "meta_convergence_max": 1,
+    "clarification_passes": 0,
+    "implementation_flight": 1,
+    "review_triplet": 1,
+    "fix_pass_max": 1,
+    "scientific_attempts": 0
+  }
+}

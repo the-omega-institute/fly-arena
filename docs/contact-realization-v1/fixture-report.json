@@ -1,0 +1,17 @@
+{
+  "schema": "contact-source-fixtures/v1",
+  "tests": 23,
+  "failures": 0,
+  "errors": 0,
+  "success": true,
+  "elapsed_s": 0.6582009792327881,
+  "observed_peak_rss_bytes": 42270720,
+  "interpreter": "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python",
+  "python_version": "3.12.13 (main, Mar  3 2026, 12:39:30) [Clang 17.0.0 (clang-1700.6.3.2)]",
+  "bytecode_disabled": true,
+  "scientific_imports_present": [],
+  "native_calls": 0,
+  "native_intent_equation_calls": 0,
+  "forbidden_data_reads": 0,
+  "limitations": "Authored observation/forecast/reference fixtures only. No native CPG equation, adapter geometry, compiled model or physical checkpoint restore executed."
+}
