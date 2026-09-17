@@ -57,7 +57,9 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 worker.stop()
             auth.provider.close()
 
-    app = FastAPI(title="Fly Arena API", version="0.1.0", lifespan=lifespan,
+    release_path = ROOT / 'release.json'
+    release = json.loads(release_path.read_text()) if release_path.exists() else {'release':'development'}
+    app = FastAPI(title="Fly Arena API", version=release['release'].removeprefix('v'), lifespan=lifespan,
                   description="Published connectome designs and trusted embodied matches. All submitted flies and match replays are public in this MVP workspace.")
     app.state.research = research
     def match_runtime(profile='legacy-v1'):
@@ -110,7 +112,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     @app.get("/api/v1/health")
     def health():
         return {"status": "ok", "connectome_ready": (DATA / "connectome/manifest.json").exists(),
-                "readout_ready": (DATA / "connectome/readout.json").exists(), "version": "0.1.0"}
+                "readout_ready": (DATA / "connectome/readout.json").exists(), "version": app.version, "commit": release.get("commit")}
 
     @app.get("/api/v1/season")
     def season():
