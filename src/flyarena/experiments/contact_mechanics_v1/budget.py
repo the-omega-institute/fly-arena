@@ -80,7 +80,7 @@ class Budget:
     def complete(self,name):
         if self.completed.get(name,0)>=self.attempted.get(name,0):raise ValueError('completion without charged attempt: '+name)
         self.completed[name]=self.completed.get(name,0)+1
-    def call(self,name,fn,*args,**kwargs):
+    def call(self,name,fn,/,*args,**kwargs):
         if name=='MjData':self.check(pending_memory=data_allocation_bytes(args[0] if args else kwargs['model']))
         if name in ('model_build','model_load','checkpoint','restore','mj_copyData','MjData','MjSpec.compile'):self.check()
         self.charge(name);started=time.monotonic()

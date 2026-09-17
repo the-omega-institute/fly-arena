@@ -1,0 +1,24 @@
+{
+  "scope": "FIX3 targeted and selected guarded regression fixtures",
+  "targeted_tests": 8,
+  "preserved_regression_tests": 4,
+  "tests": 12,
+  "failures": 0,
+  "errors": 0,
+  "passed": true,
+  "elapsed_s": 0.6054847240447998,
+  "rss_bytes": 47022080,
+  "interpreter": "/Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python",
+  "bytecode_disabled": true,
+  "native": 0,
+  "production_intent": 0,
+  "forbidden_reads": 0,
+  "native_modules": [],
+  "numeric_threads": {
+    "OPENBLAS_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "VECLIB_MAXIMUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1"
+  }
+}

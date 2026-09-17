@@ -1,0 +1,17 @@
+test_all_internal_parameter_keywords_and_positional_payload_forward_unchanged (mechanics_fix3_tests.ForwardingContracts.test_all_internal_parameter_keywords_and_positional_payload_forward_unchanged) ... ok
+test_cap_and_unregistered_reject_before_forwarded_leaf (mechanics_fix3_tests.ForwardingContracts.test_cap_and_unregistered_reject_before_forwarded_leaf) ... ok
+test_failure_propagates_same_exception_and_retains_attempt_and_timing (mechanics_fix3_tests.ForwardingContracts.test_failure_propagates_same_exception_and_retains_attempt_and_timing) ... ok
+test_internal_calls_supply_category_and_callable_positionally (mechanics_fix3_tests.ForwardingContracts.test_internal_calls_supply_category_and_callable_positionally) ... ok
+test_native_guard_forwards_collision_keywords_and_restores_on_exception (mechanics_fix3_tests.ForwardingContracts.test_native_guard_forwards_collision_keywords_and_restores_on_exception) ... ok
+test_native_guard_forwards_collision_keywords_and_restores_on_success (mechanics_fix3_tests.ForwardingContracts.test_native_guard_forwards_collision_keywords_and_restores_on_success) ... ok
+test_old_signature_reproduces_collision_before_leaf_or_charge (mechanics_fix3_tests.ForwardingContracts.test_old_signature_reproduces_collision_before_leaf_or_charge) ... ok
+test_preflight_dynamics_rejection_still_precedes_leaf (mechanics_fix3_tests.ForwardingContracts.test_preflight_dynamics_rejection_still_precedes_leaf) ... ok
+test_attempt_completion_ledger_keeps_failed_calls (mechanics_source_tests.AdditionalContracts.test_attempt_completion_ledger_keeps_failed_calls) ... ok
+test_native_data_pending_allocation_stops_before_authored_constructor (mechanics_fix1_tests.ClosureAndSetupContracts.test_native_data_pending_allocation_stops_before_authored_constructor) ... ok
+test_control_observation_accounting_uses_all_three_families (mechanics_fix1_tests.ClosureAndSetupContracts.test_control_observation_accounting_uses_all_three_families) ... ok
+test_ledger_caps_hashes_and_data_array_coefficients (mechanics_fix1_tests.ClosureAndSetupContracts.test_ledger_caps_hashes_and_data_array_coefficients) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 0.315s
+
+OK

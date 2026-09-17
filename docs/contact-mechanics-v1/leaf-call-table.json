@@ -570,8 +570,8 @@
       "source_call_sites": []
     },
     "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/budget.py": {
-      "bytes": 12737,
-      "sha256": "4ef683d009fa192e6278f3de6859c2ca94231005d1a247956ac7f39466c66308",
+      "bytes": 12739,
+      "sha256": "e86cf37fa83e512ead0f8286ee73dcad28defe6f251af36de7e8e2a5386111d5",
       "source_call_sites": []
     },
     "/private/tmp/fly-arena-contact-mechanics-v1/src/flyarena/experiments/contact_mechanics_v1/control_evidence.py": {

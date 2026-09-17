@@ -790,9 +790,13 @@
       "bytes": 3363,
       "sha256": "137b56709f98da3e7fec115264342e530e40102c57dc938082334d12fb768f3f"
     },
+    "docs/contact-mechanics-v1/FIX3.md": {
+      "bytes": 3122,
+      "sha256": "93774d76b7ddaf11604d5508d36e6322c9ddd98f34eba43be9802f21adbbdb2d"
+    },
     "docs/contact-mechanics-v1/HANDOFF.md": {
-      "bytes": 14765,
-      "sha256": "8c4f83a39928e016a61b4b8650b6e78e5580bd4e20bf4d76b92296d3923cb17a"
+      "bytes": 15009,
+      "sha256": "6ed5687d9b3530e25d367cade369e382a7743ea446b959b4f6dd6a2957009dcb"
     },
     "docs/contact-mechanics-v1/accepted-source-manifest.json": {
       "bytes": 27960,
@@ -818,6 +822,18 @@
       "bytes": 3479,
       "sha256": "b934637cd6c1e4b2bc4ba5d09632858fe14e5418c28e082e88be7f7684160bba"
     },
+    "docs/contact-mechanics-v1/fix3-fixture-report.json": {
+      "bytes": 634,
+      "sha256": "39e409fb001dc8142e4fc9d87331cdae43a65c1206e3f98a625f6fe72bcce22f"
+    },
+    "docs/contact-mechanics-v1/fix3-fixtures.txt": {
+      "bytes": 2226,
+      "sha256": "19ff9172dbeedea4aa6cab9c6fbc4ef1a1d7167a8f7d0274c33c3c54070e431e"
+    },
+    "docs/contact-mechanics-v1/fix3-source-flight-report.json": {
+      "bytes": 3886,
+      "sha256": "cae893494e58048b4ced68ac1ba6d96fe69e1aa2fb25894b893c105582a97d5d"
+    },
     "docs/contact-mechanics-v1/fixture-report.json": {
       "bytes": 324,
       "sha256": "2c96265ee332f7de13c747e407c7b2304a6bff5f7ed646546a77e6ca30a113c7"
@@ -828,7 +844,7 @@
     },
     "docs/contact-mechanics-v1/leaf-call-table.json": {
       "bytes": 34803,
-      "sha256": "03a99556762dc12d454a354e4274ab39a6e13ffa859817f6ccaba0f4264c2600"
+      "sha256": "bc46113bb07b63887b97f772635d0e00e10810311f630c5c7c64cd7f5f1d5ccc"
     },
     "docs/contact-mechanics-v1/model-locator.json": {
       "bytes": 6801,
@@ -851,8 +867,8 @@
       "sha256": "db2e3135adcd67ecb357dba7281ac1ac8b4131b6b6964cf0879ef1abd57b4330"
     },
     "src/flyarena/experiments/contact_mechanics_v1/budget.py": {
-      "bytes": 12737,
-      "sha256": "4ef683d009fa192e6278f3de6859c2ca94231005d1a247956ac7f39466c66308"
+      "bytes": 12739,
+      "sha256": "e86cf37fa83e512ead0f8286ee73dcad28defe6f251af36de7e8e2a5386111d5"
     },
     "src/flyarena/experiments/contact_mechanics_v1/control_evidence.py": {
       "bytes": 3668,
@@ -902,6 +918,10 @@
       "bytes": 4369,
       "sha256": "594fde00623d5573605bd54687f1f11047206f95de1ef7d416fa6ff75db8065e"
     },
+    "tests/contact_mechanics_v1/run_fix3_fixtures.py": {
+      "bytes": 4267,
+      "sha256": "1ddc34e6c5be96d9e0cc21aa1b4fe7673c0bfe4899ec364012f7c470d549235c"
+    },
     "tests/contact_mechanics_v1/run_source_fixtures.py": {
       "bytes": 3036,
       "sha256": "d4427507018d90de538d2c7002763b6f4f8de2fef1d76fa0b84039676cd395c8"
@@ -914,13 +934,17 @@
       "bytes": 2499,
       "sha256": "6c6ec75cd1d2937a15f3237ae29b4896eb1ef9e1676779dbd9135bf048356eac"
     },
+    "tests/contact_mechanics_v1/test_fix3.py": {
+      "bytes": 9060,
+      "sha256": "6b551ec9ef8ce6812d596465ad473f10b4c741548a1c7882be2e8f999f491540"
+    },
     "tests/contact_mechanics_v1/test_source.py": {
       "bytes": 15763,
       "sha256": "ec3e78e963bfc1d413dd4f4a0ae5054f2d5156954de17676d3e2f1fc250970ad"
     }
   },
   "full_goal_complete": false,
-  "kind": "FIX2 source closure",
+  "kind": "FIX3 source closure",
   "manifest_excludes_itself": true,
   "ready": false
 }
