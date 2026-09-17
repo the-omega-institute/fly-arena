@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 15
     env:
       MPLBACKEND: Agg
-      MUJOCO_GL: egl
+      MUJOCO_GL: "disable"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
       NUMBA_NUM_THREADS: "1"
