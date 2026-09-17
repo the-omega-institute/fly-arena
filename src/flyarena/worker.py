@@ -14,6 +14,14 @@ class Worker:
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self.run, name="arena-worker", daemon=True)
         self.process = None
+        from functools import lru_cache
+        from .services.training import TrainingService
+        @lru_cache(maxsize=1)
+        def compiler():
+            from .compiler import Compiler
+            from .connectome import Connectome
+            return Compiler(Connectome())
+        self.training = TrainingService(store, compiler)
 
     def start(self):
         self.thread.start()
@@ -26,6 +34,7 @@ class Worker:
     def run(self):
         while not self.stop_event.is_set():
             try:
+                self.training.tick()
                 from .services.experiments import ExperimentRepository
                 research_claim = ExperimentRepository(self.store).claim()
                 if research_claim:
