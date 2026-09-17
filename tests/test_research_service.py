@@ -102,8 +102,8 @@ def test_request_queue_independent_comparison_and_durable_reload(lab):
     assert lab.client.post('/api/v1/experiments',json={'fly_id':lab.fly['id'],'seeds':[44]},headers={'Idempotency-Key':'run'}).status_code==422
 
 
-def test_auto_save_schedules_exact_one_and_reports_errors(lab):
-    response=lab.client.post('/api/v1/flies',json={'name':'Saved','connectome_sha256':'a'*64})
+def test_explicit_save_comparison_schedules_exact_one_and_reports_errors(lab):
+    response=lab.client.post('/api/v1/flies?compare=true',json={'name':'Saved','connectome_sha256':'a'*64})
     assert response.status_code==201,response.text
     fly=response.json();assert fly['experiment_status']=='queued' and fly['submission_channel']=='api'
     assert fly['reference_kind']=='user' and fly['release_id'] is None
@@ -112,7 +112,7 @@ def test_auto_save_schedules_exact_one_and_reports_errors(lab):
     assert lab.service.schedule_saved(fly)['experiment_id']==fly['experiment_id']
     assert len(lab.service.repository.list())==1
     lab.probes.profile=lab.probes.profile|{'ready':False}
-    failed=lab.client.post('/api/v1/flies',json={'name':'Unavailable','connectome_sha256':'a'*64}).json()
+    failed=lab.client.post('/api/v1/flies?compare=true',json={'name':'Unavailable','connectome_sha256':'a'*64}).json()
     assert failed['experiment_status']=='error' and failed['experiment_id'] is None
     assert 'unavailable' in failed['experiment_error']
 
@@ -284,3 +284,16 @@ def test_local_bearer_browser_channel_is_web_without_reference_authority(lab,hea
     assert response.json()['submission_channel']=='web'
     assert response.json()['reference_kind']=='user' and response.json()['release_id'] is None
     assert lab.client.post('/api/v1/flies',json={'name':'Invalid channel','connectome_sha256':'a'*64},headers={'X-Arena-Submission-Channel':'seed'}).status_code==422
+
+
+def test_saving_a_design_does_not_start_compute_or_depend_on_lab_readiness(lab):
+    lab.probes.profile=lab.probes.profile|{'ready':False}
+    response=lab.client.post('/api/v1/flies',json={'name':'Ready for training','connectome_sha256':'a'*64})
+    assert response.status_code==201,response.text
+    fly=response.json()
+    assert lab.store.fly(fly['id'])['artifact_id']==fly['artifact_id']
+    assert fly['experiment_id'] is None and fly['experiment_error'] is None
+    assert lab.service.repository.list()==[] and lab.store.matches()==[]
+    assert lab.executor.calls==[]
+    with lab.store.db() as db:
+        assert db.execute('SELECT count(*) FROM training_runs').fetchone()[0]==0

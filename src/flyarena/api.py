@@ -173,7 +173,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
             return compiler().compile(spec)
 
     @app.post("/api/v1/flies", status_code=201)
-    def publish(spec: FlySpec, request: Request, owner: dict = Depends(identity)):
+    def publish(spec: FlySpec, request: Request, owner: dict = Depends(identity), compare: bool = Query(default=False)):
         declared_channel = request.headers.get('x-arena-submission-channel')
         if declared_channel not in (None, 'web', 'api'):
             raise ValueError('Submission channel must be web or api; it grants no reference authority')
@@ -187,7 +187,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
             channel = 'api'
         fly = store.add_fly(owner['id'],spec.model_dump(by_alias=True),report,
                             submission_channel=channel,agent_channel=agent_channel)
-        return research.schedule_saved(fly)
+        return research.schedule_saved(fly) if compare else fly
 
     @app.get('/api/v1/research/catalog')
     def research_catalog():

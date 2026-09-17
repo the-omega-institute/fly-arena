@@ -61,7 +61,7 @@ uv run python scripts/train.py --run RUN_ID --control resume
 
 The client prints its creation key before submission; reuse `--key KEY` after a transport failure with the identical plan. `--run ID` observes an existing run without creating another. `--opponent ID --budget 8` evaluates the same small plan with mirrored competition. Credentials are read from the environment and excluded from exported results.
 
-User-hosted optimization can use `/flies/validate`, `/flies`, `/matches` and `/tournaments`; [ai_designer.py](../scripts/ai_designer.py) shows this existing lower-level path. These ordinary matches enter normal standings and publishing a fly requests the existing Lab comparison. Use the external proposal interface below for custom optimization within training sessions. Arbitrary strategy code is not executed on the service.
+User-hosted optimization can use `/flies/validate`, `/flies`, `/matches` and `/tournaments`; [ai_designer.py](../scripts/ai_designer.py) shows this existing lower-level path. These ordinary matches enter normal standings. Publishing a fly alone does not schedule Lab work; `POST /flies?compare=true` explicitly requests the existing comparison. Use the external proposal interface below for custom optimization within training sessions. Arbitrary strategy code is not executed on the service.
 
 When the operator enables [node execution](COMPUTE.md#route-the-apps-match-queue-to-a-nyxid-compute-node), the same training plans use that node through the ordinary queue. The recorded runtime belongs to the machine executing the match. A short connection loss does not submit another evaluation, and replay data returns to this application's normal endpoints.
 
