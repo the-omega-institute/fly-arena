@@ -27,7 +27,7 @@ page.on('pageerror',e=>errors.push(e.message))
 page.on('requestfailed',request=>{if(request.url().includes('/matches/'))aborted.push(new URL(request.url()).pathname)})
 const ownA={...fixtureFlies[2],id:'TEST-own-A',name:'TEST Own A'}
 const ownB={...ownA,id:'TEST-own-B',name:'TEST Own B'}
-let flies=[...fixtureFlies.slice(0,2),ownA,ownB],submitted=null
+let flies=[...fixtureFlies.slice(0,2),ownA,ownB],submitted=null,archived=false
 const ids=['TEST-A01','TEST-B02','TEST-C03','TEST-Q04']
 const matches=ids.map((id,i)=>({id,status:i===3?'queued':'verified',progress:0,created:0,attempt:1,error:null,request:{fly_ids:[ownA.id,ownB.id],bridge_profile:i===1?'sensorimotor-research-v2':'legacy-v1',map_id:'TEST-arena',mode:'contest',seed:42+i,duration_seconds:[3,7,11,3][i]},result:i===3?null:{winner_slot:i===0?null:0,scores:[i+1,0],outcome:i===0?'draw':'win',receipt_sha256:'TEST-not-scientific-'+id}}))
 const scene=id=>({body:{meshes:{},geoms:[]},size:12,obstacles:[],food:[],flies:[{id:id+'-fly',name:id+' Scene',color:'mint'}]})
@@ -51,10 +51,10 @@ await page.route('**/*',async route=>{
  if(apiPath==='/maps')return json(route,[{id:'TEST-arena',name:'测试竞技场',english:'TEST Arena',size:12,color:'#ddd',obstacles:[],food:[],modes:['contest']}])
  if(apiPath==='/preview')return json(route,{body:{meshes:{},geoms:[]}})
  if(apiPath==='/leaderboard')return json(route,[])
- if(apiPath==='/matches')return json(route,matches)
+ if(apiPath==='/matches')return json(route,archived?matches.filter(m=>m.id!==ids[2]):matches)
  if(apiPath.startsWith('/matches/')) {
    const [, ,id,kind]=apiPath.split('/')
-   assert.ok(ids.includes(id));assert.ok(['scene','frames'].includes(kind))
+   assert.ok(ids.includes(id));if(!kind)return json(route,matches.find(m=>m.id===id));assert.ok(['scene','frames'].includes(kind))
    const body=kind==='scene'?scene(id):frames(id)
    if(modes.get(id)==='hold'){pending.push({id,kind,route,body});return}
    return json(route,body)
@@ -151,6 +151,10 @@ try {
  assert.equal(await page.locator('#fly-name').inputValue(),'TEST preserved unsaved draft')
  assert.ok(await page.getByText('Unsaved canonical draft',{exact:true}).count())
  checks.push('Unsaved design name and canonical draft identity survive Lab refresh/submission and replay navigation')
+ archived=true;await page.goto('https://fly-ui.test/#tab=arena&match='+ids[2]);await loaded(ids[2])
+ assert.equal(await page.locator('.match-row').count(),3)
+ await page.waitForResponse(r=>r.url().endsWith('/api/v1/matches'));await loaded(ids[2])
+ checks.push('Direct archived match URL loads metadata/replay outside the recent list and survives list refresh')
  assert.deepEqual(await page.evaluate(()=>window.replayMismatches),[])
  checks.push('DOM mutation observer detected zero transient match/scene identity mismatches')
  assert.deepEqual(errors,[])

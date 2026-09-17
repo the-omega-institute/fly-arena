@@ -20,6 +20,7 @@ await page.route('**/api/v1/**',async route=>{const req=route.request(),path=new
  if(path==='/matches'&&method==='POST'){matchRequest=req.postDataJSON();if(rejectMatch)return reply({detail:'TEST v2 qualification unavailable'},409);return reply({...replay,id:'TEST-new-match',status:'queued',request:matchRequest})}
  if(path==='/tournaments'&&method==='POST'){tournamentRequest=req.postDataJSON();return reply({id:'TEST-tournament',matches:[replay]})}
  if(path==='/connectome/annotations'){const params=new URL(req.url()).searchParams;assert.equal(params.get('limit'),'50');annotations.push(Object.fromEntries(params));const field=params.get('field');return reply({field,items:field==='side'?[{value:'L',count:20},{value:'M',count:10}]:[{value:field==='class'?'olfactory':'TEST-cell-type',count:20}],metadata_sha256:'TEST-actual-response-metadata-hash',total:1})}
+ if(path==='/matches/TEST-replay')return reply(replay);
  if(path==='/matches/TEST-replay/scene')return reply(replayScene);
  if(path==='/matches/TEST-replay/frames')return reply(replayFrames);
  if(path==='/research/catalog')return reply(catalog);

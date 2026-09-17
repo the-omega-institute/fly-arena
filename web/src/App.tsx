@@ -81,7 +81,26 @@ export default function App(){
   const [inspectCircuit,setInspectCircuit]=useState('descending')
   const fileInput=useRef<HTMLInputElement>(null)
   const selectedFly=flies.find(f=>f.id===selected)
-  const current=matches.find(m=>m.id===focused)
+  const [archivedMatch,setArchivedMatch]=useState<Match|null>(null)
+  const [archiveError,setArchiveError]=useState<{id:string;message:string}|null>(null)
+  const listedMatch=matches.find(m=>m.id===focused)
+  const current=listedMatch||(archivedMatch?.id===focused?archivedMatch:undefined)
+  const matchError=!current&&archiveError?.id===focused?archiveError.message:''
+  useEffect(()=>{
+    if(!focused||listedMatch)return
+    setArchiveError(null)
+    const controller=new AbortController();let timer:ReturnType<typeof setTimeout>
+    async function load(){
+      try{
+        const match=await api<Match>('/matches/'+encodeURIComponent(focused),{signal:controller.signal})
+        if(controller.signal.aborted)return
+        setArchivedMatch(match);setArchiveError(null)
+        if(match.status==='queued'||match.status==='running')timer=setTimeout(load,2500)
+      }catch(e){if(!controller.signal.aborted)setArchiveError({id:focused,message:e instanceof Error?e.message:String(e)})}
+    }
+    void load()
+    return()=>{controller.abort();clearTimeout(timer)}
+  },[focused,listedMatch?.id])
   const replay=useReplay(focused,current?.status)
   const {scene,frames}=replay
   const chosenMap=maps.find(m=>m.id===mapId)
@@ -204,10 +223,10 @@ export default function App(){
         </div>
         <AdvancedInterventions value={interventions} onChange={v=>{setInterventions(v);setReport(null)}} report={report} spec={spec} onValidate={validate} busy={!!busy}/>
         <div className="section-title"><div><span className="eyebrow">{t("CHOOSE YOUR CHALLENGE")}</span><h2>{t("下一站，竞技场。")}</h2></div><button className="text-link" onClick={()=>setTab('arena')}>{t("探索全部环境")}<ArrowUpRight size={16}/></button></div>
-        <div className="map-grid">{maps.map((m,i)=><button className="map-card" key={m.id} onClick={()=>{setMapId(m.id);setMode(m.id==='ring'?'sumo':'contest');setTab('arena')}}><div className="map-card-top"><span>0{i+1} / {(locale==='en'?m.english:m.name).toUpperCase()}</span><ArrowUpRight size={17}/></div><MapDrawing map={m}/><div className="map-card-bottom"><div><h3>{locale==='en'?m.english:m.name}</h3><p>{m.id==='orchard'?t("感知 · 探索 · 觅食"):m.id==='maze'?t("路径 · 障碍 · 适应"):m.id==='scarcity'?t("稀缺 · 竞争 · 耗尽"):t("接触 · 推挤 · 争夺")}</p></div><span className="map-tag">{m.id==='ring'?t("对抗"):t("觅食")}</span></div></button>)}<div className="ai-card"><span className="ai-icon"><Sparkles size={21}/></span><span className="eyebrow">{t("CO-DESIGN WITH AI")}</span><h3>{t("让 AI，")}<br/>{t("设计它的第一只果蝇。")}</h3><p>{t("开放 FlySpec 与 API。")}<br/>{t("你的 agent，可以直接加入。")}</p><button onClick={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}>{t("接入你的 AI")}<ArrowRight size={16}/></button></div></div>
+        <div className="map-grid">{maps.map((m,i)=><button className="map-card" key={m.id} onClick={()=>{setMapId(m.id);setMode(m.id==='ring'?'sumo':'contest');setFocused('');setPlay(false)}}><div className="map-card-top"><span>0{i+1} / {(locale==='en'?m.english:m.name).toUpperCase()}</span><ArrowUpRight size={17}/></div><MapDrawing map={m}/><div className="map-card-bottom"><div><h3>{locale==='en'?m.english:m.name}</h3><p>{m.id==='orchard'?t("感知 · 探索 · 觅食"):m.id==='maze'?t("路径 · 障碍 · 适应"):m.id==='scarcity'?t("稀缺 · 竞争 · 耗尽"):t("接触 · 推挤 · 争夺")}</p></div><span className="map-tag">{m.id==='ring'?t("对抗"):t("觅食")}</span></div></button>)}<div className="ai-card"><span className="ai-icon"><Sparkles size={21}/></span><span className="eyebrow">{t("CO-DESIGN WITH AI")}</span><h3>{t("让 AI，")}<br/>{t("设计它的第一只果蝇。")}</h3><p>{t("开放 FlySpec 与 API。")}<br/>{t("你的 agent，可以直接加入。")}</p><button onClick={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}>{t("接入你的 AI")}<ArrowRight size={16}/></button></div></div>
       </>}
 
-      {tab==='arena'&&<ArenaFeature replayStatus={replay.status} replayError={replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={flies} frames={frames} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy||(replay.status==='loading'?'replay':'')} startMatch={startMatch} startSeries={startSeries}/>}
+      {tab==='arena'&&<ArenaFeature replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={flies} frames={frames} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy||(replay.status==='loading'?'replay':'')} startMatch={startMatch} startSeries={startSeries}/>}
 
       {tab==='train'&&<TrainingSandbox flies={flies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={fly=>{setSelected(fly.id);setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
