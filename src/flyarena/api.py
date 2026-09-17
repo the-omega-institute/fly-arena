@@ -30,7 +30,7 @@ from .store import Store
 from .worker import Worker
 from .research import ExperimentSpec
 from .services.research_service import ResearchService
-from .services.training import TrainingService, TrainingSpec
+from .services.training import TrainingService, TrainingSpec, ProposedCandidate
 
 
 def create_app(*, with_worker: bool = True, store: Store | None = None, auth_config: AuthConfig | None = None, oidc_client: NyxIDClient | None = None, research_service: ResearchService | None = None) -> FastAPI:
@@ -57,7 +57,9 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 worker.stop()
             auth.provider.close()
 
-    app = FastAPI(title="Fly Arena API", version="0.1.0", lifespan=lifespan,
+    release_path = ROOT / 'release.json'
+    release = json.loads(release_path.read_text()) if release_path.exists() else {'release':'development'}
+    app = FastAPI(title="Fly Arena API", version=release['release'].removeprefix('v'), lifespan=lifespan,
                   description="Published connectome designs and trusted embodied matches. All submitted flies and match replays are public in this MVP workspace.")
     app.state.research = research
     def match_runtime(profile='legacy-v1'):
@@ -99,10 +101,18 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def identity(request: Request, bearer=Depends(HTTPBearer(auto_error=False))):
         return auth.identity(request)
 
+    def registered_agent(request, owner):
+        from .auth import hashed
+        authorization = request.headers.get('authorization', '')
+        if not authorization.startswith('Bearer '):return False
+        with store.db() as db:
+            return db.execute('SELECT 1 FROM agent_tokens WHERE owner=? AND hash=? AND expires>?',
+                              (owner['id'], hashed(authorization[7:]), time.time())).fetchone() is not None
+
     @app.get("/api/v1/health")
     def health():
         return {"status": "ok", "connectome_ready": (DATA / "connectome/manifest.json").exists(),
-                "readout_ready": (DATA / "connectome/readout.json").exists(), "version": "0.1.0"}
+                "readout_ready": (DATA / "connectome/readout.json").exists(), "version": app.version, "commit": release.get("commit")}
 
     @app.get("/api/v1/season")
     def season():
@@ -172,13 +182,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         with compile_lock:
             report = compiler().compile(spec, publish=True, root=store.root)
         # Only Arena-issued agent token records assert the registered agent channel.
-        agent_channel = False
-        if bearer:
-            from .auth import hashed
-            token = request.headers.get('authorization', '')[7:]
-            with store.db() as db:
-                agent_channel = db.execute('SELECT 1 FROM agent_tokens WHERE owner=? AND hash=? AND expires>?',
-                                           (owner['id'],hashed(token),time.time())).fetchone() is not None
+        agent_channel = registered_agent(request, owner)
         if agent_channel:
             channel = 'api'
         fly = store.add_fly(owner['id'],spec.model_dump(by_alias=True),report,
@@ -237,6 +241,12 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if set(body) != {'action'} or body['action'] not in ('pause','resume','stop'):
             raise ValueError("Provide action: pause, resume or stop")
         return training.control(ident, owner['id'], body['action'])
+
+    @app.post("/api/v1/training/{ident}/candidates", status_code=201)
+    def training_propose(ident: str, body: ProposedCandidate, request: Request, owner: dict = Depends(identity)):
+        owned_training(ident, owner)
+        with compile_lock:
+            return training.propose(ident, owner['id'], body, agent_channel=registered_agent(request, owner))
 
     @app.post("/api/v1/training/{ident}/save")
     def training_save(ident: str, body: dict, owner: dict = Depends(identity)):
