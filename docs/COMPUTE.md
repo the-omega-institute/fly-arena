@@ -45,3 +45,27 @@ PYTHONPATH=src OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMBA_NUM_THREADS=1 \
 | 1.1 | 1.184215 | 4,427,972 | 36.14 s |
 
 发放数量变化说明这些有预算的连接干预影响了此模型的神经响应；它不能用作适应度排名。原始记录在节点 `neural-sweep-20260917/results`，每个 subject 包含完整 FlySpec 和实际数组。
+
+## Route the app's match queue to a NyxID compute node
+
+The optional executor uses the existing application queue and a single shared file lock on the node. NyxID handles the SSH connection; it is not imported into neural dynamics, physics or scoring. Research Lab jobs retain their existing executor. Legacy matches and training evaluations can use the remote node; other profiles retain their local path.
+
+Install the same released source and locked Python environment on the node, with the canonical graph and the same readout. Create a configuration file on the app host (no credentials go in this file):
+
+```json
+{
+  "service": "deepevo-4060-ssh",
+  "principal": "root",
+  "root": "/tmp/fly-arena-embodied-v020",
+  "data": "/tmp/fly-arena-data",
+  "nyxid": "/absolute/path/to/nyxid"
+}
+```
+
+Start the app with `ARENA_NODE_CONFIG=/absolute/path/to/node.json`. The app host must already have an authorized NyxID CLI session. Omit the variable to keep local execution; configuring a node does not install credentials or activate NyxID end-user login.
+
+Admission checks that scientific sources, dependency lock, graph, readout and rules agree, then records the **node's actual runtime**, including its platform and Python/MuJoCo versions. The node recompiles each submitted FlySpec and checks the artifact identity. Results return to the originating app for ordinary evidence verification and replay. An unavailable configured node returns 503 at admission rather than silently changing the execution environment. Already admitted jobs keep observing the same remote job during a temporary transport outage.
+
+Each remote match uses its existing match ID as the node job ID. Repeated submission attaches to the same process/result. A retry never restarts a simulation just because an SSH response was lost. Heavy runs acquire `/tmp/fly-arena-gpu.lock`, shared with operator experiments; queued jobs wait for it. Current execution uses CPU/Numba because the measured ordered CUDA implementation is slower for this workload. The node records progress, errors and retained evidence under `var/node-jobs/JOB_ID/`.
+
+Keep the node source and data in place while jobs are active. Update or disable routing after queues drain; changing execution configuration is an operator action, not a player's setting. Completed jobs retain their evidence for reconnects. As in the existing queue, a process that actually disappears without a result is reported as failed.
