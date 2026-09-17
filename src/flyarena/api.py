@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 import json
 import os
+import subprocess
 import secrets
 import threading
 import time
@@ -59,6 +60,16 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     app = FastAPI(title="Fly Arena API", version="0.1.0", lifespan=lifespan,
                   description="Published connectome designs and trusted embodied matches. All submitted flies and match replays are public in this MVP workspace.")
     app.state.research = research
+    def match_runtime(profile='legacy-v1'):
+        from .services.node import configured_node
+        node = configured_node()
+        if node and profile == 'legacy-v1':
+            try:
+                return node.runtime(profile)
+            except (ConnectionError, subprocess.TimeoutExpired) as exc:
+                raise HTTPException(503, 'Compute node is temporarily unavailable; try again shortly') from exc
+        return runtime_manifest(bridge_profile=profile)
+
     training = TrainingService(store, compiler)
     app.state.training = training
     app.add_middleware(GZipMiddleware, minimum_size=1000)
@@ -204,7 +215,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 if fly is None:
                     raise ValueError("Starting fly or opponent does not exist")
                 compiler().compile(FlySpec.model_validate(fly['spec']))
-        return training.create(owner['id'], body, digest(runtime_manifest(bridge_profile=body.bridge_profile)), idempotency_key)
+        return training.create(owner['id'], body, digest(match_runtime(body.bridge_profile)), idempotency_key)
 
     @app.get("/api/v1/training")
     def training_list(owner: dict = Depends(identity)):
@@ -247,7 +258,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if prior is not None:
             return prior
         require_bridge(body.bridge_profile)
-        return store.add_match(owner["id"], body.model_dump(), digest(runtime_manifest(bridge_profile=body.bridge_profile)), key=idempotency_key)
+        return store.add_match(owner["id"], body.model_dump(), digest(match_runtime(body.bridge_profile)), key=idempotency_key)
 
     @app.get("/api/v1/matches/{ident}")
     def match_get(ident: str):
@@ -276,7 +287,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if prior is not None:
             return prior
         require_bridge(body.bridge_profile)
-        return store.add_tournament(owner["id"], body.model_dump(), digest(runtime_manifest(bridge_profile=body.bridge_profile)), idempotency_key)
+        return store.add_tournament(owner["id"], body.model_dump(), digest(match_runtime(body.bridge_profile)), idempotency_key)
 
     @app.get("/api/v1/tournaments")
     def tournaments():

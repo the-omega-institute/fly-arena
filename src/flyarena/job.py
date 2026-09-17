@@ -17,7 +17,10 @@ def main():
     try:
         match = store.match(ident)
         request = MatchRequest.model_validate(match["request"])
-        if match["runtime_hash"] != digest(runtime_manifest(bridge_profile=request.bridge_profile)):
+        local_runtime = digest(runtime_manifest(bridge_profile=request.bridge_profile))
+        from .services.node import configured_node
+        node = configured_node() if match['runtime_hash'] != local_runtime else None
+        if node is None and match['runtime_hash'] != local_runtime:
             raise ValueError("Runtime changed after admission; create a match under the current season")
         if match["attempt"] != int(generation):
             raise ValueError("Attempt generation changed")
@@ -27,7 +30,10 @@ def main():
             raise ValueError("Contestants changed after admission")
         folder = store.result_folder(match)
         store.heartbeat(ident, lease, 0)
-        simulate(request, flies, folder, lambda p: store.heartbeat(ident, lease, p), var=store.root)
+        if node:
+            node.execute(match, flies, folder, lambda p: store.heartbeat(ident, lease, p))
+        else:
+            simulate(request, flies, folder, lambda p: store.heartbeat(ident, lease, p), var=store.root)
         verdict = verify(folder, expected_request=match["request"], expected_artifacts=match["artifacts"], expected_runtime_hash=match["runtime_hash"])
         store.finish(ident, lease, verdict)
     except BaseException as error:
