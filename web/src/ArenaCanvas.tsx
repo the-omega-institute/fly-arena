@@ -3,7 +3,7 @@ import {useEffect,useMemo,useRef} from 'react'
 import {Canvas,useFrame} from '@react-three/fiber'
 import {OrbitControls,Grid,Html} from '@react-three/drei'
 import * as THREE from 'three'
-import type {BodyModel,Frame,Scene,Preview} from './types'
+import type {ArenaLayout,BodyModel,Frame,Scene,Preview} from './types'
 import {useI18n} from './shared/i18n'
 import {sceneThemes} from './shared/theme'
 import {colors} from './types'
@@ -35,7 +35,7 @@ function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;fram
   </mesh>)}</>
 }
 
-function World({scene,frame}:{scene:Scene;frame:Frame}){
+function World({scene,frame}:{scene:Scene|ArenaLayout;frame?:Frame}){
   const {resolved}=useI18n();const tokens=sceneThemes[resolved]
   return <>
     <mesh receiveShadow position={[0,0,-.1]}><boxGeometry args={[scene.size,scene.size,.2]}/><meshStandardMaterial color={tokens.floor} roughness={.95}/></mesh>
@@ -43,7 +43,7 @@ function World({scene,frame}:{scene:Scene;frame:Frame}){
     {scene.ring_radius&&<mesh position={[0,0,.02]}><ringGeometry args={[scene.ring_radius-.09,scene.ring_radius,96]}/><meshBasicMaterial color={tokens.ring} transparent opacity={.65} side={THREE.DoubleSide}/></mesh>}
     {scene.obstacles.map((o,i)=><mesh key={i} position={o.position as [number,number,number]} castShadow receiveShadow><boxGeometry args={o.size as [number,number,number]}/><meshStandardMaterial color={tokens.obstacle} roughness={.8}/></mesh>)}
     {scene.food.map((food,i)=>{
-      const left=frame.food?.[i]??food.initial
+      const left=frame?.food?.[i]??food.initial
       return left>.001&&<group key={food.id} position={[food.position[0],food.position[1],.12]}>
         <mesh><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={tokens.food} emissive={tokens.foodEmissive} emissiveIntensity={.18} roughness={.4}/></mesh>
         <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={.3} side={THREE.DoubleSide}/></mesh>
@@ -52,7 +52,7 @@ function World({scene,frame}:{scene:Scene;frame:Frame}){
   </>
 }
 
-export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles}:{preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
+export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles,layout,participants=[]}:{layout?:ArenaLayout;participants?:{name:string;color:string}[];preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
   const {resolved,t}=useI18n();const tokens=sceneThemes[resolved]
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
@@ -60,6 +60,14 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
     <ambientLight intensity={.8}/><hemisphereLight args={[tokens.sky,tokens.ground,1.6]}/>
     <directionalLight position={[6,-5,12]} intensity={3.2} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-bias={-.0003}/>
     <directionalLight position={[-7,5,3]} intensity={1.5} color={tokens.fill}/>
+    {layout&&<>
+      <World scene={layout}/>
+      {layout.spawns.slice(0,participants.length).map((spawn,i)=><group key={i} position={[spawn[0],spawn[1],.08]} rotation={[0,0,spawn[2]]}>
+        <mesh><ringGeometry args={[.65,.8,48]}/><meshBasicMaterial color={colors[participants[i].color]||colors.mint} side={THREE.DoubleSide}/></mesh>
+        <mesh position={[1,0,0]} rotation={[0,0,-Math.PI/2]}><coneGeometry args={[.18,.55,3]}/><meshBasicMaterial color={colors[participants[i].color]||colors.mint}/></mesh>
+        <Html position={[0,0,1.4]} center style={{pointerEvents:'none'}}><span className="spawn-label">{i+1} · {participants[i].name}</span></Html>
+      </group>)}
+    </>}
     {body&&shown&&<>
       {scene?<World scene={scene} frame={shown}/>:<>
         <mesh position={[0,0,-.14]} rotation={[Math.PI/2,0,0]} receiveShadow><cylinderGeometry args={[4.8,5,.18,96]} /><meshStandardMaterial color={tokens.platform} roughness={.93}/></mesh>

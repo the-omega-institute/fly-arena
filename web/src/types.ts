@@ -22,3 +22,5 @@ export type AuthSettings = {mode:"local"|"nyxid";nyxid_enabled:boolean;login_url
 export type MatchProfile={id:string;name:string;ready:boolean;reason?:string}
 export function defaultMatchProfile(season:Season){return season.match_profiles?.find(p=>p.id==='sensorimotor-research-v2'&&p.ready)?.id||season.default_bridge_profile||''}
 export function recordedMatchProfile(match:Match){return match.request.bridge_profile||'legacy-v1'}
+
+export type ArenaLayout = {id:string;size:number;obstacles:{position:number[];size:number[]}[];food:{position:number[];initial:number;id:string}[];spawns:number[][];ring_radius?:number}
