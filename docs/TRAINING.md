@@ -61,6 +61,49 @@ uv run python scripts/train.py --run RUN_ID --control resume
 
 The client prints its creation key before submission; reuse `--key KEY` after a transport failure with the identical plan. `--run ID` observes an existing run without creating another. `--opponent ID --budget 8` evaluates the same small plan with mirrored competition. Credentials are read from the environment and excluded from exported results.
 
-User-hosted optimization can use `/flies/validate`, `/flies`, `/matches` and `/tournaments`; [ai_designer.py](../scripts/ai_designer.py) shows this existing lower-level path. These ordinary matches enter normal standings and publishing a fly requests the existing Lab comparison. The first sandbox release hosts only the two named strategies; arbitrary strategy code is not executed on the service. An external proposal interface that keeps custom evaluations inside training sessions is a follow-up.
+User-hosted optimization can use `/flies/validate`, `/flies`, `/matches` and `/tournaments`; [ai_designer.py](../scripts/ai_designer.py) shows this existing lower-level path. These ordinary matches enter normal standings and publishing a fly requests the existing Lab comparison. Use the external proposal interface below for custom optimization within training sessions. Arbitrary strategy code is not executed on the service.
 
 When the operator enables [node execution](COMPUTE.md#route-the-apps-match-queue-to-a-nyxid-compute-node), the same training plans use that node through the ordinary queue. The recorded runtime belongs to the machine executing the match. A short connection loss does not submit another evaluation, and replay data returns to this application's normal endpoints.
+
+## Bring your own optimizer
+
+Choose **Your own optimizer · API** in the training page, or create a session with `"strategy":"external"`. The server prepares and evaluates an exact founder copy at **generation 0, slot 0**. Your own program supplies the remaining candidates and chooses parents using actual results. No custom optimizer code is uploaded or executed by the service.
+
+The session response adds `proposal_generation` and `open_slots`. Both use zero-based indices. Proposals are accepted only for missing slots in the current generation; the next generation opens after all previous-generation individuals have been evaluated. The baseline can run while the server waits for proposals. The state `awaiting_candidates` means the optimizer needs to submit more individuals, not a stalled simulation.
+
+```http
+POST /api/v1/training/SESSION_ID/candidates
+Authorization: Bearer ARENA_TOKEN
+Content-Type: application/json
+
+{
+  "generation": 0,
+  "slot": 1,
+  "spec": {
+    "name": "My proposal",
+    "parent_id": "FOUNDER_ID",
+    "connectome_sha256": "PINNED_CONNECTOME_SHA256",
+    "weight_mutations": [{"selector":"olfactory","scale":1.08}]
+  }
+}
+```
+
+A proposal is a complete ordinary FlySpec, including any supported edge/type interventions or intrinsic parameters. The normal compiler budget and model limits apply. `circuits` and `mutation_strength` configure only the built-in search; external sessions normalize `circuits` to an empty list and the optimizer determines its interventions. Within-match plasticity remains unsupported.
+
+The parent must be the session founder or an evaluated member of an earlier generation in the same session. Parameters are absolute relative to the canonical graph; parentage records lineage rather than applying the parent's edits again. Multiple children can branch from the same parent, or your optimizer can restart from the founder. The server does not replace your parent selection with its own best individual.
+
+`(session, generation, slot)` is the proposal's stable identity. An identical retry returns the existing fly; different content for an occupied slot is rejected. Terminal sessions reject new candidates, and a stop racing with compilation prevents admission. Proposals may be prepared while paused, but evaluation does not resume until the user resumes the session. Finite population/generation limits prevent extra slots from consuming additional evaluations.
+
+Candidates remain hidden from the library, do not schedule Lab experiments, and their training matches do not enter standings. Save an evaluated candidate explicitly when you want to publish it. The web page shows external sessions, the baseline, proposal status, scores, parents and replay. **Branch training from this fly** saves the selected individual and opens a new training plan rooted in it. **Export results and lineage** downloads the session and complete FlySpecs as JSON for sharing or analysis. A bookmarked session URL requires its owner's login; it is not a public sharing permission.
+
+Run the working coordinate-search example:
+
+```sh
+export ARENA_URL=http://127.0.0.1:18080
+# Set ARENA_TOKEN from the app's AI / API panel.
+uv run python scripts/custom_strategy.py --population 2 --generations 2 --budget 4 --save-best
+# Or attach to the session created in the browser:
+uv run python scripts/custom_strategy.py --run SESSION_ID
+```
+
+Replace `propose()` to implement your own optimizer using any library on your machine, or call the same HTTP endpoints from another language or AI agent. The example retains an incumbent and explores deterministic circuit coordinates; it makes no promise of improved fitness. It exports the observed training history and submitted proposals. Use `scripts/train.py --run SESSION_ID` to additionally download scene, frames, events and receipts for its evaluations. Pausing in the browser stops the example's optimization loop; after resuming the session, rerun it with the same `--run` ID. An observation timeout leaves server work intact and prints the ID needed to reattach.

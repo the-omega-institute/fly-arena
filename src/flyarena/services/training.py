@@ -40,8 +40,8 @@ class TrainingSpec(StrictModel):
     name: str = Field(default='My evolution', min_length=1, max_length=64)
     founder_id: str = Field(pattern=r'^[0-9a-f]{32}$')
     opponent_id: str | None = Field(default=None, pattern=r'^[0-9a-f]{32}$')
-    strategy: Literal['evolution', 'random_search'] = 'evolution'
-    circuits: list[CircuitId] = Field(default_factory=lambda:['olfactory','projection','descending'],min_length=1,max_length=8)
+    strategy: Literal['evolution', 'random_search', 'external'] = 'evolution'
+    circuits: list[CircuitId] = Field(default_factory=lambda:['olfactory','projection','descending'],max_length=8)
     mutation_strength: float = Field(default=.08,ge=.01,le=.3)
     population: int = Field(default=3,ge=2,le=6)
     generations: int = Field(default=3,ge=1,le=8)
@@ -63,11 +63,58 @@ class TrainingSpec(StrictModel):
     @model_validator(mode='after')
     def bounded(self):
         if not self.name.strip():raise ValueError('Name cannot be blank')
+        if self.strategy == 'external':self.circuits = []
+        elif not self.circuits:raise ValueError('Choose at least one circuit')
         if len(set(self.circuits))!=len(self.circuits):raise ValueError('Choose distinct circuits')
         if self.mode=='contest' and self.opponent_id is None:raise ValueError('Choose a fixed opponent')
         if self.evaluations>self.max_evaluations:
             raise ValueError(f'This plan needs {self.evaluations} evaluations; budget is {self.max_evaluations}')
         return self
+
+
+class ProposedCandidate(StrictModel):
+    generation: int = Field(ge=0, le=7, strict=True)
+    slot: int = Field(ge=0, le=5, strict=True)
+    spec: FlySpec
+
+
+def proposal_position(spec, members):
+    """The first generation still needing evaluation; indices are zero-based."""
+    for generation in range(spec.generations):
+        group = [m for m in members if m['generation'] == generation]
+        if len(group) < spec.population or any(m['fitness'] is None for m in group):
+            return generation, [slot for slot in range(spec.population)
+                                if not any(m['slot'] == slot for m in group)
+                                and (generation, slot) != (0, 0)]
+    return None, []
+
+
+def check_proposal(db, owner, position, candidate):
+    """Rechecked inside candidate insertion to fence stop/admission races."""
+    ident, generation, slot = position
+    run = db.execute('SELECT * FROM training_runs WHERE id=? AND owner=?', (ident, owner)).fetchone()
+    if run is None:
+        raise ValueError('Training session not found')
+    plan = TrainingSpec.model_validate_json(run['spec'])
+    if plan.strategy != 'external':
+        raise ValueError('Candidate submission requires an external strategy session')
+    old = db.execute('SELECT f.id,f.spec FROM training_members m JOIN flies f ON f.id=m.fly_id WHERE m.run_id=? AND m.generation=? AND m.slot=?', position).fetchone()
+    if old:
+        prior = FlySpec.model_validate_json(old['spec']).model_dump(by_alias=True)
+        if prior != candidate:
+            raise ValueError('This generation slot already contains a different candidate')
+        return old['id']
+    if run['status'] in {'complete', 'stopped', 'failed'} or run['control'] == 'stop':
+        raise ValueError('Training session is already terminal')
+    members = [dict(r) for r in db.execute('SELECT * FROM training_members WHERE run_id=?', (ident,))]
+    current, slots = proposal_position(plan, members)
+    if generation != current or slot not in slots:
+        raise ValueError('Submit an open slot in the current generation; G1 slot 0 is the server baseline')
+    allowed_parents = {plan.founder_id} | {m['fly_id'] for m in members
+        if m['generation'] < generation and m['fitness'] is not None}
+    if candidate['parent_id'] not in allowed_parents:
+        raise ValueError('Parent must be the founder or an evaluated earlier-generation individual in this session')
+    return None
 
 
 class TrainingService:
@@ -114,6 +161,10 @@ class TrainingService:
         if result['control']!='run' and result['status'] not in {'complete','stopped','failed'}:
             pending=any(m and m['status'] in {'queued','running'} for m in matches.values())
             result['status']=('pausing' if pending else 'paused') if result['control']=='pause' else ('stopping' if pending else 'stopped')
+        position, slots = proposal_position(spec, members) if spec.strategy == 'external' else (None, [])
+        if result['status'] in {'complete', 'failed', 'stopped', 'stopping'}:
+            position, slots = None, []
+        result.update(proposal_generation=position, open_slots=slots)
         result.pop('runtime_hash')
         return result
 
@@ -144,10 +195,27 @@ class TrainingService:
             db.execute('UPDATE training_members SET saved=1 WHERE run_id=? AND fly_id=?',(ident,fly_id))
         return self.store.fly(fly_id)
 
+    def propose(self, ident, owner, proposal, *, agent_channel=False):
+        proposal = ProposedCandidate.model_validate(proposal)
+        spec = proposal.spec.model_dump(by_alias=True)
+        position = (ident, proposal.generation, proposal.slot)
+        with self.store.db() as db:
+            prior = check_proposal(db, owner, position, spec)
+        if prior:
+            return self.store.fly(prior)
+        report = self.compiler().compile(proposal.spec, publish=True, root=self.store.root)
+        return self.store.add_fly(owner, spec, report, submission_channel='api',
+                                  training=position, external_proposal=True, agent_channel=agent_channel)
+
     def _candidate(self,run,spec,generation,slot,parent):
         compiler=self.compiler()
         raw=dict(parent['spec']);raw['parent_id']=parent['id']
         raw['name']=f"{spec.name[:42]} · G{generation+1}.{slot+1}"
+        if slot == 0:
+            candidate = FlySpec.model_validate(raw)
+            report = compiler.compile(candidate, publish=True, root=self.store.root)
+            return self.store.add_fly(run['owner'], candidate.model_dump(by_alias=True), report,
+                                       training=(run['id'], generation, slot))
         rng=np.random.default_rng(np.random.SeedSequence([spec.seed,generation,slot]))
         scales={}
         for mutation in raw['weight_mutations']:
@@ -209,7 +277,15 @@ class TrainingService:
         if generation>=spec.generations:
             with self.store.db() as db:db.execute("UPDATE training_runs SET status='complete',updated=? WHERE id=?",(time.time(),run['id']))
             return
-        if len(current)<spec.population:
+        if spec.strategy == 'external':
+            if generation == 0 and not any(m['slot'] == 0 for m in current):
+                self._candidate(run, spec, 0, 0, self.store.fly(spec.founder_id))
+                return
+            if not any(m['fitness'] is None for m in current):
+                with self.store.db() as db:
+                    db.execute("UPDATE training_runs SET status='awaiting_candidates' WHERE id=?", (run['id'],))
+                return
+        elif len(current)<spec.population:
             parent=self.store.fly(spec.founder_id)
             if generation and spec.strategy=='evolution':
                 previous=[m for m in members if m['generation']==generation-1]

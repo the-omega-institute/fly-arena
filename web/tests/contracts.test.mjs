@@ -36,3 +36,18 @@ test('training plan admits finite solo work and charges both mirrored positions'
 test('training navigation can be bookmarked without becoming a lab or match route',()=>{
  assert.equal(readRoute(routeHash('train')).tab,'train');
 });
+const {memberRole,trainingFocus,trainingHash}=await moduleAt('../src/features/training/plan.ts');
+test('custom optimizer plans skip built-in circuit controls but keep numeric and match budgets',()=>{
+ assert.equal(planProblem({...trainingPlan,strategy:'external',circuits:[]}),null);
+ assert.ok(planProblem({...trainingPlan,strategy:'external',circuits:[],budget:3}));
+ assert.equal(memberRole('external',0,0),'Baseline');
+ assert.equal(memberRole('external',1,0),'Optimizer proposal');
+ assert.equal(memberRole('external',0,1),'Optimizer proposal');
+ assert.equal(memberRole('evolution',1,0),'Retained parent');
+});
+test('training bookmarks round-trip and reject malformed session IDs',()=>{
+ const id='a'.repeat(32);assert.equal(trainingFocus(trainingHash(id)),id);
+ assert.equal(readRoute(trainingHash(id)).tab,'train');
+ assert.equal(trainingFocus('#tab=train&training=bad'), '');
+ assert.equal(trainingFocus(trainingHash('')), '');
+});

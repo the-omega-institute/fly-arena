@@ -60,7 +60,7 @@ class Store:
             row = db.execute("SELECT id,name FROM identities WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
         return dict(row) if row else None
 
-    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False, training: tuple | None = None) -> dict:
+    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False, training: tuple | None = None, external_proposal: bool = False) -> dict:
         if any(k in spec for k in ('provenance','scientific_version','reference_kind','release_id','submission_channel')):
             raise ValueError('Provenance is server-owned')
         if submission_channel not in {'web','api'}:
@@ -68,7 +68,11 @@ class Store:
         ident = uuid.uuid4().hex
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
-            if training:
+            if external_proposal:
+                from .services.training import check_proposal
+                prior = check_proposal(db, owner, training, spec)
+                if prior:return self.fly(prior)
+            elif training:
                 old=db.execute('SELECT fly_id FROM training_members WHERE run_id=? AND generation=? AND slot=?',training).fetchone()
                 if old:return self.fly(old[0])
             if spec.get("parent_id") and not db.execute("SELECT 1 FROM flies WHERE id=?", (spec["parent_id"],)).fetchone():
@@ -83,6 +87,8 @@ class Store:
                         report["artifact_id"], canonical(report).decode(), time.time()))
             db.execute('INSERT INTO fly_provenance VALUES(?,?,?,?,NULL)', (ident,'ai' if agent_channel else 'user',None,submission_channel))
             if training:db.execute('INSERT INTO training_members(run_id,generation,slot,fly_id) VALUES(?,?,?,?)',(*training,ident))
+            if external_proposal:
+                db.execute("UPDATE training_runs SET status=CASE WHEN status='awaiting_candidates' THEN 'queued' ELSE status END,updated=? WHERE id=?", (time.time(), training[0]))
         return self.fly(ident)
 
     def fly(self, ident: str) -> dict | None:

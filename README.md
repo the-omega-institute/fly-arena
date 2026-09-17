@@ -61,7 +61,7 @@ Open **Train / 训练沙箱** to evolve a chosen fly or compare random search. C
 
 Start small: 2 individuals × 2 generations × 1 second, with a budget of 4 solo evaluations. Mirrored competition requires twice as many evaluations. These searches make no promise of improvement.
 
-[Training contracts and limits](docs/TRAINING.md) describe the shared browser/AI API. Run `uv run python scripts/train.py --save-best` with `ARENA_URL` and `ARENA_TOKEN` set to try the same bounded flow from your own agent or terminal.
+[Training contracts and limits](docs/TRAINING.md) describe the shared browser/AI API. Run `uv run python scripts/train.py --save-best` with `ARENA_URL` and `ARENA_TOKEN` set to try the same bounded flow from your own agent or terminal. For your own optimization algorithm, choose **Your own optimizer · API** and run `scripts/custom_strategy.py --run SESSION_ID`; replace its `propose()` function to submit custom candidates within the same evaluation budget. The web page can branch training from an evaluated descendant and export results and lineage as JSON.
 
 ## Scientific status and competition limits
 
