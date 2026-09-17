@@ -107,3 +107,7 @@ uv run python scripts/custom_strategy.py --run SESSION_ID
 ```
 
 Replace `propose()` to implement your own optimizer using any library on your machine, or call the same HTTP endpoints from another language or AI agent. The example retains an incumbent and explores deterministic circuit coordinates; it makes no promise of improved fitness. It exports the observed training history and submitted proposals. Use `scripts/train.py --run SESSION_ID` to additionally download scene, frames, events and receipts for its evaluations. Pausing in the browser stops the example's optimization loop; after resuming the session, rerun it with the same `--run` ID. An observation timeout leaves server work intact and prints the ID needed to reattach.
+
+### Scarce-resource training
+
+Choose **Last Oasis / 最后的绿洲** (`scarcity`) in the sandbox or pass `--map scarcity` to either training client. Its smaller arena has one shared patch with only **2 food units total**, compared with 50 across five patches in Amber Orchard. Food never replenishes and the existing odor signal weakens with the remaining amount. Train alone for collection or use a fixed opponent with mirrored spawn evaluations for competition. Scores remain actual food consumed; a scarce-map score is not directly comparable to an orchard score.

@@ -22,6 +22,13 @@ MAPS = {
         "food": [[0, 0], [0, 7], [0, -7], [8, 6], [-8, -6]],
         "modes": ["forage", "contest"],
     },
+    "scarcity": {
+        "id": "scarcity", "name": "最后的绿洲", "english": "Last Oasis",
+        "description": "只有一个共享食物点，共 2 单位；吃完不再补充，气味随剩余食物减弱。", "size": 18,
+        "color": "#d49a79", "spawns": [[-4, -.6, 0], [4, .6, 3.141592653589793]],
+        "obstacles": [], "food": [[0, 0]], "food_units": 2.0,
+        "modes": ["forage", "contest"],
+    },
     "ring": {
         "id": "ring", "name": "微观擂台", "english": "Micro Sumo",
         "description": "共同物理世界中的接触推挤；胸部越过圆环边界即离台。", "size": 24,
@@ -47,7 +54,7 @@ def scenario(map_id: str, seed: int) -> dict:
     rng = np.random.default_rng(seed)
     # Only food is jittered; valid spawn geometry is identical across paired slots.
     result["food"] = [dict(id=f"food-{i}", position=[float(x + rng.uniform(-.25, .25)),
-                        float(y + rng.uniform(-.25, .25)), .15], initial=10.0)
+                        float(y + rng.uniform(-.25, .25)), .15], initial=result.get("food_units", 10.0))
                       for i, (x, y) in enumerate(result["food"])]
     result["sha256"] = digest(result)
     return result

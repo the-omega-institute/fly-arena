@@ -90,7 +90,7 @@ BridgeProfile = Literal["legacy-v1", "sensorimotor-research-v2"]
 class MatchRequest(StrictModel):
     bridge_profile: BridgeProfile = "legacy-v1"
     fly_ids: list[str] = Field(min_length=1, max_length=2)
-    map_id: Literal["orchard", "maze", "ring"] = "orchard"
+    map_id: Literal["orchard", "maze", "scarcity", "ring"] = "orchard"
     mode: Literal["forage", "contest", "sumo"] = "contest"
     seed: int = Field(default=42, ge=0, le=2**31 - 1)
     duration_seconds: int = Field(default=5, ge=1, le=30)
@@ -115,7 +115,7 @@ class TournamentRequest(StrictModel):
     bridge_profile: BridgeProfile = "legacy-v1"
     name: str = Field(min_length=1, max_length=80)
     fly_ids: list[str] = Field(min_length=2, max_length=8)
-    map_id: Literal["orchard", "maze", "ring"] = "orchard"
+    map_id: Literal["orchard", "maze", "scarcity", "ring"] = "orchard"
     mode: Literal["contest", "sumo"] = "contest"
     seeds: list[int] = Field(default_factory=lambda: [42], min_length=1, max_length=3)
     duration_seconds: int = Field(default=5, ge=1, le=30)

@@ -27,3 +27,18 @@ def test_preview_matches_runner_layout_without_loading_a_brain(client, map_id, p
 ])
 def test_invalid_layout_inputs(client,path,status):
     assert client.get('/api/v1/maps/'+path).status_code==status
+
+
+def test_scarce_food_is_shared_finite_and_available_to_contests(client):
+    from flyarena.contracts import MatchRequest, TournamentRequest
+    layout=client.get('/api/v1/maps/scarcity/preview?seed=42').json()
+    orchard=client.get('/api/v1/maps/orchard/preview?seed=42').json()
+    assert sum(f['initial'] for f in layout['food'])==2
+    assert sum(f['initial'] for f in orchard['food'])==50
+    assert len(layout['food'])==1 and len(layout['spawns'])==2
+    assert layout['spawns'][0][:2]==[-v for v in layout['spawns'][1][:2]]
+    ids=['a'*32,'b'*32]
+    assert MatchRequest(map_id='scarcity',fly_ids=ids).mode=='contest'
+    assert TournamentRequest(name='Oasis',map_id='scarcity',fly_ids=ids).map_id=='scarcity'
+    with pytest.raises(ValueError,match='ring'):
+        MatchRequest(map_id='scarcity',mode='sumo',fly_ids=ids)
