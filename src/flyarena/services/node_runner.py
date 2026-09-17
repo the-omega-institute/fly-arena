@@ -30,6 +30,10 @@ def state(path: Path) -> dict:
         try:
             os.kill(status['pid'], 0)
         except ProcessLookupError:
+            # The worker may have published its result between our read and exit.
+            status = json.loads((path/'status.json').read_text())
+            if status['status'] in {'complete', 'failed'}:
+                return status
             status.update(status='failed', error='Node process stopped before producing a result')
             write_json(path/'status.json', status)
     return status

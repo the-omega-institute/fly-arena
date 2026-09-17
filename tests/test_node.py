@@ -60,6 +60,18 @@ def test_runtime_freezes_actual_node_platform_but_rejects_different_science(monk
     with pytest.raises(ValueError,match='synchronization'):node.runtime('legacy-v1')
 
 
+def test_process_exit_after_final_write_does_not_replace_completed_result(tmp_path,monkeypatch):
+    path=tmp_path/'status.json'
+    path.write_text(json.dumps({'status':'running','pid':987654,'progress':.9}))
+    complete={'status':'complete','pid':987654,'progress':1.,'bytes':123}
+    def finished(pid,signal):
+        path.write_text(json.dumps(complete))
+        raise ProcessLookupError
+    monkeypatch.setattr(node_runner.os,'kill',finished)
+    assert node_runner.state(tmp_path)==complete
+    assert json.loads(path.read_text())==complete
+
+
 def archive(member='frames.json'):
     result=io.BytesIO()
     with tarfile.open(fileobj=result,mode='w:gz') as tar:
