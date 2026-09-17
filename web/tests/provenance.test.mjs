@@ -161,3 +161,20 @@ test('actual translated cards and frozen details render Chinese via the existing
     }
   }
 })
+
+test('observations follow the selected second fly and show its real parent and zero values', () => {
+  const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+  const parent=fly('parent01',{name:'Ancestor'})
+  const child=fly('child001',{name:'Descendant',spec:{parent_id:parent.id},report:{budget_used:12,budget_limit:100}})
+  const frame={time:.1,tick:1000,poses:[],positions:[],scores:[99,0],energy:[88,0],drives:[[1,1],[0,0]],traces:[{olfactory:123},{olfactory:0}]}
+  const html=render(MatchObservations,{scene:{flies:[parent,child]},frame,frames:[frame],flies:[parent,child],selectedId:child.id,
+    season:{connectome:{circuits:[{id:'olfactory',label:'olfactory',color:'#abc'}]}}})
+  const text=textOnly(html)
+  assert.match(text,/Ancestor · parent01/)
+  assert.match(text,/Food collected0.00/)
+  assert.match(text,/Energy reserve0.0/)
+  assert.match(text,/Left \/ right motor drive0.00 \/ 0.00/)
+  assert.doesNotMatch(text,/123.0|99.00|88.0/)
+  assert.doesNotMatch(html,/NaN|Infinity/)
+  assert.match(html,/aria-pressed="true"[^>]*>.*Slot 2 · Descendant/)
+})
