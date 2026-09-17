@@ -1,0 +1,16 @@
+.venv/
+.uv-cache/
+.npm-cache/
+.bootstrap/
+.python/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+data/
+var/
+web/node_modules/
+web/dist/
+artifacts/
+*.tsbuildinfo
+.env
