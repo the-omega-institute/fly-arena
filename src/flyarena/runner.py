@@ -20,7 +20,13 @@ from .scenarios import RULES, arena_scene
 from .replay import POLICY, REPLAY_RECEIPT
 
 
-def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> dict:
+def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
+                     sensory_profile: str = "odor-only-v1") -> dict:
+    from .experiments.embodied_sensor import PROFILE as MULTIMODAL_PROFILE, validate_profile
+    validate_profile(bridge_profile, sensory_profile)
+    sensory = {"id": sensory_profile}
+    if sensory_profile == MULTIMODAL_PROFILE["id"]:
+        sensory = dict(MULTIMODAL_PROFILE)
     if bridge_profile == "sensorimotor-research-v2":
         from .experiments.probes import profile_manifest, runtime_closure
         profile = profile_manifest(data)
@@ -30,16 +36,18 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
                 "profile": profile, "closure": runtime_closure(), "rules": RULES,
                 "replay_policy": dict(POLICY),
                 "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba",
+                "sensory_profile": sensory,
                 "sensors": {"olfaction": "analytic_bilateral_v2",
                              "vision": "raycast_engineered_observation_v1",
                              "touch": "mujoco_food_contact_observation_v1"}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
-    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py"]
+    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
             "replay_policy": dict(POLICY),
+            "sensory_profile": sensory,
             "sensors": {"olfaction": "analytic_bilateral_v1",
                         "vision": "raycast_engineered_observation_v1",
                         "touch": "mujoco_food_contact_observation_v1"},
@@ -57,9 +65,13 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     if any(p.name != "worker.log" for p in output.iterdir()):
         raise FileExistsError("Arena evidence directory must be empty; immutable run")
     v2 = request.bridge_profile == "sensorimotor-research-v2"
-    frozen_runtime = runtime_manifest(data, request.bridge_profile)
+    frozen_runtime = runtime_manifest(data, request.bridge_profile, request.sensory_profile)
     graph = Connectome(data, verify=True)
     compiler = Compiler(graph)
+    sensory_encoder = None
+    if request.sensory_profile == "engineered-multimodal-v1":
+        from .experiments.embodied_sensor import EmbodiedSensor
+        sensory_encoder = EmbodiedSensor(graph)
     readout, ro = None, None
     if not v2:
         readout = json.loads((data / "connectome/readout.json").read_text())
@@ -93,6 +105,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             motors.append(MotorTransfer())
     scene = arena_scene(request.map_id, request.seed, request.bridge_profile)
     scene["replay_policy"] = dict(POLICY)
+    if sensory_encoder:
+        scene["sensory_encoder"] = sensory_encoder.manifest
     bodies = Bodies(scene, len(flies), request.seed)
     scene["body"] = bodies.rendering_manifest()
     scene["flies"] = [{k: f[k] for k in ["id", "name", "color", "artifact_id"]} for f in flies]
@@ -107,7 +121,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     frames, events = [], []
     senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "raycast_engineered_observation",
                "touch": 0.0, "touch_status": "mujoco_food_contact_observation_v1", "contact_food": [],
-               "nearest_food": None, "mouth_distance": None} for _ in flies]
+               "nearest_food": None, "mouth_distance": None,
+               "sensory_profile": request.sensory_profile} for _ in flies]
     sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
     contact_ticks = 0
     last_contact = False
@@ -176,7 +191,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                             "visual_status": "raycast_engineered_observation",
                             "touch": touch, "touch_status": "mujoco_food_contact_observation_v1",
                             "contact_food": contact_food, "nearest_food": nearest,
-                            "mouth_distance": mouth_distance}
+                            "mouth_distance": mouth_distance,
+                            "sensory_profile": request.sensory_profile}
             if sum(odor) > .04 and not sensory_latches[slot]["odor"]:
                 events.append({"type": "odor_detected", "tick": bodies.tick, "slot": slot,
                                "values": [float(odor[0]), float(odor[1])]})
@@ -194,8 +210,6 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             if v2:
                 backend = backends[slot]
                 encoded = encode_odor(*odor)
-                # Vision and touch are recorded observations until their
-                # sensor/neural encoders are independently qualified.
                 backend.stimulate(float(encoded[0]), float(encoded[1]))
                 backend.advance(RULES["sense_ticks"])
                 command = decoder.command(backend.neural_output(decoder.neurons))
@@ -205,10 +219,12 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
                 common = (odor[0] + odor[1]) / 2
                 encoded = np.clip([common + 2 * contrast, common - 2 * contrast], 0, 1)
-                # Keep the legacy behaviour bridge odor-only.  Geometry-derived
-                # vision/contact remains visible in the replay but cannot alter
-                # neural activity without a validated encoder.
-                brain.stimulate(float(encoded[0]), float(encoded[1]))
+                if sensory_encoder:
+                    senses[slot]["neural_input"] = sensory_encoder.apply(
+                        brain, float(encoded[0]), float(encoded[1]),
+                        float(visual[0]), float(visual[1]), touch)
+                else:
+                    brain.stimulate(float(encoded[0]), float(encoded[1]))
                 brain.advance(RULES["sense_ticks"])
                 command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
                 # Fixed low-pass decoder; no access to food or world coordinates.
