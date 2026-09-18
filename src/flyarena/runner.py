@@ -31,7 +31,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
                 "replay_policy": dict(POLICY),
                 "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba",
                 "sensors": {"olfaction": "analytic_bilateral_v2",
-                             "vision": "engineered_observation_v1",
+                             "vision": "raycast_engineered_observation_v1",
                              "touch": "geometric_contact_observation_v1"}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
@@ -41,7 +41,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
             "replay_policy": dict(POLICY),
             "sensors": {"olfaction": "analytic_bilateral_v1",
-                        "vision": "engineered_observation_v1",
+                        "vision": "raycast_engineered_observation_v1",
                         "touch": "geometric_contact_observation_v1"},
             "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
             "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
@@ -105,7 +105,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     eliminated = np.zeros(len(flies), dtype=bool)
     exit_ticks = [None for _ in flies]
     frames, events = [], []
-    senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "engineered_observation",
+    senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "raycast_engineered_observation",
                "touch": 0.0, "touch_status": "geometric_contact_observation",
                "nearest_food": None, "mouth_distance": None} for _ in flies]
     sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
@@ -162,27 +162,17 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 raw = float(np.sum(strength * np.exp(-distance2 / (2 * RULES["odor_sigma_mm"]**2))))
                 odor.append(raw if v2 else float(np.clip(raw, 0, 1)))
             position, rotation = bodies.pose(slot)
-            forward = rotation[:, 0][:2]
-            forward /= np.linalg.norm(forward) or 1.0
-            visual = [0.0, 0.0]
             nearest = None
             for source, amount_at_source in zip(food_xy, strength):
                 delta = source - position[:2]
                 distance = float(np.linalg.norm(delta))
                 nearest = distance if nearest is None else min(nearest, distance)
-                if distance < 1e-6:
-                    continue
-                unit = delta / distance
-                front = max(0.0, float(np.dot(forward, unit)))
-                side = float(forward[0] * unit[1] - forward[1] * unit[0])
-                signal = float(np.clip(amount_at_source, 0, 1) * front * np.exp(-distance / 16.0))
-                visual[0 if side < 0 else 1] += signal
-            visual = [float(np.clip(v, 0, 1)) for v in visual]
+            visual = [0.0, 0.0] if request.mode == "sumo" else bodies.visual_food(slot, remaining)
             mouth = bodies.mouth(slot)
             mouth_distance = float(np.min(np.linalg.norm(food_xy - mouth[:2], axis=1))) if len(food_xy) else None
             touch = float(mouth_distance is not None and mouth_distance <= RULES["mouth_radius_mm"] * 1.5)
             senses[slot] = {"odor": [float(odor[0]), float(odor[1])], "visual": visual,
-                            "visual_status": "engineered_observation",
+                            "visual_status": "raycast_engineered_observation",
                             "touch": touch, "touch_status": "geometric_contact_observation",
                             "nearest_food": nearest,
                             "mouth_distance": mouth_distance}
@@ -192,7 +182,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             sensory_latches[slot]["odor"] = sum(odor) > .04
             if max(visual) > .05 and not sensory_latches[slot]["visual"]:
                 events.append({"type": "visual_target_detected", "tick": bodies.tick, "slot": slot,
-                               "values": visual, "observation": "engineered_geometry"})
+                               "values": visual, "observation": "raycast_engineered_geometry"})
             sensory_latches[slot]["visual"] = max(visual) > .05
             if touch and not sensory_latches[slot]["touch"]:
                 events.append({"type": "food_contact", "tick": bodies.tick, "slot": slot,

@@ -41,6 +41,14 @@ class Bodies:
             if rgba is not None:
                 kwargs["rgba"] = rgba
             world.mjcf_root.worldbody.add_geom(**kwargs)
+        # Food sources are explicit MuJoCo visual targets.  They are static
+        # non-colliding geoms so ray visibility follows the same 3D scene as
+        # the browser without changing the historical locomotion dynamics.
+        for food in scene["food"]:
+            world.mjcf_root.worldbody.add_geom(
+                name=food["id"], type=mj.mjtGeom.mjGEOM_SPHERE,
+                pos=food["position"], size=(.45,), contype=0, conaffinity=0,
+                rgba=(.92, .42, .16, 1.0))
         contact_sensors = {}
         for index, name in enumerate(self.names):
             fly = make_locomotion_fly(name)
@@ -62,7 +70,7 @@ class Bodies:
         self.sim = Simulation(world, timestep=RULES["physics_dt"])
         self.model, self.data = self.sim.mj_model, self.sim.mj_data
         self.controllers = []
-        self.body_ids, self.head_ids, self.geom_slots = [], [], {}
+        self.body_ids, self.head_ids, self.geom_slots, self.food_geom_ids = [], [], {}, {}
         for slot, name in enumerate(self.names):
             c = HybridTurningController(timestep=RULES["physics_dt"])
             # Same initial CPG phases in each slot; independent, no shared state.
@@ -72,6 +80,8 @@ class Bodies:
             self.head_ids.append(mj.mj_name2id(self.model, mj.mjtObj.mjOBJ_SITE, f"{name}/head_origin"))
         for i in range(self.model.ngeom):
             name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_GEOM, i) or ""
+            if name in {food["id"] for food in scene["food"]}:
+                self.food_geom_ids[name] = i
             for slot, fly_name in enumerate(self.names):
                 if name.startswith(fly_name + "/"):
                     self.geom_slots[i] = slot
@@ -95,6 +105,43 @@ class Bodies:
         rot = self.data.site_xmat[head].reshape(3, 3)
         pos = self.data.site_xpos[head]
         return pos + rot @ np.array([.45, .45, 0]), pos + rot @ np.array([.45, -.45, 0])
+
+    def visual_food(self, slot: int, remaining: np.ndarray | None = None) -> list[float]:
+        """Return bilateral, line-of-sight food observations from MuJoCo rays.
+
+        Food is a static scene geom and obstacles are the same geoms used by
+        physics. A target contributes only when its ray reaches that target
+        before any obstacle or ground geom. This remains an observation until
+        a visual neural encoder is independently qualified.
+        """
+        origins = self.antennae(slot)
+        position, rotation = self.pose(slot)
+        forward = rotation[:, 0][:2]
+        norm = np.linalg.norm(forward)
+        if norm:
+            forward = forward / norm
+        values = [0.0, 0.0]
+        for index, (food_id, geom_id) in enumerate(self.food_geom_ids.items()):
+            target = self.data.geom_xpos[geom_id].copy()
+            amount = 1.0 if remaining is None else max(0.0, float(remaining[index]))
+            for side, origin in enumerate(origins):
+                delta = target - origin
+                distance = float(np.linalg.norm(delta))
+                if distance < 1e-6:
+                    continue
+                direction = delta / distance
+                hit = np.full(1, -1, dtype=np.int32)
+                ray_distance = mj.mj_ray(
+                    self.model, self.data, origin, direction, None, True,
+                    int(self.model.body_rootid[self.body_ids[slot]]), hit)
+                if ray_distance < 0 or int(hit[0]) != geom_id:
+                    continue
+                unit = delta[:2] / max(distance, 1e-6)
+                front = max(0.0, float(np.dot(forward, unit)))
+                lateral = float(forward[0] * unit[1] - forward[1] * unit[0])
+                signal = float(np.clip(amount / 10.0, 0, 1) * front * np.exp(-distance / 16.0))
+                values[0 if lateral < 0 else 1] += signal
+        return [float(np.clip(value, 0, 1)) for value in values]
 
     def step(self, drives: np.ndarray):
         # Observe all flies before writing any controls; advance the shared world once.
@@ -133,7 +180,9 @@ class Bodies:
             name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_GEOM, geom)
             geoms.append({"id": geom, "slot": slot, "name": name, "mesh": key})
         self.replay_geoms = np.array([g["id"] for g in geoms])
-        return {"meshes": meshes, "geoms": geoms, "unit": "mm", "up": "Z", "quaternion": "wxyz",
+        return {"meshes": meshes, "geoms": geoms,
+                "food_geoms": [{"id": geom, "food_id": food_id} for food_id, geom in self.food_geom_ids.items()],
+                "unit": "mm", "up": "Z", "quaternion": "wxyz",
                 "source": "FlyGym 2.1.0 NeuroMechFly simplified anatomical mesh"}
 
     def snapshot(self) -> dict:
