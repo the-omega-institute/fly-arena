@@ -5,7 +5,7 @@
 ## 每个 PR 的 CI
 
 - 后端：锁定依赖，运行 API、权重预算、神经递推、任务状态、真实短物理测试和回放测试。
-- 前端：锁定 npm 依赖，运行交互逻辑测试、TypeScript 检查和生产构建。
+- 前端：锁定 npm 依赖，运行交互逻辑测试、TypeScript 检查和生产构建。`test:journeys` 在 DOM 中操作真实 React 控件，覆盖新手引导、WT 挑战预设、AI 任务复制与失败处理；不启动仿真。
 - 失败先修，全部通过后及时合并。构建产物由 CI 保存，部署使用该版本。
 - CI 取消同分支过时任务，失败输出测试报告。不开多轮角色评审，不重复逐文件哈希。
 
@@ -17,6 +17,7 @@ uv run pytest -q -m "not integration"
 cd web
 npm ci
 npm test
+npm run test:journeys
 npm run build
 ```
 

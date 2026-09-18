@@ -1,3 +1,5 @@
+import {PlaygroundGuide} from './features/guide/PlaygroundGuide'
+import {matchingWildType} from './features/arena/wildtype'
 import {TrainingSandbox} from './features/training/TrainingSandbox'
 import {SavedFlyCard} from './features/design/SavedFlyCard'
 import {AuthDialogs} from './features/auth/AuthDialogs'
@@ -196,6 +198,12 @@ export default function App(){
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label={t("关闭错误")}><X size={16}/></button></div>}
 
       {tab==='design'&&<>
+        <PlaygroundGuide neuronCount={season?.connectome.neuron_count}
+          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!identity&&flies.some(f=>f.owner===identity.id)}
+          onDesign={()=>{document.getElementById('fly-name')?.scrollIntoView({block:'center',behavior:'smooth'});document.getElementById('fly-name')?.focus({preventScroll:true})}}
+          onCloneWT={()=>{const wt=matchingWildType(flies);if(wt){clone(wt);setToast(locale==='zh-CN'?'已复制 WT 为草稿。修改并保存后，再训练或挑战。':'WT copied into a draft. Edit and save it before training or competing.');document.getElementById('fly-name')?.focus()}}}
+          onTrain={()=>setTab('train')} onArena={()=>{setFocused('');setPlay(false)}}
+          onAI={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}/>
         <div className="design-workspace">
           <aside className="collection panel"><div className="panel-heading"><span>{t("我的果蝇库")}</span><span className="count">{flies.length.toString().padStart(2,'0')}</span></div><div className="tiny-label">{t("SELECT A STARTING POINT")}</div><p className="draft-status">{parentId?t('Unsaved draft from parent')+': '+parentId:t('Unsaved canonical draft')}</p>
             <div className="fly-list">{flies.slice(0,12).map(f=><SavedFlyCard key={f.id} fly={f} viewer={identity?.id} selected={parentId===f.id} onClone={clone}/>)}</div>

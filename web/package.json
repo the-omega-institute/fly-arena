@@ -10,11 +10,12 @@
     "test": "node --test tests/contracts.test.mjs tests/transitions.test.mjs tests/provenance.test.mjs tests/replay.test.mjs",
     "test:ui:transitions": "node tests/transitions.browser.mjs",
     "test:ui": "node tests/browser.test.mjs",
-    "test:ui:real": "node tests/real-ui-smoke.mjs"
+    "test:ui:real": "node tests/real-ui-smoke.mjs",
+    "test:journeys": "node --test tests/playground.test.mjs"
   },
   "dependencies": {
-    "@react-three/fiber": "^9.3.0",
     "@react-three/drei": "^10.7.0",
+    "@react-three/fiber": "^9.3.0",
     "lucide-react": "^0.468.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19.1.0",
     "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "jsdom": "^26.1.0",
     "typescript": "~5.9.2",
     "vite": "^7.1.0"
   }
