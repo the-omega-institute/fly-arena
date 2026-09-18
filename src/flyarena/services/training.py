@@ -165,7 +165,9 @@ class TrainingService:
         if result['status'] in {'complete', 'failed', 'stopped', 'stopping'}:
             position, slots = None, []
         result.update(proposal_generation=position, open_slots=slots)
-        result.pop('runtime_hash')
+        # Existing immutable runtime identity lets the UI distinguish evaluations
+        # made under different engine/connectome versions without new storage.
+        result['evaluation_context'] = result.pop('runtime_hash')
         return result
 
     def list(self,owner):

@@ -37,6 +37,8 @@ def test_generation_selection_hidden_candidates_publication_and_reload(lab):
     result=TrainingService(Store(store.root),service.compiler).get(run['id'])
     assert result['status']=='complete' and result['evaluations_completed']==4
     assert result['baseline_fitness']==1
+    assert result['evaluation_context']=='fixture-runtime'
+    assert 'runtime_hash' not in result
     assert [m['fitness'] for m in result['members']]==[1,3,3,2]
     first=result['members'][:2];children=result['members'][2:]
     assert all(m['fly']['spec']['parent_id']==first[1]['fly_id'] for m in children)

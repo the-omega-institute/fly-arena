@@ -36,9 +36,24 @@ const {ArenaWorldLabel} = require('./src/features/arena/ArenaWorldLabel.js')
 const {PhenotypeLab} = require('./src/features/phenotype/PhenotypeLab.js')
 const {FrozenSubjects} = require('./src/features/phenotype/FrozenSubjects.js')
 const {I18nProvider} = require('./src/shared/i18n.js')
+const {TrainingComparison} = require('./src/features/training/TrainingComparison.js')
 test.after(() => fs.rmSync(output, {recursive:true, force:true}))
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props))
 const noop = () => {}
+test('actual training comparison shows negative results, condition differences and incomplete status',()=>{
+  const run={id:'first',status:'stopped',evaluation_context:'runtime-a',spec:{name:'Run A',strategy:'evolution',founder_id:'ancestor',opponent_id:'opponent',map_id:'ring',mode:'contest',duration_seconds:2,seed:42,bridge_profile:'legacy-v1',population:2,generations:2,max_evaluations:8,circuits:['olfactory'],mutation_strength:.08},baseline_fitness:-2,evaluations_started:2,evaluations_completed:2,evaluations_total:8,members:[{generation:0,slot:0,fitness:-2},{generation:0,slot:1,fitness:null}]};
+  const second={...run,id:'second',spec:{...run.spec,name:'Run B',seed:7}};
+  const html=render(TrainingComparison,{runs:[run,second],maps:[],flies:[],onOpen:noop});
+  assert.match(textOnly(html),/Different evaluation conditions:.*Seed/);
+  assert.match(textOnly(html),/Incomplete session/);
+  assert.match(textOnly(html),/-2\.000/);
+  assert.match(html,/stroke-dasharray|fill="var\(--paper\)"/);
+  assert.doesNotMatch(textOnly(html),/Same recorded evaluation conditions/);
+  assert.match(textOnly(html),/Time budget is completed evaluations/);
+});
+test('actual comparison safely handles an account without sessions',()=>{
+  assert.match(textOnly(render(TrainingComparison,{runs:[],maps:[],flies:[],onOpen:noop})),/Your training sessions will appear here/);
+});
 const fly = (id, patch={}) => ({id, owner:'owner', designer:'Arena Lab', name:'Wild Type / 原型', color:'mint',
   artifact_id:'same-artifact', spec:{parent_id:null}, report:{}, reference_kind:null, submission_channel:null, release_id:null, ...patch})
 const legacy = fly('legacy01-full-id')
