@@ -1422,6 +1422,7 @@ export const catalog = {
   ,"Visual L / R":{"en":"Visual L / R","zh-CN":"左 / 右视觉"}
   ,"Touch":{"en":"Touch","zh-CN":"触碰"}
   ,"geometric observation":{"en":"geometric observation","zh-CN":"几何观测"}
+  ,"MuJoCo contact observation":{"en":"MuJoCo contact observation","zh-CN":"MuJoCo 物理接触观测"}
   ,"Nearest food":{"en":"Nearest food","zh-CN":"最近食物"}
   ,"edited":{"en":"edited","zh-CN":"已修改"}
   ,"Recorded neural activity graph":{"en":"Recorded neural activity graph","zh-CN":"记录的神经活动图"}

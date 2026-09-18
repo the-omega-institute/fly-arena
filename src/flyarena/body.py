@@ -41,13 +41,14 @@ class Bodies:
             if rgba is not None:
                 kwargs["rgba"] = rgba
             world.mjcf_root.worldbody.add_geom(**kwargs)
-        # Food sources are explicit MuJoCo visual targets.  They are static
-        # non-colliding geoms so ray visibility follows the same 3D scene as
-        # the browser without changing the historical locomotion dynamics.
+        # Food sources are explicit MuJoCo targets. The same sphere is used
+        # for ray visibility and for a small, mouth-only contact pair. Food
+        # does not collide with legs or terrain: its conaffinity is reserved
+        # for the mouth contact geoms added below.
         for food in scene["food"]:
             world.mjcf_root.worldbody.add_geom(
                 name=food["id"], type=mj.mjtGeom.mjGEOM_SPHERE,
-                pos=food["position"], size=(.45,), contype=0, conaffinity=0,
+                pos=food["position"], size=(.45,), contype=8, conaffinity=0,
                 rgba=(.92, .42, .16, 1.0))
         contact_sensors = {}
         for index, name in enumerate(self.names):
@@ -58,7 +59,16 @@ class Bodies:
                 for geom in geoms:
                     geom.contype = 1 << index
                     geom.conaffinity = (3 ^ (1 << index)) | 4
-            fly.bodyseg_to_mjcfbody[BodySegment("c_head")].add_site(name="head_origin", pos=(0, 0, 0), size=(.01,))
+            head = fly.bodyseg_to_mjcfbody[BodySegment("c_head")]
+            head.add_site(name="head_origin", pos=(0, 0, 0), size=(.01,))
+            # Registered feeding contact probe. The simplified FlyGym body has
+            # no articulated proboscis reaching the ground plane, so this
+            # probe is aligned with the existing mouth XY rule and explicitly
+            # remains a physical observation rather than a neural input.
+            head.add_geom(name="mouth_contact", type=mj.mjtGeom.mjGEOM_SPHERE,
+                          pos=(.35, 0, -1.0), size=(.55,),
+                          contype=1 << index, conaffinity=8 | 4,
+                          rgba=(0, 0, 0, 0), friction=(0, 0, 0))
             x, y, yaw = scene["spawns"][index]
             world.add_fly(fly, (x, y, .25), Rotation3D("quat", (np.cos(yaw / 2), 0, 0, np.sin(yaw / 2))))
             # FlyGym 2.1 creates these sensors on the world root with unscoped
@@ -70,7 +80,9 @@ class Bodies:
         self.sim = Simulation(world, timestep=RULES["physics_dt"])
         self.model, self.data = self.sim.mj_model, self.sim.mj_data
         self.controllers = []
-        self.body_ids, self.head_ids, self.geom_slots, self.food_geom_ids = [], [], {}, {}
+        self.body_ids, self.head_ids = [], []
+        self.geom_slots, self.food_geom_ids = {}, {}
+        self.mouth_contact_geom_ids = {}
         for slot, name in enumerate(self.names):
             c = HybridTurningController(timestep=RULES["physics_dt"])
             # Same initial CPG phases in each slot; independent, no shared state.
@@ -85,8 +97,12 @@ class Bodies:
             for slot, fly_name in enumerate(self.names):
                 if name.startswith(fly_name + "/"):
                     self.geom_slots[i] = slot
+                    if name.endswith("/mouth_contact"):
+                        self.mouth_contact_geom_ids[slot] = i
         if min(self.body_ids + self.head_ids) < 0:
             raise ValueError("Body manifest does not match expected thorax/head segments")
+        if set(self.mouth_contact_geom_ids) != set(range(count)):
+            raise ValueError("Body manifest does not contain one mouth contact geom per fly")
         mj.mj_forward(self.model, self.data)
         self.drives = np.zeros((count, 2))
         self.tick = 0
@@ -143,6 +159,22 @@ class Bodies:
                 values[0 if lateral < 0 else 1] += signal
         return [float(np.clip(value, 0, 1)) for value in values]
 
+    def food_contacts(self, slot: int) -> list[str]:
+        """Return food IDs with an actual MuJoCo mouth contact."""
+        mouth_geom = self.mouth_contact_geom_ids[slot]
+        food_by_geom = {geom: food_id for food_id, geom in self.food_geom_ids.items()}
+        touched = []
+        for contact in self.data.contact:
+            if contact.dist > 0:
+                continue
+            first, second = int(contact.geom1), int(contact.geom2)
+            if first != mouth_geom and second != mouth_geom:
+                continue
+            other = second if first == mouth_geom else first
+            if other in food_by_geom:
+                touched.append(food_by_geom[other])
+        return sorted(set(touched))
+
     def step(self, drives: np.ndarray):
         # Observe all flies before writing any controls; advance the shared world once.
         observations = [HybridControllerObservation.from_sim(self.sim, name) for name in self.names]
@@ -182,6 +214,9 @@ class Bodies:
         self.replay_geoms = np.array([g["id"] for g in geoms])
         return {"meshes": meshes, "geoms": geoms,
                 "food_geoms": [{"id": geom, "food_id": food_id} for food_id, geom in self.food_geom_ids.items()],
+                "contact_probes": [{"slot": slot, "id": geom,
+                                    "observation": "mujoco_food_contact_observation_v1"}
+                                   for slot, geom in sorted(self.mouth_contact_geom_ids.items())],
                 "unit": "mm", "up": "Z", "quaternion": "wxyz",
                 "source": "FlyGym 2.1.0 NeuroMechFly simplified anatomical mesh"}
 

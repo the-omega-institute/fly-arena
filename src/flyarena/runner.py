@@ -32,7 +32,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
                 "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba",
                 "sensors": {"olfaction": "analytic_bilateral_v2",
                              "vision": "raycast_engineered_observation_v1",
-                             "touch": "geometric_contact_observation_v1"}}
+                             "touch": "mujoco_food_contact_observation_v1"}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
     files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py"]
@@ -42,7 +42,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
             "replay_policy": dict(POLICY),
             "sensors": {"olfaction": "analytic_bilateral_v1",
                         "vision": "raycast_engineered_observation_v1",
-                        "touch": "geometric_contact_observation_v1"},
+                        "touch": "mujoco_food_contact_observation_v1"},
             "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
             "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
             "mujoco": mujoco.__version__, "python": platform.python_version(),
@@ -106,7 +106,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     exit_ticks = [None for _ in flies]
     frames, events = [], []
     senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "raycast_engineered_observation",
-               "touch": 0.0, "touch_status": "geometric_contact_observation",
+               "touch": 0.0, "touch_status": "mujoco_food_contact_observation_v1", "contact_food": [],
                "nearest_food": None, "mouth_distance": None} for _ in flies]
     sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
     contact_ticks = 0
@@ -170,11 +170,12 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             visual = [0.0, 0.0] if request.mode == "sumo" else bodies.visual_food(slot, remaining)
             mouth = bodies.mouth(slot)
             mouth_distance = float(np.min(np.linalg.norm(food_xy - mouth[:2], axis=1))) if len(food_xy) else None
-            touch = float(mouth_distance is not None and mouth_distance <= RULES["mouth_radius_mm"] * 1.5)
+            contact_food = [] if request.mode == "sumo" else bodies.food_contacts(slot)
+            touch = float(bool(contact_food))
             senses[slot] = {"odor": [float(odor[0]), float(odor[1])], "visual": visual,
                             "visual_status": "raycast_engineered_observation",
-                            "touch": touch, "touch_status": "geometric_contact_observation",
-                            "nearest_food": nearest,
+                            "touch": touch, "touch_status": "mujoco_food_contact_observation_v1",
+                            "contact_food": contact_food, "nearest_food": nearest,
                             "mouth_distance": mouth_distance}
             if sum(odor) > .04 and not sensory_latches[slot]["odor"]:
                 events.append({"type": "odor_detected", "tick": bodies.tick, "slot": slot,
@@ -187,7 +188,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             if touch and not sensory_latches[slot]["touch"]:
                 events.append({"type": "food_contact", "tick": bodies.tick, "slot": slot,
                                "mouth_distance": mouth_distance,
-                               "observation": "geometric_mouth_distance"})
+                               "food": contact_food,
+                               "observation": "mujoco_food_contact"})
             sensory_latches[slot]["touch"] = bool(touch)
             if v2:
                 backend = backends[slot]
