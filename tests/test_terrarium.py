@@ -42,8 +42,15 @@ def test_terrarium_compiles_fullsize_quats_colors_and_masks():
         assert bodies.model.geom_conaffinity[geom_id] == 3
         assert bodies.model.geom_rgba[geom_id, 3] == 1
     assert sum(bodies.model.geom_type[i] == mj.mjtGeom.mjGEOM_ELLIPSOID for i in obstacle_ids) >= 2
-    assert all(bodies.model.geom_conaffinity[i] & 4 for i in range(bodies.model.ngeom)
-               if i not in obstacle_ids and (mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, i) or "").startswith("fly-"))
+    fly_geoms = [i for i in range(bodies.model.ngeom)
+                 if i not in obstacle_ids and
+                 (mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, i) or "").startswith("fly-")]
+    # Locomotion geoms collide with terrain; the feeding probe is a
+    # food-only sensor and must not add a ground reaction force.
+    assert all(bodies.model.geom_conaffinity[i] & 4 for i in fly_geoms
+               if not (mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, i) or "").endswith("/mouth_contact"))
+    assert all(not (bodies.model.geom_conaffinity[i] & 4) for i in fly_geoms
+               if (mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, i) or "").endswith("/mouth_contact"))
 
 
 def test_terrarium_ramps_have_real_gentle_ground_to_leaf_profile():
@@ -124,6 +131,9 @@ def test_food_is_a_raycast_target_and_obstacles_occlude_visual_observation():
     assert len(visible.rendering_manifest()["food_geoms"]) == 1
     assert visible.rendering_manifest()["contact_probes"][0]["observation"] == "mujoco_food_contact_observation_v1"
     assert set(visible.mouth_contact_geom_ids) == {0}
+    mouth_geom = visible.mouth_contact_geom_ids[0]
+    assert visible.model.geom_conaffinity[mouth_geom] == 8
+    np.testing.assert_allclose(visible.model.geom_size[mouth_geom, 0], .65)
 
     blocked_scene = scenario("orchard", 42)
     blocked_scene["spawns"] = [[-7, 0, 0]]

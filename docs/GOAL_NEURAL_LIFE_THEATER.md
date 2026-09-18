@@ -296,3 +296,22 @@ receipt:     e5d230721163763d2ec8f1314cc24a712938c219ca2f8c80659f91bf0b677cdb
 物理触碰的隔离仿真证据在本地 MaleCNS artifact 上完成。目录 `/tmp/fly-arena-mujoco-contact-replay-near` 使用 1 秒、10000 physics ticks 的单体 forage run；receipt 为 `c9248ce565196ac9df7685d1c068d7d763acb03ced80c5bc130ccfed177a2feb`。在食物附近出生的受控场景于 tick 0 记录 `food_contact`，事件包含 `observation: mujoco_food_contact` 和 `food: ["food-0"]`；101 个 replay frames 中有 2 帧触碰为 ON，所有帧的 provenance 为 `mujoco_food_contact_observation_v1`。这条记录证明触碰事件确实来自物理 contact buffer；该受控场景使用静音隔离运行，尚未作为标准地图的排名证据提交。它仍然是工程化的接触探针观测，不等于已经完成触觉神经编码或生物学验证。
 
 本次接触增量的验证结果：后端完整测试 `441 passed, 4 skipped`；前端 `npm run build --prefix web` 成功。新增的物理接触单元测试同时检查食物 contact geom、口器接触探针、遮挡射线和有限物理 rollout。构建仍有 Vite 关于 bundle 大小的提示，但没有类型或生产构建错误。
+
+## 当前公开回放：标准场景生命闭环短验证
+
+在修正口器 contact probe 后，Mac Studio 本地生成并通过独立裁判了一条标准 `orchard / contest / seed 42` 回放：
+
+```text
+match:       de796b637f094429b763c3bfc9260211
+duration:    2.0 s
+flies:       Wild Type / Nectar
+status:      verified
+receipt:     131dc85f9988cb478cf53d939d365c0dd6b85b81dbb486909417c835b546651b
+scores:      [0.3120, 0.0608]
+```
+
+这条回放已经把同一时间轴上的事件闭合起来：双方在 tick 0 产生嗅觉和射线视觉观测，tick 6400 由 MuJoCo contact buffer 记录 `food_contact`，tick 6500 发生摄取；随后保存食物余额、能量、身体位姿、两只果蝇的物理接触、脑区 trace 和 receipt。回放目录位于 `var/runs/de796b637f094429b763c3bfc9260211/1`，API 可通过 `/api/v1/matches/de796b637f094429b763c3bfc9260211` 和对应的 `scene`、`frames`、`events`、`receipt` 端点读取。
+
+这次修正解决了一个会让果蝇停滞的物理错误：透明口器探针此前同时碰撞地面并带有默认质量，改变了身体惯量。现在探针是零质量、只与食物几何接触，并且半径 `0.65 mm` 与 `0.45 mm` 食物球之和匹配 `1.1 mm` 的摄取阈值。`tests/test_terrarium.py` 与 `tests/test_embodied_sensor.py` 的相关检查已通过。
+
+这条记录是标准地图上的真实接触→摄取短验证，已经可以作为网页回放样本；它仍然不能替代第一阶段要求的 30 秒以上公开长回放。当前 `odor-only-v1` 将视觉和触碰作为带 provenance 的物理观测保存，只有明确选择 `engineered-multimodal-v1` 才把它们注入声明的实验性神经群组。后续必须在不改变这些科学边界的前提下，把同样事件链延长到 30 秒并完成浏览器肉眼验收。

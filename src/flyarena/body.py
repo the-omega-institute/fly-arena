@@ -66,9 +66,20 @@ class Bodies:
             # probe is aligned with the existing mouth XY rule and explicitly
             # remains a physical observation rather than a neural input.
             head.add_geom(name="mouth_contact", type=mj.mjtGeom.mjGEOM_SPHERE,
-                          pos=(.35, 0, -1.0), size=(.55,),
-                          contype=1 << index, conaffinity=8 | 4,
-                          rgba=(0, 0, 0, 0), friction=(0, 0, 0))
+                          # The food radius is 0.45 mm and the game mouth
+                          # radius is 1.1 mm, so the massless probe radius is
+                          # chosen to make physical contact conserve that
+                          # same threshold.
+                          pos=(.35, 0, -1.0), size=(.65,),
+                          # The probe is an observation sensor.  It may
+                          # contact food (contype 8), but must never become
+                          # a second foot that collides with the ground.
+                          # Including the ground bit here changes locomotion
+                          # before a fly has sensed anything.
+                          contype=1 << index, conaffinity=8,
+                          # A probe must also be massless; MuJoCo otherwise
+                          # adds the invisible sphere to the fly's inertia.
+                          density=0, rgba=(0, 0, 0, 0), friction=(0, 0, 0))
             x, y, yaw = scene["spawns"][index]
             world.add_fly(fly, (x, y, .25), Rotation3D("quat", (np.cos(yaw / 2), 0, 0, np.sin(yaw / 2))))
             # FlyGym 2.1 creates these sensors on the world root with unscoped
