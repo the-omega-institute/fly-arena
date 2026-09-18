@@ -185,3 +185,52 @@ Choose **Last Oasis / 最后的绿洲** (`scarcity`) in the sandbox or pass `--m
 
 
 The `terrarium` map (Rotting Fruit Grove / 腐果林地) is available to both forage and contest evaluations, including multi-condition sessions and external optimizers. Select it in the web map selector or pass `--condition terrarium:42` / `--map terrarium`. Its low ramps and raised passage are physical collision geometry; food remains on the ground and odor is the existing analytic field. Changing terrain alone does not add vision or online learning.
+
+## Choose an algorithm or bring a model
+
+The Evolution page now provides four choices:
+
+| Choice | Candidate generation | What learns |
+| --- | --- | --- |
+| Evolution | Retain the highest-scoring previous individual; Gaussian mutations of its log circuit multipliers | Selection updates the parent |
+| Random search | Independent Gaussian perturbations around the founder; slot 0 repeats the founder | No learned search distribution; a useful control |
+| Cross-entropy (CEM) | Fit a diagonal Gaussian to the top half of the previous generation and sample it; keep the best parent | Log-weight mean and standard deviation, smoothing α=0.7, σ floor=0.01 |
+| Custom algorithm / model | Your local program submits each open candidate slot | Whatever your optimizer implements, using completed scores and valid FlySpecs |
+
+All three built-ins share selected circuits, mutation strength, bounds `[0.5,2]`, compiler mutation budget, deterministic generation/slot seeds and evaluation accounting. CEM's initial generation uses the same proposals as the other built-ins. Later CEM distributions are reconstructed from completed generations after restart. Illegal mutations are shrunk toward the retained parent; the effective search distribution near a budget boundary is therefore constrained. These are black-box weight optimizers, not different biological neural dynamics. The evaluated fly still uses `malecns-lif-cpu-v1`; within-match plasticity is `none`.
+
+Choose **Custom algorithm / model** in the browser, label the model, and start a finite session. Set `ARENA_URL` and your own `ARENA_TOKEN` locally, then attach a plugin:
+
+```sh
+python scripts/custom_strategy.py --run SESSION_ID --plugin my_optimizer.py --config config.json
+```
+
+A plugin exports:
+
+```python
+def propose(founder, history, generation, slot, config):
+    # history contains completed scores, FlySpecs, lineage and replay match IDs.
+    # Choose founder or an evaluated earlier-generation member as parent.
+    spec = dict(founder['spec'])
+    spec.update(name=f'My model G{generation+1}.{slot+1}', parent_id=founder['id'])
+    spec['weight_mutations'] = [{'selector': 'olfactory', 'scale': 1.08}]
+    return spec
+```
+
+The CLI loads this file on **your machine**. It never uploads/executes Python, model weights or config on the Arena service. The return value is a validated, absolute FlySpec relative to the canonical graph. Cached proposal files are written before network submission, so resuming a stochastic optimizer resends the exact proposal. Use one optimizer process per session. A browser JSON form also accepts `{generation, slot, spec}` for manual/API experimentation.
+
+Without `--plugin`, the driver uses the included deterministic coordinate-search example. For a real learned optimizer example, install PyTorch locally and use:
+
+```sh
+python scripts/custom_strategy.py --run SESSION_ID --plugin examples/optimizers/torch_surrogate.py
+```
+
+This example fits a small MLP to observed log circuit multipliers and fitness, ranks a sampled candidate pool, and retains the best evaluated parent. It warms up with random proposals until four observations have distinct scores. It is a surrogate-assisted optimizer, not PPO, a differentiable simulator or a replacement fly-brain model. Its `config.json` can specify `seed`, `sigma`, `steps` and `pool`. A proposal exceeding the mutation budget is rejected; adapt your optimizer to handle constrained designs.
+
+## Public evolution gallery
+
+Visitors can open Evolution without logging in and compare explicitly published, completed sessions. Charts retain flat and worsening scores. Each generation exposes candidate weights, parents, budget, actual scores and neural/behavior replays. **Use as starting fly** prepares a new session; it never enqueues work until Start training is pressed.
+
+`POST /api/v1/training/{id}/publish` shares the completed session's designs, scores and replay references; only the owner may publish. `GET /api/v1/training-showcase` and `GET /api/v1/training-showcase/{id}` require no login. Unpublished training remains owner-only. Publication removes account identifiers and operational fields from the response. Local model configuration is never uploaded. Users choose publication explicitly after completion.
+
+For useful comparisons, keep the founder, runtime, objective, maps/seeds, duration, population and evaluation limit the same. Short examples illustrate the workflow; they do not establish algorithm superiority, long-term learning or held-out performance.

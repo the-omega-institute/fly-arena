@@ -367,3 +367,64 @@ def test_failed_second_condition_preserves_partial_result_without_fitness_or_mor
     assert [c['fitness'] for c in first['condition_results']]==[2,None]
     for _ in range(3):service.tick()
     assert service.get(run['id'])['evaluations_started']==2
+
+
+def test_cem_updates_distribution_from_elites_and_restarts_deterministically(lab):
+    store,service,user,parent=lab
+    plan=TrainingSpec(founder_id=parent['id'],strategy='cross_entropy',circuits=['olfactory'],
+                      population=3,generations=2,max_evaluations=6,duration_seconds=1)
+    run=service.create(user['id'],plan,'fixture-runtime')
+    scores=iter([1.,4.,2.,4.,3.,5.])
+    for _ in range(45):
+        service=TrainingService(Store(store.root),service.compiler)
+        service.tick()
+        if any(m['status']=='queued' for m in store.matches()):complete_next(store,[next(scores)])
+        if service.get(run['id'])['status']=='complete':break
+    detail=service.get(run['id']);assert detail['status']=='complete'
+    first=detail['members'][:3];second=detail['members'][3:]
+    assert all(m['fly']['spec']['parent_id']==first[1]['fly_id'] for m in second)
+    assert second[0]['fly']['artifact_id']==first[1]['fly']['artifact_id']
+    # Independent mathematical check: top half (2/3), log-space mean/std,
+    # smoothed alpha=.7 with initial zero mean and .08 standard deviation.
+    import numpy as np
+    import math
+    elite=np.array([math.log(m['fly']['spec']['weight_mutations'][0]['scale']) for m in [first[1],first[2]]])
+    mean=.7*elite.mean();sigma=max(.01,.3*.08+.7*elite.std())
+    expected=np.random.default_rng(np.random.SeedSequence([42,1,1])).normal(mean,sigma)
+    actual=math.log(second[1]['fly']['spec']['weight_mutations'][0]['scale'])
+    assert actual==pytest.approx(expected)
+    # No hidden optimizer state: a fresh service generates the same candidate.
+    again=service.create(user['id'],plan,'fixture-runtime')
+    clone=service._candidate(again,plan,1,1,first[1]['fly'],first)
+    assert clone['artifact_id']==second[1]['fly']['artifact_id']
+
+
+def test_completed_showcase_is_opt_in_owner_controlled_and_sanitized(lab,monkeypatch):
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    store,service,user,parent=lab
+    run=create(lab)
+    monkeypatch.setattr('flyarena.api.Connectome',lambda:service.compiler().graph)
+    with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
+        assert client.get('/api/v1/training-showcase').json()==[]
+        path='/api/v1/training/'+run['id']+'/publish'
+        assert client.post(path).status_code==401
+        client.headers['Authorization']='Bearer '+user['token']
+        assert client.post(path).status_code==422
+        for _ in range(30):
+            service.tick()
+            if any(m['status']=='queued' for m in store.matches()):complete_next(store,[1])
+            if service.get(run['id'])['status']=='complete':break
+        stranger=store.identity('Stranger');client.headers['Authorization']='Bearer '+stranger['token']
+        assert client.post(path).status_code==404
+        client.headers['Authorization']='Bearer '+user['token']
+        assert client.post(path).status_code==200
+        client.headers.clear()
+        public=client.get('/api/v1/training-showcase/'+run['id']);assert public.status_code==200
+        data=public.json();assert data['status']=='complete' and len(data['members'])==4
+        assert data['evaluation_context']=='fixture-runtime'
+        for private in ['owner','designer','control','error','lease','token']:
+            assert '"'+private+'"' not in public.text
+        assert client.get('/api/v1/training/'+run['id']).status_code==401
+        assert len(client.get('/api/v1/training-showcase').json())==1

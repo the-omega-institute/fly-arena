@@ -230,6 +230,16 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def training_list(owner: dict = Depends(identity)):
         return training.list(owner['id'])
 
+    @app.get('/api/v1/training-showcase')
+    def training_showcase():
+        return training.showcase()
+
+    @app.get('/api/v1/training-showcase/{ident}')
+    def training_example(ident: str):
+        result=training.showcase(ident)
+        if result is None:raise HTTPException(404,'Published session not found')
+        return result
+
     def owned_training(ident, owner):
         session = training.get(ident)
         if session is None or session['owner'] != owner['id']:
@@ -259,6 +269,11 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if set(body) != {'fly_id'} or not isinstance(body['fly_id'], str):
             raise ValueError("Provide a training fly_id")
         return training.save(ident, owner['id'], body['fly_id'])
+
+    @app.post('/api/v1/training/{ident}/publish')
+    def training_publish(ident: str, owner: dict = Depends(identity)):
+        owned_training(ident, owner)
+        return training.publish(ident,owner['id'])
 
     @app.get("/api/v1/matches")
     def matches():

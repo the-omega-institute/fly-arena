@@ -114,3 +114,35 @@ test('AI JSON editing retains import errors and does not publish or enqueue on o
  await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
  assert.ok(button('复制任务提示'))
 })
+
+test('optimizer cards select CEM and custom model with clear runtime semantics',async()=>{
+ const {AlgorithmPicker}=require('./src/features/training/AlgorithmPicker.js')
+ const changes=[];const names=[]
+ await mount(AlgorithmPicker,{value:'evolution',onChange:v=>changes.push(v),name:'My model',onName:v=>names.push(v)})
+ assert.equal(document.querySelectorAll('input[type=radio]').length,4)
+ await act(async()=>document.querySelector('input[value=cross_entropy]').click())
+ assert.deepEqual(changes,['cross_entropy'])
+ await mount(AlgorithmPicker,{value:'external',onChange:v=>changes.push(v),name:'My model',onName:v=>names.push(v)})
+ assert.equal(document.querySelector('input[type=radio][value=external]').checked,true)
+ assert.ok([...document.querySelectorAll('input')].some(i=>i.value==='My model'))
+ assert.match(document.body.textContent,/same connectome LIF simulator/)
+ const language=document.querySelector('select[aria-label="Language"]')
+ await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.body.textContent,/自定义算法/)
+})
+
+test('public gallery exposes real generations and branches without starting compute',async()=>{
+ const {TrainingShowcase}=require('./src/features/training/TrainingShowcase.js')
+ const requests=[];const branched=[]
+ const fly={...own,report:{budget_used:1},spec:{...spec,weight_mutations:[{selector:'olfactory',scale:1.1}]}}
+ const run={id:'c'.repeat(32),status:'complete',spec:{name:'Real CEM',strategy:'cross_entropy',founder_id:wt.id,opponent_id:null,map_id:'orchard',mode:'forage',seed:42,duration_seconds:1,population:2,generations:2,max_evaluations:4,circuits:['olfactory'],mutation_strength:.08},baseline_fitness:0,evaluation_context:'runtime',evaluations_completed:4,evaluations_started:4,evaluations_total:4,best_fly_id:fly.id,members:[{generation:0,slot:0,fitness:0,fly_id:wt.id,fly:{...fly,id:wt.id},matches:[],condition_results:[]},{generation:1,slot:1,fitness:.25,fly_id:fly.id,fly,matches:[],condition_results:[]}]}
+ globalThis.fetch=async(url,options)=>{requests.push([url,options?.method||'GET']);return {ok:true,json:async()=>[run]}}
+ await mount(TrainingShowcase,{maps:[],onReplay:noop,onBranch:f=>branched.push(f)})
+ assert.equal(requests.length,1);assert.match(String(requests[0][0]),/training-showcase/)
+ assert.match(document.body.textContent,/Real CEM/)
+ await click('G21 evaluated')
+ assert.match(document.body.textContent,/0.250/)
+ await click('Use as starting fly');assert.equal(branched[0].id,fly.id)
+ assert.deepEqual(requests.map(r=>r[1]),['GET'])
+ globalThis.fetch=()=>{throw Error('Unexpected network')}
+})
