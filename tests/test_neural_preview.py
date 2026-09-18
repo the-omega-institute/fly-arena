@@ -4,20 +4,26 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from flyarena.api import create_app
+import flyarena.api as api_module
 from flyarena.auth import AuthConfig
-from flyarena.common import DATA
+from flyarena.connectome import Connectome
+from flyarena.api import create_app
 from flyarena.store import Store
+from test_replay_parity import tiny_assets
 
 
-def test_neural_preview_returns_model_state_for_fixed_stimuli(tmp_path):
-    manifest = json.loads((DATA / "connectome/manifest.json").read_text())
+def test_neural_preview_returns_model_state_for_fixed_stimuli(tmp_path, monkeypatch):
+    data, _, _ = tiny_assets(tmp_path / "assets")
+    manifest = json.loads((data / "connectome/manifest.json").read_text())
+    # CI intentionally does not ship the 165k-neuron research data bundle. The
+    # four-node fixture still exercises the same endpoint and Brain implementation.
+    monkeypatch.setattr(api_module, "Connectome", lambda: Connectome(data))
     with TestClient(create_app(with_worker=False, store=Store(Path(tmp_path)), auth_config=AuthConfig())) as client:
         identity = client.post("/api/v1/identities", json={"name": "preview tester"}).json()
         body = {
             "name": "preview candidate",
             "connectome_sha256": manifest["sha256"],
-            "weight_mutations": [{"selector": "olfactory", "scale": 1.1}],
+            "weight_mutations": [{"selector": "olfactory", "scale": 1.01}],
         }
         response = client.post("/api/v1/flies/preview", json=body,
                               headers={"Authorization": "Bearer " + identity["token"]})
