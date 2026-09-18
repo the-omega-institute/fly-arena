@@ -29,7 +29,10 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
         return {"schema": "arena-runtime/v2", "bridge_profile": bridge_profile,
                 "profile": profile, "closure": runtime_closure(), "rules": RULES,
                 "replay_policy": dict(POLICY),
-                "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba"}
+                "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba",
+                "sensors": {"olfaction": "analytic_bilateral_v2",
+                             "vision": "engineered_observation_v1",
+                             "touch": "geometric_contact_observation_v1"}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
     files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py"]
@@ -37,6 +40,9 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
             "replay_policy": dict(POLICY),
+            "sensors": {"olfaction": "analytic_bilateral_v1",
+                        "vision": "engineered_observation_v1",
+                        "touch": "geometric_contact_observation_v1"},
             "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
             "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
             "mujoco": mujoco.__version__, "python": platform.python_version(),
@@ -99,7 +105,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     eliminated = np.zeros(len(flies), dtype=bool)
     exit_ticks = [None for _ in flies]
     frames, events = [], []
-    senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "touch": 0.0,
+    senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "engineered_observation",
+               "touch": 0.0, "touch_status": "geometric_contact_observation",
                "nearest_food": None, "mouth_distance": None} for _ in flies]
     sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
     contact_ticks = 0
@@ -107,13 +114,27 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     duration_ticks = request.duration_seconds * 10000
     consumption = np.zeros((len(flies), len(remaining)))
 
+    # Choose display nodes once per run.  The simulation still runs the complete
+    # connectome; this fixed, labelled sample keeps the brain view comparable
+    # from frame to frame and makes a missing value different from zero activity.
+    sample_nodes = []
+    for circuit in graph.manifest.get("circuits", []):
+        circuit_id = circuit["id"]
+        group = np.asarray(graph.groups.get(circuit_id, []), dtype=np.int64)
+        if len(group):
+            sample_nodes.extend(group[np.linspace(0, len(group) - 1, min(6, len(group)), dtype=int)].tolist())
+    if not sample_nodes:
+        sample_nodes = np.linspace(0, graph.n - 1, min(48, graph.n), dtype=int).tolist()
+    sample_nodes = list(dict.fromkeys(int(i) for i in sample_nodes))[:48]
+
     def neural_sample(brain):
         rates = np.asarray(brain.rates)
-        active = np.flatnonzero(rates > 0)
-        if len(active):
-            active = active[np.argsort(rates[active])[-12:][::-1]]
-        return {"circuits": brain.trace(),
-                "top_nodes": [{"id": str(int(graph.ids[i])), "activity": float(rates[i])} for i in active]}
+        sampled = [{"id": str(int(graph.ids[i])), "activity": float(rates[i])}
+                   for i in sample_nodes]
+        return {"circuits": brain.trace(), "sampled_nodes": sampled,
+                # Keep the old field for clients that still read v0.4.2 data.
+                "top_nodes": sampled,
+                "sampling": {"kind": "fixed-circuit-sample", "count": len(sampled)}}
 
     def snapshot():
         frame = bodies.snapshot()
@@ -161,7 +182,9 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             mouth_distance = float(np.min(np.linalg.norm(food_xy - mouth[:2], axis=1))) if len(food_xy) else None
             touch = float(mouth_distance is not None and mouth_distance <= RULES["mouth_radius_mm"] * 1.5)
             senses[slot] = {"odor": [float(odor[0]), float(odor[1])], "visual": visual,
-                            "touch": touch, "nearest_food": nearest,
+                            "visual_status": "engineered_observation",
+                            "touch": touch, "touch_status": "geometric_contact_observation",
+                            "nearest_food": nearest,
                             "mouth_distance": mouth_distance}
             if sum(odor) > .04 and not sensory_latches[slot]["odor"]:
                 events.append({"type": "odor_detected", "tick": bodies.tick, "slot": slot,
@@ -169,16 +192,19 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             sensory_latches[slot]["odor"] = sum(odor) > .04
             if max(visual) > .05 and not sensory_latches[slot]["visual"]:
                 events.append({"type": "visual_target_detected", "tick": bodies.tick, "slot": slot,
-                               "values": visual})
+                               "values": visual, "observation": "engineered_geometry"})
             sensory_latches[slot]["visual"] = max(visual) > .05
             if touch and not sensory_latches[slot]["touch"]:
                 events.append({"type": "food_contact", "tick": bodies.tick, "slot": slot,
-                               "mouth_distance": mouth_distance})
+                               "mouth_distance": mouth_distance,
+                               "observation": "geometric_mouth_distance"})
             sensory_latches[slot]["touch"] = bool(touch)
             if v2:
                 backend = backends[slot]
                 encoded = encode_odor(*odor)
-                backend.stimulate(float(encoded[0]), float(encoded[1]), visual[0], visual[1], touch)
+                # Vision and touch are recorded observations until their
+                # sensor/neural encoders are independently qualified.
+                backend.stimulate(float(encoded[0]), float(encoded[1]))
                 backend.advance(RULES["sense_ticks"])
                 command = decoder.command(backend.neural_output(decoder.neurons))
                 drives[slot] = motors[slot].advance(command)
@@ -187,7 +213,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
                 common = (odor[0] + odor[1]) / 2
                 encoded = np.clip([common + 2 * contrast, common - 2 * contrast], 0, 1)
-                brain.stimulate(float(encoded[0]), float(encoded[1]), visual[0], visual[1], touch)
+                # Keep the legacy behaviour bridge odor-only.  Geometry-derived
+                # vision/contact remains visible in the replay but cannot alter
+                # neural activity without a validated encoder.
+                brain.stimulate(float(encoded[0]), float(encoded[1]))
                 brain.advance(RULES["sense_ticks"])
                 command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
                 # Fixed low-pass decoder; no access to food or world coordinates.

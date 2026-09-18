@@ -31,21 +31,14 @@ class CPUBrainBackend:
         # Neural integration is deterministic; seed belongs to the body/scenario.
         self.brain.reset()
 
-    def stimulate(self, left: float, right: float, visual_left: float = 0.0,
-                  visual_right: float = 0.0, touch: float = 0.0) -> None:
-        values = np.asarray([left, right, visual_left, visual_right, touch], dtype=float)
+    def stimulate(self, left: float, right: float) -> None:
+        values = np.asarray([left, right], dtype=float)
         if not np.isfinite(values).all() or np.any(values < 0) or np.any(values > 1):
             raise ValueError("encoded sensory values must be finite in [0,1]")
         # Versioned wrapper: v1 Brain.stimulate and its tonic current are untouched.
         self.brain.external.fill(0)
         for side, value in zip(("left", "right"), values):
-            if side in ("left", "right"):
-                self.brain.external[self.brain.graph.groups[f"olfactory_{side}"]] = 48.0 * value
-        visual = float((values[2] + values[3]) * .5)
-        if visual and len(self.brain.graph.groups.get("visual", [])):
-            self.brain.external[self.brain.graph.groups["visual"]] += 12.0 * visual
-        if values[4] and len(self.brain.graph.groups.get("local", [])):
-            self.brain.external[self.brain.graph.groups["local"]] += 8.0 * values[4]
+            self.brain.external[self.brain.graph.groups[f"olfactory_{side}"]] = 48.0 * value
 
     def advance(self, steps: int) -> np.ndarray:
         if not isinstance(steps, (int, np.integer)) or steps < 0:
