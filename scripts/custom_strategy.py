@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 from copy import deepcopy
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -19,6 +20,16 @@ import time
 import uuid
 
 import httpx
+
+
+def load_optimizer(path):
+    """Explicit local code loading. The server never imports the user's plugin."""
+    module_spec=importlib.util.spec_from_file_location('arena_user_optimizer',Path(path).resolve())
+    if module_spec is None or module_spec.loader is None:raise ValueError('Provide a Python plugin file')
+    module=importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    if not callable(getattr(module,'propose',None)):raise ValueError('Plugin must export propose(founder, history, generation, slot, config)')
+    return module.propose
 
 
 def propose(founder: dict, history: list[dict], generation: int, slot: int) -> dict:
@@ -47,6 +58,9 @@ relative to the canonical graph, not deltas added a second time to the parent.
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run')
+    parser.add_argument('--plugin',type=Path,help='Local Python file exporting propose(founder, history, generation, slot, config)')
+    parser.add_argument('--config',type=Path,help='Local JSON object passed to the plugin; never uploaded')
+    parser.add_argument('--name',default='My custom optimizer')
     parser.add_argument('--founder')
     parser.add_argument('--population',type=int,default=2)
     parser.add_argument('--generations',type=int,default=2)
@@ -59,6 +73,9 @@ def main():
     parser.add_argument('--timeout',type=int,default=3600)
     parser.add_argument('--output',type=Path,default=Path('var/custom-strategies'))
     args=parser.parse_args()
+    optimizer=load_optimizer(args.plugin) if args.plugin else lambda f,h,g,s,c:propose(f,h,g,s)
+    config=json.loads(args.config.read_text()) if args.config else {}
+    if not isinstance(config,dict):parser.error('--config must contain a JSON object')
     token=os.environ.get('ARENA_TOKEN')
     if not token:parser.error('Set ARENA_TOKEN to your designer/agent API token.')
     base=os.environ.get('ARENA_URL','http://127.0.0.1:18080').rstrip('/')
@@ -78,7 +95,7 @@ def main():
             founder=args.founder or next(f['id'] for f in flies if f.get('reference_kind')=='wildtype')
             print('Creation key:',args.key,flush=True)
             run=api('POST','/training',headers={'Idempotency-Key':args.key},json={
-                'name':'My coordinate search','strategy':'external','founder_id':founder,
+                'name':args.name,'optimizer_name':args.name,'strategy':'external','founder_id':founder,
                 'circuits':[], 'population':args.population,'generations':args.generations,
                 'max_evaluations':args.budget,'duration_seconds':args.seconds,'map_id':args.map,
                 'seed':args.seed,'mode':'forage','bridge_profile':'legacy-v1',
@@ -99,11 +116,16 @@ def main():
             if run['control']=='run':
                 for slot in run.get('open_slots',[]):
                     generation=run['proposal_generation']
-                    candidate=propose(founder,run['members'],generation,slot)
-                    proposal={'generation':generation,'slot':slot,'spec':candidate}
+                    cached=folder/f'proposal-{generation}-{slot}.json'
+                    if cached.exists():proposal=json.loads(cached.read_text())
+                    else:
+                        candidate=optimizer(deepcopy(founder),deepcopy(run['members']),generation,slot,deepcopy(config))
+                        proposal={'generation':generation,'slot':slot,'spec':candidate}
+                        # Cache before sending: stochastic/local learned models
+                        # must resend the same proposal after transport failures.
+                        cached.write_text(json.dumps(proposal,indent=2),encoding='utf-8')
                     # No /flies publication: candidates remain in training and do not enqueue Lab work.
                     fly=api('POST',path+'/candidates',json=proposal)
-                    (folder/f'proposal-{generation}-{slot}.json').write_text(json.dumps(proposal,indent=2),encoding='utf-8')
                     print('Proposed',generation+1,slot+1,fly['id'],flush=True)
             time.sleep(5)
             run=api('GET',path)

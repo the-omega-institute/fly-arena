@@ -1,3 +1,4 @@
+import {algorithmName} from './algorithms'
 import {useState} from 'react'
 import {ArrowRight,Download,GitCompareArrows} from 'lucide-react'
 import type {ArenaMap,Fly} from '../../types'
@@ -8,10 +9,10 @@ import type {ComparableRun} from './comparison'
 const colors=['#538b76','#bc7253','#8572ac']
 const score=(n:number|null)=>n===null?'—':n.toFixed(3)
 
-export function TrainingComparison({runs,maps,flies,onOpen}:{runs:ComparableRun[];maps:ArenaMap[];flies:Fly[];onOpen:(id:string)=>void}){
+export function TrainingComparison({runs,maps,flies,onOpen,initiallyOpen=false}:{runs:ComparableRun[];maps:ArenaMap[];flies:Fly[];onOpen:(id:string)=>void;initiallyOpen?:boolean}){
   const {t,locale}=useI18n()
   const [chosen,setChosen]=useState<string[]|null>(null)
-  const ids=chosen??runs.slice(0,2).map(r=>r.id)
+  const ids=chosen??runs.slice(0,3).map(r=>r.id)
   const selected=runs.filter(r=>ids.includes(r.id))
   const differences=comparisonDifferences(selected)
   const scale=curveScale(selected)
@@ -25,7 +26,7 @@ export function TrainingComparison({runs,maps,flies,onOpen}:{runs:ComparableRun[
     const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))
     const link=document.createElement('a');link.href=url;link.download='training-comparison.json';link.click();URL.revokeObjectURL(url)
   }
-  return <details className="panel training-comparison">
+  return <details className="panel training-comparison" open={initiallyOpen||undefined}>
     <summary><GitCompareArrows size={17}/><span>{t('Compare training strategies')}</span><small>{t('Up to three sessions')}</small></summary>
     <div className="comparison-content">
       <p>{t('Compare real generation scores and evaluation costs. This view starts no simulations.')}</p>
@@ -48,7 +49,7 @@ export function TrainingComparison({runs,maps,flies,onOpen}:{runs:ComparableRun[
           </svg>
           <p>{t('Best food score in each generation')} · {t('Hollow points indicate partially evaluated generations. Missing results remain blank.')}</p>
           <div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>{t('Session name')}</th><th>{t('Starting food score')}</th><th>{t('Best food score')}</th><th>{t('Change from baseline')}</th><th>{t('Evaluations completed')}</th><th>{t('Evaluated time budget')}</th></tr></thead><tbody>{rows.map(({run,baseline,best,gain,budgetedSeconds},i)=><tr key={run.id}>
-            <td><button className="text-link" style={{color:colors[i]}} onClick={()=>onOpen(run.id)}>{run.spec.name}<ArrowRight size={13}/></button><small>{t(run.spec.strategy==='evolution'?'Evolution · select and mutate':run.spec.strategy==='random_search'?'Random search · explore from founder':'Your own optimizer · API')}</small><small>{run.status==='complete'?t('Complete'):t('Incomplete session')}</small></td>
+            <td><button className="text-link" style={{color:colors[i]}} onClick={()=>onOpen(run.id)}>{run.spec.name}<ArrowRight size={13}/></button><small>{t(algorithmName(run.spec.strategy))}</small><small>{run.status==='complete'?t('Complete'):t('Incomplete session')}</small></td>
             <td>{score(baseline)}</td><td>{score(best)}</td><td>{gain===null?'—':(gain>0?'+':'')+score(gain)}</td><td>{run.evaluations_completed} / {run.evaluations_total}<small>{t('Started')} {run.evaluations_started} · {t('Limit')} {run.spec.max_evaluations}</small></td><td>{budgetedSeconds} s</td>
           </tr>)}</tbody></table></div>
           <p>{t('Time budget is completed evaluations × configured duration, not wall time or hardware cost. Best score includes the baseline.')}</p>

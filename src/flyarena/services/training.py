@@ -33,6 +33,8 @@ def initialize(db):
     CREATE TABLE IF NOT EXISTS training_keys(
       owner TEXT NOT NULL,key TEXT NOT NULL,spec TEXT NOT NULL,run_id TEXT NOT NULL,
       PRIMARY KEY(owner,key));
+    CREATE TABLE IF NOT EXISTS training_publications(
+      run_id TEXT PRIMARY KEY, published REAL NOT NULL);
     ''')
 
 
@@ -45,7 +47,8 @@ class TrainingSpec(StrictModel):
     name: str = Field(default='My evolution', min_length=1, max_length=64)
     founder_id: str = Field(pattern=r'^[0-9a-f]{32}$')
     opponent_id: str | None = Field(default=None, pattern=r'^[0-9a-f]{32}$')
-    strategy: Literal['evolution', 'random_search', 'external'] = 'evolution'
+    strategy: Literal['evolution', 'random_search', 'cross_entropy', 'external'] = 'evolution'
+    optimizer_name: str = Field(default='', max_length=64)
     circuits: list[CircuitId] = Field(default_factory=lambda:['olfactory','projection','descending'],max_length=8)
     mutation_strength: float = Field(default=.08,ge=.01,le=.3)
     population: int = Field(default=3,ge=2,le=6)
@@ -213,6 +216,30 @@ class TrainingService:
             ids=[r[0] for r in db.execute('SELECT id FROM training_runs WHERE owner=? ORDER BY created DESC LIMIT 40',(owner,))]
         return [self.get(i) for i in ids]
 
+    def publish(self,ident,owner):
+        with self.store.db() as db:
+            row=db.execute('SELECT status FROM training_runs WHERE id=? AND owner=?',(ident,owner)).fetchone()
+            if row is None:raise ValueError('Training session not found')
+            if row['status']!='complete':raise ValueError('Only completed sessions can be published')
+            db.execute('INSERT OR IGNORE INTO training_publications VALUES(?,?)',(ident,time.time()))
+        return self.showcase(ident)
+
+    def showcase(self,ident=None):
+        with self.store.db() as db:
+            ids=[r[0] for r in db.execute('SELECT run_id FROM training_publications ORDER BY published DESC LIMIT 40')]
+        if ident is None:return [self.showcase(i) for i in ids]
+        with self.store.db() as db:
+            if not db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(ident,)).fetchone():return None
+        # Publishing explicitly shares designs, lineage, scores and replay links.
+        # Strip account identifiers and operational fields at every nested level.
+        def public(value):
+            if isinstance(value,dict):
+                return {k:public(v) for k,v in value.items() if k not in
+                        {'owner','designer','control','error','experiment_error','lease','expires','runtime_hash'}}
+            if isinstance(value,list):return [public(v) for v in value]
+            return value
+        return public(self.get(ident))
+
     def control(self,ident,owner,action):
         if action not in {'pause','resume','stop'}:raise ValueError('Unknown training action')
         with self.store.db() as db:
@@ -247,7 +274,7 @@ class TrainingService:
         return self.store.add_fly(owner, spec, report, submission_channel='api',
                                   training=position, external_proposal=True, agent_channel=agent_channel)
 
-    def _candidate(self,run,spec,generation,slot,parent):
+    def _candidate(self,run,spec,generation,slot,parent,members=()):
         compiler=self.compiler()
         raw=dict(parent['spec']);raw['parent_id']=parent['id']
         raw['name']=f"{spec.name[:42]} · G{generation+1}.{slot+1}"
@@ -261,7 +288,27 @@ class TrainingService:
         for mutation in raw['weight_mutations']:
             scales[mutation['selector']]=scales.get(mutation['selector'],1.)*mutation['scale']
         # Slot zero is the retained parent, so every generation has an incumbent.
-        perturb={c:float(rng.normal(0,spec.mutation_strength)) for c in spec.circuits} if slot else {}
+        perturb={c:float(rng.normal(0,spec.mutation_strength)) for c in spec.circuits} if spec.strategy!='cross_entropy' else {}
+        if spec.strategy=='cross_entropy':
+            # Diagonal Gaussian CEM in log-weight space, with elite retention.
+            # Rebuild its smoothed distribution from completed generations so a
+            # restart needs no hidden optimizer state. Alpha=.7, elite fraction=.5.
+            def vector(fly):
+                values={c:0. for c in spec.circuits}
+                for mutation in fly['spec']['weight_mutations']:
+                    if mutation['selector'] in values:values[mutation['selector']]+=math.log(mutation['scale'])
+                return np.array([values[c] for c in spec.circuits])
+            mean=vector(self.store.fly(spec.founder_id))
+            sigma=np.full(len(mean),spec.mutation_strength)
+            for previous in range(generation):
+                ranked=sorted((m for m in members if m['generation']==previous and m['fitness'] is not None),
+                              key=lambda m:(-m['fitness'],m['slot']))
+                if len(ranked)!=spec.population:raise ValueError('CEM needs a fully evaluated previous generation')
+                elite=np.array([vector(m['fly']) for m in ranked[:max(1,math.ceil(spec.population*.5))]])
+                mean=.3*mean+.7*elite.mean(axis=0)
+                sigma=np.maximum(.01,.3*sigma+.7*elite.std(axis=0))
+            target=rng.normal(mean,sigma)
+            perturb={c:float(target[i]-math.log(scales.get(c,1.))) for i,c in enumerate(spec.circuits)}
         original=compiler.compile(FlySpec.model_validate(raw))['artifact_id']
         for shrink in range(9):
             values=dict(scales)
@@ -328,10 +375,10 @@ class TrainingService:
                 return
         elif len(current)<spec.population:
             parent=self.store.fly(spec.founder_id)
-            if generation and spec.strategy=='evolution':
+            if generation and spec.strategy in {'evolution','cross_entropy'}:
                 previous=[m for m in members if m['generation']==generation-1]
                 parent=max(previous,key=lambda m:(m['fitness'],-m['slot']))['fly']
-            self._candidate(run,spec,generation,len(current),parent)
+            self._candidate(run,spec,generation,len(current),parent,members)
             return
         member=next(m for m in current if m['fitness'] is None)
         trial=len(member['matches']);ids=[member['fly_id']]
