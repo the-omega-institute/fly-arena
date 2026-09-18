@@ -58,7 +58,7 @@ class Node:
         # Platform/Python may differ. Scientific sources, graph, rules and readout must match.
         if profile != 'legacy-v1':
             raise ValueError('Remote execution currently supports legacy-v1 matches only')
-        for key in ('sources', 'lock_sha256', 'model', 'rules', 'replay_policy',
+        for key in ('sources', 'lock_sha256', 'model', 'models', 'rules', 'replay_policy',
                     'connectome_sha256', 'readout_weights_sha256'):
             if remote.get(key) != local.get(key):
                 raise ValueError('Compute node needs synchronization: '+key)

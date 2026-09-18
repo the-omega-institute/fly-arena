@@ -92,7 +92,7 @@ def main():
             run=api('GET','/training/'+args.run)
         else:
             flies=api('GET','/flies')
-            founder=args.founder or next(f['id'] for f in flies if f.get('reference_kind')=='wildtype')
+            founder=args.founder or next(f['id'] for f in sorted(flies,key=lambda f:f['spec'].get('model_profile')!='malecns-lif-cpu-v1') if f.get('reference_kind')=='wildtype')
             print('Creation key:',args.key,flush=True)
             run=api('POST','/training',headers={'Idempotency-Key':args.key},json={
                 'name':args.name,'optimizer_name':args.name,'strategy':'external','founder_id':founder,

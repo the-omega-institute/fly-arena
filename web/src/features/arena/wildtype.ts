@@ -2,6 +2,7 @@ import type {Fly} from '../../types'
 
 /** Reference status comes from the server, never the display name or owner. */
 export function matchingWildType(flies:Fly[], subject?:Fly):Fly|undefined {
+  if(!subject){const lif=flies.find(f=>f.reference_kind==='wildtype'&&f.spec.model_profile==='malecns-lif-cpu-v1');if(lif)return lif}
   return flies.find(f=>f.reference_kind==='wildtype'&&(!subject||
     (f.spec.model_profile===subject.spec.model_profile&&f.spec.connectome_sha256===subject.spec.connectome_sha256)))
 }

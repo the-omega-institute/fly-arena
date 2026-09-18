@@ -12,7 +12,7 @@ import numpy as np
 from .common import VAR, digest, file_sha, write_json
 from .connectome import Connectome
 from .contracts import FlySpec
-from .neural import PROFILE
+from .models import profile as model_profile
 
 BUDGET = {
     "id": "mutation-budget-v1", "points": 100.0,
@@ -117,7 +117,7 @@ class Compiler:
         weights_sha = hashlib.sha256(weights.tobytes()).hexdigest()
         phenotype = {"connectome_sha256": spec.connectome_sha256,
                      "weights_sha256": weights_sha, "neuron_parameters": p.model_dump(),
-                     "model": PROFILE, "budget": BUDGET}
+                     "model": model_profile(spec.model_profile), "budget": BUDGET}
         artifact_id = digest(phenotype)
         report = {"artifact_id": artifact_id, "budget_used": round(cost, 6), "budget_limit": 100,
                   "weight_points": round(weight_points, 6), "intrinsic_points": round(intrinsic_points, 6),
@@ -164,7 +164,7 @@ class Compiler:
             raise ValueError("Artifact identity mismatch")
         if manifest["phenotype"]["connectome_sha256"] != self.graph.manifest["sha256"]:
             raise ValueError("Artifact belongs to a different connectome")
-        if manifest["phenotype"]["model"] != PROFILE or manifest["phenotype"]["budget"] != BUDGET:
+        if manifest["phenotype"]["model"] != model_profile(manifest["phenotype"]["model"]["id"]) or manifest["phenotype"]["budget"] != BUDGET:
             raise ValueError("Artifact belongs to a different neural model or budget profile")
         if file_sha(folder / "mutations.npz") != manifest["mutation_sha256"]:
             raise ValueError("Mutation artifact hash mismatch")

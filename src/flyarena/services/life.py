@@ -160,7 +160,7 @@ class LifeLedger:
             exits=[e for e in events if e['type']=='exit' and e['slot']==slot]
             path=sum(math.dist(a['positions'][slot],b['positions'][slot]) for a,b in zip(frames,frames[1:]))
             food=sum(e['amount'] for e in intake)
-            observations.append({'slot':slot,'food_consumed':food,'food_outcome':'no_intake_observed' if not intake else 'intake_observed',
+            observations.append({'slot':slot,'model_profile':self.store.fly(ident)['spec'].get('model_profile','malecns-lif-cpu-v1'),'food_consumed':food,'food_outcome':'no_intake_observed' if not intake else 'intake_observed',
                 'first_intake_record_seconds':min((e['tick']*dt for e in intake),default=None),
                 'exit_seconds':min((e['tick']*dt for e in exits),default=None),
                 'sampled_path_mm':path,'final_energy':frames[-1].get('energy',[None]*len(match['request']['fly_ids']))[slot],

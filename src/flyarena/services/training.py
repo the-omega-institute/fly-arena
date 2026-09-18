@@ -149,6 +149,8 @@ def check_proposal(db, owner, position, candidate):
         raise ValueError('Submit an open slot in the current generation; G1 slot 0 is the server baseline')
     allowed_parents = {plan.founder_id} | {m['fly_id'] for m in members
         if m['generation'] < generation and m['fitness'] is not None}
+    founder=json.loads(db.execute('SELECT spec FROM flies WHERE id=?',(plan.founder_id,)).fetchone()[0])
+    if candidate['model_profile']!=founder['model_profile']:raise ValueError('Keep the founder neural model within a training session')
     if candidate['parent_id'] not in allowed_parents:
         raise ValueError('Parent must be the founder or an evaluated earlier-generation individual in this session')
     return None
@@ -175,6 +177,8 @@ class TrainingService:
             for fly_id in [spec.founder_id]+([spec.opponent_id] if spec.mode=='contest' else []):
                 row=db.execute('SELECT spec FROM flies WHERE id=?',(fly_id,)).fetchone()
                 if row is None:raise ValueError('Starting fly or opponent does not exist')
+                from ..models import require_model_bridge
+                require_model_bridge(json.loads(row['spec']).get('model_profile','malecns-lif-cpu-v1'),spec.bridge_profile)
             active=db.execute("SELECT count(*) FROM training_runs WHERE owner=? AND status NOT IN ('complete','stopped','failed')",(owner,)).fetchone()[0]
             if active>=2:raise ValueError('Finish or stop a session first; at most 2 unfinished training sessions')
             db.execute("INSERT INTO training_runs(id,owner,spec,runtime_hash,status,created,updated) VALUES(?,?,?,?,'queued',?,?)",(ident,owner,raw,runtime_hash,now,now))
@@ -209,6 +213,7 @@ class TrainingService:
         # Existing immutable runtime identity lets the UI distinguish evaluations
         # made under different engine/connectome versions without new storage.
         result['evaluation_context'] = result.pop('runtime_hash')
+        result['model_profile'] = self.store.fly(spec.founder_id)['spec'].get('model_profile','malecns-lif-cpu-v1')
         return result
 
     def list(self,owner):

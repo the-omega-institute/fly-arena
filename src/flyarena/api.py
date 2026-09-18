@@ -23,6 +23,7 @@ from .compiler import BUDGET, Compiler
 from .connectome import Connectome
 from .contracts import CreateIdentity, FlySpec, MatchRequest, TournamentRequest
 from .neural import PROFILE
+from .models import catalog as model_catalog, require_model_bridge
 from .runner import runtime_manifest
 from .bridge import match_profiles, require_bridge
 from .scenarios import MAPS, RULES, scenario, arena_scene
@@ -127,7 +128,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         profiles = match_profiles()
         return {"default_bridge_profile": "sensorimotor-research-v2" if profiles[1]["ready"] else "legacy-v1",
                 "match_profiles": profiles, "id": "genesis-alpha", "name": "GENESIS / 创生季", "connectome": graph.manifest,
-                "model": PROFILE, "budget": BUDGET, "rules": RULES,
+                "model": PROFILE, "models": model_catalog(), "budget": BUDGET, "rules": RULES,
                 "runtime_sha256": digest(runtime_manifest()),
                 "readout": json.loads((DATA / "connectome/readout.json").read_text()),
                 "invite_required": bool(os.environ.get("ARENA_INVITE_CODE")),
@@ -252,6 +253,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 fly = store.fly(fly_id)
                 if fly is None:
                     raise ValueError("Starting fly or opponent does not exist")
+                require_model_bridge(fly['spec']['model_profile'],body.bridge_profile)
                 compiler().compile(FlySpec.model_validate(fly['spec']))
         return training.create(owner['id'], body, digest(match_runtime(body.bridge_profile)), idempotency_key)
 

@@ -234,3 +234,7 @@ Visitors can open Evolution without logging in and compare explicitly published,
 `POST /api/v1/training/{id}/publish` shares the completed session's designs, scores and replay references; only the owner may publish. `GET /api/v1/training-showcase` and `GET /api/v1/training-showcase/{id}` require no login. Unpublished training remains owner-only. Publication removes account identifiers and operational fields from the response. Local model configuration is never uploaded. Users choose publication explicitly after completion.
 
 For useful comparisons, keep the founder, runtime, objective, maps/seeds, duration, population and evaluation limit the same. Short examples illustrate the workflow; they do not establish algorithm superiority, long-term learning or held-out performance.
+
+## Brain model and neural gradient training
+
+Choose LIF or experimental continuous-rate dynamics in Studio before saving the founder. All built-in optimizers work with either model. Each session retains that model; different models are explicitly flagged in comparisons. The custom [rate Adam trainer](RATE_MODEL.md) fits neural responses using backpropagation through the full connectome, then submits candidates for actual embodied scoring. It does not backpropagate through MuJoCo or learn within a match.
