@@ -33,9 +33,6 @@ CIRCUITS = [
     ("motor", "运动回路", "Ventral nerve cord motor", "superclass", "vnc_motor", "#e8947c"),
 ]
 
-SENSORY_CLASSES = ("mechanosensory_tactile", "mechanosensory",
-                   "mechanosensory_proprioceptive", "gustatory")
-
 
 def download(data: Path = DATA) -> None:
     raw = data / "raw"
@@ -163,19 +160,6 @@ class Connectome:
         for name in ["ids", "pre", "post", "counts", "indptr", "signs", "side"]:
             setattr(self, name, np.load(self.path / f"{name}.npy", mmap_mode="r", allow_pickle=False))
         self.groups = dict(np.load(self.path / "groups.npz", allow_pickle=False))
-        # Older manifests predate the multimodal bridge and therefore do not
-        # contain class-labelled sensory populations in groups.npz.  Derive
-        # these names from the immutable official neuron metadata without
-        # changing the graph hash or canonical arrays.
-        metadata_path = self.path / "neurons.json"
-        if metadata_path.exists():
-            metadata = json.loads(metadata_path.read_text())
-            for class_name in SENSORY_CLASSES:
-                if class_name not in self.groups:
-                    indices = [index for index, row in enumerate(metadata)
-                               if row.get("class") == class_name]
-                    if indices:
-                        self.groups[class_name] = np.asarray(indices, dtype=np.int32)
         self.n, self.e = len(self.ids), len(self.post)
 
     def baseline_weights(self) -> np.ndarray:

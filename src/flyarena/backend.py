@@ -31,24 +31,14 @@ class CPUBrainBackend:
         # Neural integration is deterministic; seed belongs to the body/scenario.
         self.brain.reset()
 
-    def stimulate(self, left: float, right: float, visual_left: float = 0.0,
-                  visual_right: float = 0.0, touch: float = 0.0) -> dict:
-        return self.stimulate_multimodal(left, right, visual_left, visual_right, touch)
-
-    def stimulate_multimodal(self, odor_left: float, odor_right: float,
-                             visual_left: float = 0.0, visual_right: float = 0.0,
-                             touch: float = 0.0) -> dict:
-        multimodal = np.asarray([odor_left, odor_right, visual_left, visual_right, touch], dtype=float)
-        if not np.isfinite(multimodal).all() or np.any(multimodal < 0) or np.any(multimodal > 1):
+    def stimulate(self, left: float, right: float) -> None:
+        values = np.asarray([left, right], dtype=float)
+        if not np.isfinite(values).all() or np.any(values < 0) or np.any(values > 1):
             raise ValueError("encoded sensory values must be finite in [0,1]")
-        from .experiments.embodied_sensor import apply
-        # CPUBrainBackend historically used a zero odor background and 48 mV
-        # gain. Keep that exact odor-only current for backend parity while the
-        # new channels use the explicit experimental profile gains.
-        return apply(self.brain.external, self.brain.graph,
-                     odor_left=float(odor_left), odor_right=float(odor_right),
-                     visual_left=float(visual_left), visual_right=float(visual_right),
-                     touch=float(touch), odor_background=0.0, odor_gain=48.0)
+        # Versioned wrapper: v1 Brain.stimulate and its tonic current are untouched.
+        self.brain.external.fill(0)
+        for side, value in zip(("left", "right"), values):
+            self.brain.external[self.brain.graph.groups[f"olfactory_{side}"]] = 48.0 * value
 
     def advance(self, steps: int) -> np.ndarray:
         if not isinstance(steps, (int, np.integer)) or steps < 0:

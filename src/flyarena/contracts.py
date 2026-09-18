@@ -99,6 +99,8 @@ class MatchRequest(StrictModel):
 
     @model_validator(mode="after")
     def slots(self):
+        from .experiments.embodied_sensor import validate_profile
+        validate_profile(self.bridge_profile, self.sensory_profile)
         if any(len(i) != 32 or any(c not in "0123456789abcdef" for c in i) for i in self.fly_ids):
             raise ValueError("Invalid fly ID")
         expected = 1 if self.mode == "forage" else 2

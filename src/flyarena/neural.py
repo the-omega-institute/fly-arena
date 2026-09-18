@@ -75,16 +75,12 @@ class Brain:
         self.total_spikes = 0
         self.tick = 0
 
-    def stimulate(self, left: float, right: float, visual_left: float = 0.0,
-                  visual_right: float = 0.0, touch: float = 0.0):
-        return self.stimulate_multimodal(left, right, visual_left, visual_right, touch)
-
-    def stimulate_multimodal(self, odor_left: float, odor_right: float,
-                              visual_left: float = 0.0, visual_right: float = 0.0,
-                              touch: float = 0.0) -> dict:
-        from .experiments.embodied_sensor import apply
-        return apply(self.external, self.graph, odor_left=odor_left, odor_right=odor_right,
-                     visual_left=visual_left, visual_right=visual_right, touch=touch)
+    def stimulate(self, left: float, right: float):
+        self.external.fill(0)
+        # A bilateral odor-current encoder into anatomically annotated ORNs.
+        # The constant background is a declared sensory baseline, not a motor action.
+        for side, concentration in [("left", left), ("right", right)]:
+            self.external[self.graph.groups[f"olfactory_{side}"]] = 8.0 + 40.0 * np.clip(concentration, 0, 1)
 
     def advance(self, steps: int = 100) -> np.ndarray:
         counts = np.zeros(self.graph.n, dtype=np.int32)

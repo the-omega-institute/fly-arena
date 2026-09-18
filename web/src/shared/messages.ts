@@ -1,4 +1,11 @@
 export const catalog = {
+  "Sensory input profile": {"en": "Sensory input profile", "zh-CN": "感觉输入模式"},
+  "Sensory profile": {"en": "Sensory profile", "zh-CN": "感觉模式"},
+  "Versioned neural input": {"en": "Versioned neural input", "zh-CN": "已记录版本的神经输入"},
+  "Bilateral odor only": {"en": "Bilateral odor only", "zh-CN": "仅双侧嗅觉"},
+  "Experimental vision + touch": {"en": "Experimental vision + touch", "zh-CN": "实验性视觉 + 触觉"},
+  "Vision and touch can drive the brain in an experimental sandbox. These runs are unranked; the sensory encoding is an engineering model.": {"en": "Vision and touch can drive the brain in an experimental sandbox. These runs are unranked; the sensory encoding is an engineering model.", "zh-CN": "可在实验沙箱中让视觉和触觉驱动大脑。这些运行不进入排行榜；感觉编码采用工程模型。"},
+
   "Evaluation conditions": {"en": "Evaluation conditions", "zh-CN": "评测条件"},
   "Condition": {"en": "Condition", "zh-CN": "条件"},
   "Awaiting complete condition": {"en": "Awaiting complete condition", "zh-CN": "等待该条件全部评测"},

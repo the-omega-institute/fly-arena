@@ -22,9 +22,8 @@ from .replay import POLICY, REPLAY_RECEIPT
 
 def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                      sensory_profile: str = "odor-only-v1") -> dict:
-    from .experiments.embodied_sensor import PROFILE as MULTIMODAL_PROFILE
-    if sensory_profile not in {"odor-only-v1", MULTIMODAL_PROFILE["id"]}:
-        raise ValueError("Unknown sensory profile")
+    from .experiments.embodied_sensor import PROFILE as MULTIMODAL_PROFILE, validate_profile
+    validate_profile(bridge_profile, sensory_profile)
     sensory = {"id": sensory_profile}
     if sensory_profile == MULTIMODAL_PROFILE["id"]:
         sensory = dict(MULTIMODAL_PROFILE)
@@ -69,6 +68,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     frozen_runtime = runtime_manifest(data, request.bridge_profile, request.sensory_profile)
     graph = Connectome(data, verify=True)
     compiler = Compiler(graph)
+    sensory_encoder = None
+    if request.sensory_profile == "engineered-multimodal-v1":
+        from .experiments.embodied_sensor import EmbodiedSensor
+        sensory_encoder = EmbodiedSensor(graph)
     readout, ro = None, None
     if not v2:
         readout = json.loads((data / "connectome/readout.json").read_text())
@@ -102,6 +105,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             motors.append(MotorTransfer())
     scene = arena_scene(request.map_id, request.seed, request.bridge_profile)
     scene["replay_policy"] = dict(POLICY)
+    if sensory_encoder:
+        scene["sensory_encoder"] = sensory_encoder.manifest
     bodies = Bodies(scene, len(flies), request.seed)
     scene["body"] = bodies.rendering_manifest()
     scene["flies"] = [{k: f[k] for k in ["id", "name", "color", "artifact_id"]} for f in flies]
@@ -205,13 +210,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             if v2:
                 backend = backends[slot]
                 encoded = encode_odor(*odor)
-                # Vision and touch are recorded observations until their
-                # sensor/neural encoders are independently qualified.
-                if request.sensory_profile == "engineered-multimodal-v1":
-                    backend.stimulate_multimodal(float(encoded[0]), float(encoded[1]),
-                                                 float(visual[0]), float(visual[1]), touch)
-                else:
-                    backend.stimulate(float(encoded[0]), float(encoded[1]))
+                backend.stimulate(float(encoded[0]), float(encoded[1]))
                 backend.advance(RULES["sense_ticks"])
                 command = decoder.command(backend.neural_output(decoder.neurons))
                 drives[slot] = motors[slot].advance(command)
@@ -220,12 +219,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
                 common = (odor[0] + odor[1]) / 2
                 encoded = np.clip([common + 2 * contrast, common - 2 * contrast], 0, 1)
-                # Keep the legacy behaviour bridge odor-only.  Geometry-derived
-                # vision/contact remains visible in the replay but cannot alter
-                # neural activity without a validated encoder.
-                if request.sensory_profile == "engineered-multimodal-v1":
-                    brain.stimulate_multimodal(float(encoded[0]), float(encoded[1]),
-                                               float(visual[0]), float(visual[1]), touch)
+                if sensory_encoder:
+                    senses[slot]["neural_input"] = sensory_encoder.apply(
+                        brain, float(encoded[0]), float(encoded[1]),
+                        float(visual[0]), float(visual[1]), touch)
                 else:
                     brain.stimulate(float(encoded[0]), float(encoded[1]))
                 brain.advance(RULES["sense_ticks"])

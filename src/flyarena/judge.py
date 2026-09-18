@@ -95,6 +95,10 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     runtime_sensory = receipt["runtime"].get("sensory_profile", {"id": "odor-only-v1"})
     if runtime_sensory.get("id") != request.sensory_profile:
         raise ValueError("Receipt sensory profile mismatch")
+    if request.sensory_profile == "engineered-multimodal-v1":
+        encoder = stored_scene.get("sensory_encoder", {})
+        if encoder.get("profile") != runtime_sensory or not encoder.get("groups"):
+            raise ValueError("Receipt sensory encoder manifest mismatch")
     pose_ticks = _replay_cadence(receipt, stored_scene)
     if expected_runtime_hash is not None and digest(receipt["runtime"]) != expected_runtime_hash:
         raise ValueError("Execution backend differs from admitted runtime")
@@ -134,6 +138,25 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     if type(result["final_tick"]) is not int or result["final_tick"] != end:
         raise ValueError("Replay is missing ticks or final state")
     _validate_frames(frames, stored_scene, end, pose_ticks, len(artifacts))
+    if request.sensory_profile == "engineered-multimodal-v1":
+        encoder_sha = digest(stored_scene["sensory_encoder"])
+        for frame in frames[1:]:
+            senses = frame.get("senses", [])
+            if len(senses) != len(artifacts):
+                raise ValueError("Missing neural input observations")
+            for sense in senses:
+                encoded = sense.get("neural_input", {})
+                if (sense.get("sensory_profile") != request.sensory_profile or
+                        encoded.get("profile") != request.sensory_profile or
+                        encoded.get("group_manifest_sha256") != encoder_sha):
+                    raise ValueError("Recorded neural input identity mismatch")
+                values = encoded.get("values", {})
+                channels = ("odor_left", "odor_right", "visual_left", "visual_right", "touch")
+                currents = _finite_array([values.get(k) for k in channels], (5,), "neural input")
+                if np.any(currents < 0) or np.any(currents > 1):
+                    raise ValueError("Recorded neural input outside [0,1]")
+                if not np.array_equal(currents[2:], [*sense["visual"], sense["touch"]]):
+                    raise ValueError("Neural input differs from embodied observations")
     n, nf = len(artifacts), len(scene["food"])
     scores, eaten = np.zeros(n), np.zeros(nf)
     exits = [None] * n

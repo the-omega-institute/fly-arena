@@ -27,7 +27,7 @@ class Node:
                 raise ValueError('Node configuration requires '+key)
         if not all(Path(config[key]).is_absolute() for key in ('root', 'data')):
             raise ValueError('Node root and data must be absolute paths')
-        self._runtime: dict[str, tuple[float, dict]] = {}
+        self._runtime: dict[tuple[str, str], tuple[float, dict]] = {}
 
     def call(self, action: str, *args: str) -> dict:
         c = self.config
@@ -61,7 +61,7 @@ class Node:
         if profile != 'legacy-v1':
             raise ValueError('Remote execution currently supports legacy-v1 matches only')
         for key in ('sources', 'lock_sha256', 'model', 'models', 'rules', 'replay_policy',
-                    'connectome_sha256', 'readout_weights_sha256'):
+                    'connectome_sha256', 'readout_weights_sha256', 'sensory_profile'):
             if remote.get(key) != local.get(key):
                 raise ValueError('Compute node needs synchronization: '+key)
         self._runtime[(profile, sensory_profile)] = (time.monotonic(), remote)

@@ -41,13 +41,10 @@ class RateBrain:
         self.external=np.zeros(self.graph.n,dtype=np.float64)
         self.tick=0
 
-    def stimulate(self,left,right,visual_left=0.,visual_right=0.,touch=0.):
-        return self.stimulate_multimodal(left, right, visual_left, visual_right, touch)
-
-    def stimulate_multimodal(self, odor_left, odor_right, visual_left=0., visual_right=0., touch=0.):
-        from .experiments.embodied_sensor import apply
-        return apply(self.external, self.graph, odor_left=odor_left, odor_right=odor_right,
-                     visual_left=visual_left, visual_right=visual_right, touch=touch)
+    def stimulate(self,left,right):
+        self.external.fill(0)
+        for side,value in [('left',left),('right',right)]:
+            self.external[self.graph.groups['olfactory_'+side]]=8.+40.*np.clip(value,0,1)
 
     def advance(self,steps=100):
         if not isinstance(steps,(int,np.integer)) or steps<0:raise ValueError('steps must be a nonnegative integer')

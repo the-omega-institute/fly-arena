@@ -161,18 +161,20 @@ LIF 使用脉冲密度和膜电位，rate 模型使用连续活动值和相对�
 
 已加入 `engineered-multimodal-v1` 实验 profile。它把回放中的左右视觉射线值和 MuJoCo 口器接触值，分别写入 MaleCNS 的视觉左右群组和官方 `neurons.json` 中的 `mechanosensory_tactile` 群组；嗅觉仍然写入左右 ORN 群组。profile、输入通道、增益、来源 provenance 和 canonical 群组哈希会进入 runtime 与 receipt。没有触觉注释的旧图谱会 fail closed，不能把 touch 电流广播到任意神经元。
 
-`Brain`、`RateBrain` 和 `CPUBrainBackend` 现在都提供同一组多模态刺激接口。`odor-only-v1` 是默认行为，零视觉/触碰输入与旧嗅觉电流逐元素一致；实验 profile 才启用视觉/触碰电流。实验 profile 能被直接请求和审计，但在生理校准完成前不会进入排行榜，网页会把它显示为不可用的实验输入选项。
+独立的 `EmbodiedSensor` 在每场实验开始时构建群组映射，并接入 LIF 和 rate 模型。原有 `Brain`、`RateBrain`、`CPUBrainBackend` 保持主分支实现，研究 v2 的校准身份不受影响。默认 `odor-only-v1` 保留原有行为；实验 profile 才启用视觉/触碰电流。目前多模态仅支持 legacy bridge，网页可以选择并提交实验运行，结果可回放但不进入排行榜。未知左右侧不按数组顺序猜测；触觉仅采用明确的 `mechanosensory_tactile` 标注。
 
 真实 MaleCNS + MuJoCo 的 1 秒实验回放已经通过独立裁判：
 
 ```text
 profile:       engineered-multimodal-v1
-receipt:       41a783c9e47652690b4cef85861832b1439577caf52eae82ae0d68039c672087
+receipt:       30f3f53774a03848533295ec47d1b010e99ffbd58dda32a79dce681ad3015850
 final_tick:    10000
 judge:         verified / event-conservation-v1
 visual_frames: 100
 touch_frames:  0 (该种子和出生位置没有发生口器 contact)
 ```
+
+该次运行包含 165,122 个神经元、25,563,197 条连接，场景保存实际群组映射摘要，每帧保存送入大脑的输入值。完整后端回归为 `451 passed, 4 skipped`，包括研究 v2 校准身份检查；前端 51 项测试、10 项用户流程测试及构建通过。
 
 这证明多模态输入已经进入真实完整连接组的神经状态，并被 receipt 绑定；它不证明视觉或触觉编码已经具有生物学有效性，也不代替下一步必须交付的 30 秒以上、确实摄取食物的公开生命回放。
 

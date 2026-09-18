@@ -1,149 +1,88 @@
-"""Versioned bridge from embodied observations to canonical sensory groups.
+"""Opt-in engineered currents; group selection is prepared once per simulation.
 
-The arena already records visual raycasts and MuJoCo food contacts.  This
-module is the explicit, opt-in bridge that can turn those observations into
-external currents on the retained MaleCNS graph.  It is intentionally marked
-experimental: the current gains are engineering parameters and are not a
-claim that the biological visual or tactile encoding has been calibrated.
+Visual projection neurons receive direct current (no retina model). Feeding
+contact drives the annotated tactile population (no receptor-specific model).
+Neither mapping is a claim of biological calibration.
 """
 from __future__ import annotations
 
-from typing import Mapping
-
+import json
 import numpy as np
-
-from ..common import digest
-
+from ..common import digest, file_sha
 
 PROFILE = {
-    "id": "engineered-multimodal-v1",
-    "schema": "embodied-sensor/v1",
-    "status": "experimental",
+    "id": "engineered-multimodal-v1", "schema": "embodied-sensor/v1",
+    "status": "experimental", "ranking_eligible": False,
     "channels": ["odor_left", "odor_right", "visual_left", "visual_right", "touch"],
     "odor": {"background_mv": 8.0, "gain_mv": 40.0},
-    "visual": {"gain_mv": 12.0, "source": "raycast_engineered_observation_v1"},
-    "touch": {"gain_mv": 18.0, "source": "mujoco_food_contact_observation_v1"},
-    "qualification": "not-biologically-calibrated",
+    "visual": {"gain_mv": 12.0, "source": "raycast_engineered_observation_v1",
+               "selector": "visual_projection, annotated side L/R; unknown side excluded"},
+    "touch": {"gain_mv": 18.0, "source": "mujoco_food_contact_observation_v1",
+              "selector": "class = mechanosensory_tactile; whole population"},
+    "qualification": "engineered currents; no biological sensory validation",
 }
 
 
-def catalog() -> list[dict]:
+def catalog():
     return [
-        {"id": "odor-only-v1", "name": "Bilateral odor only", "ready": True,
-         "qualification": "current calibrated arena baseline"},
-        {"id": PROFILE["id"], "name": "Experimental multimodal bridge", "ready": False,
-         "reason": "Visual and tactile gains are explicit engineering parameters; biological encoding is not yet qualified.",
-         "profile": PROFILE},
+        {"id": "odor-only-v1", "name": "Bilateral odor only", "ready": True},
+        {"id": PROFILE["id"], "name": "Experimental vision + touch", "ready": True,
+         "ranking_eligible": False, "bridge_profiles": ["legacy-v1"],
+         "reason": "Engineered sensory currents; unranked sandbox runs only."},
     ]
 
 
-def _value(value: float, name: str) -> float:
-    result = float(value)
-    if not np.isfinite(result) or not 0.0 <= result <= 1.0:
-        raise ValueError(f"{name} must be finite in [0,1]")
-    return result
+def validate_profile(bridge_profile, sensory_profile):
+    if sensory_profile not in ("odor-only-v1", PROFILE["id"]):
+        raise ValueError("Unknown sensory profile")
+    if sensory_profile == PROFILE["id"] and bridge_profile != "legacy-v1":
+        raise ValueError("Experimental sensory input currently supports legacy-v1 only")
 
 
-def _side_split(graph, indices: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Split a canonical group by annotated side with a deterministic fallback."""
-    indices = np.asarray(indices, dtype=np.int32)
-    side = np.asarray(getattr(graph, "side", np.zeros(getattr(graph, "n", 0), dtype=np.int8)))
-    left = indices[side[indices] > 0] if len(side) else np.empty(0, dtype=np.int32)
-    right = indices[side[indices] < 0] if len(side) else np.empty(0, dtype=np.int32)
-    if len(left) and len(right):
-        return left, right
-    # Fixtures and future imports may not carry side annotations.  Splitting
-    # by canonical index keeps the bridge deterministic without inventing a
-    # biological laterality claim.
-    midpoint = len(indices) // 2
-    return indices[:midpoint], indices[midpoint:]
+class EmbodiedSensor:
+    def __init__(self, graph):
+        self.groups = {"odor_" + side: np.asarray(graph.groups["olfactory_" + side], dtype=np.int32)
+                       for side in ("left", "right")}
+        visual = np.asarray(graph.groups.get("visual", []), dtype=np.int32)
+        # Never infer anatomical laterality from array order.
+        side = np.asarray(graph.side)
+        self.groups.update(visual_left=visual[side[visual] == 1],
+                           visual_right=visual[side[visual] == -1])
+        if hasattr(graph, "path"):
+            path = graph.path / "neurons.json"
+            expected = graph.manifest["files"].get("neurons.json")
+            if not expected or file_sha(path) != expected:
+                raise ValueError("Sensory neuron annotation digest mismatch")
+            rows = json.loads(path.read_text())
+            if len(rows) != graph.n or any(str(row["id"]) != str(ident)
+                                          for row, ident in zip(rows, graph.ids)):
+                raise ValueError("Sensory annotations do not match canonical neuron IDs")
+            tactile = [i for i, row in enumerate(rows) if row.get("class") == "mechanosensory_tactile"]
+        else:
+            # Explicit groups support deliberately small unit-test fixtures.
+            tactile = graph.groups.get("mechanosensory_tactile", [])
+        self.groups["touch"] = np.asarray(tactile, dtype=np.int32)
+        self.manifest = {
+            "profile": PROFILE,
+            "groups": {name: {"count": len(indices),
+                               "neuron_ids_sha256": digest(graph.ids[indices].tolist())}
+                       for name, indices in self.groups.items()},
+        }
+        self.sha256 = digest(self.manifest)
 
-
-def _group(graph, *names: str) -> np.ndarray:
-    for name in names:
-        values = graph.groups.get(name)
-        if values is not None and len(values):
-            return np.asarray(values, dtype=np.int32)
-    return np.empty(0, dtype=np.int32)
-
-
-def sensory_groups(graph) -> dict[str, np.ndarray]:
-    """Return the canonical neuron IDs used by the multimodal encoder.
-
-    ``Connectome`` derives the class-labelled mechanosensory groups from the
-    official ``neurons.json`` metadata when importing a full artifact.  The
-    explicit empty fallback keeps small test graphs and old artifacts honest:
-    a missing tactile annotation cannot silently become an all-neuron input.
-    """
-    odor = _group(graph, "olfactory")
-    odor_left = _group(graph, "olfactory_left")
-    odor_right = _group(graph, "olfactory_right")
-    if not len(odor_left) and not len(odor_right):
-        odor_left, odor_right = _side_split(graph, odor)
-    visual = _group(graph, "visual")
-    visual_left = _group(graph, "visual_left")
-    visual_right = _group(graph, "visual_right")
-    if not len(visual_left) and not len(visual_right):
-        visual_left, visual_right = _side_split(graph, visual)
-    tactile = _group(graph, "mechanosensory_tactile", "mechanosensory")
-    return {
-        "odor_left": odor_left,
-        "odor_right": odor_right,
-        "visual_left": visual_left,
-        "visual_right": visual_right,
-        "touch": tactile,
-    }
-
-
-def manifest(graph) -> dict:
-    groups = sensory_groups(graph)
-    ids = np.asarray(getattr(graph, "ids", np.arange(graph.n)))
-    return {
-        "profile": PROFILE,
-        "groups": {name: {"count": int(len(values)),
-                           "neuron_ids_sha256": digest(ids[values].tolist())}
-                    for name, values in groups.items()},
-    }
-
-
-def apply(external: np.ndarray, graph, *, odor_left: float, odor_right: float,
-          visual_left: float = 0.0, visual_right: float = 0.0,
-          touch: float = 0.0, odor_background: float | None = None,
-          odor_gain: float | None = None) -> dict:
-    """Write one deterministic multimodal current frame into ``external``.
-
-    The returned metadata is stored alongside replay frames.  Visual and
-    tactile values only address their declared canonical groups.  If a graph
-    has no tactile annotation, nonzero touch fails closed instead of applying
-    current to an arbitrary population.
-    """
-    values = {"odor_left": _value(odor_left, "odor_left"),
-              "odor_right": _value(odor_right, "odor_right"),
-              "visual_left": _value(visual_left, "visual_left"),
-              "visual_right": _value(visual_right, "visual_right"),
-              "touch": _value(touch, "touch")}
-    groups = sensory_groups(graph)
-    if values["touch"] and not len(groups["touch"]):
-        raise ValueError("touch input requires an annotated mechanosensory group")
-    external.fill(0.0)
-    background = PROFILE["odor"]["background_mv"] if odor_background is None else float(odor_background)
-    gain = PROFILE["odor"]["gain_mv"] if odor_gain is None else float(odor_gain)
-    external[groups["odor_left"]] = background + gain * values["odor_left"]
-    external[groups["odor_right"]] = background + gain * values["odor_right"]
-    # Sensory populations can overlap in small fixtures or in a future
-    # imported annotation.  Add the non-odor channels and skip zero writes so
-    # the default multimodal call is exactly the historical odor baseline.
-    if values["visual_left"]:
-        external[groups["visual_left"]] += PROFILE["visual"]["gain_mv"] * values["visual_left"]
-    if values["visual_right"]:
-        external[groups["visual_right"]] += PROFILE["visual"]["gain_mv"] * values["visual_right"]
-    if values["touch"]:
-        external[groups["touch"]] += PROFILE["touch"]["gain_mv"] * values["touch"]
-    return {"profile": PROFILE["id"], "values": values,
-            "group_counts": {key: int(len(value)) for key, value in groups.items()},
-            "group_manifest_sha256": digest(manifest(graph))}
-
-
-def zero_multimodal(external: np.ndarray, graph, *, odor_left: float, odor_right: float) -> dict:
-    """Convenience assertion path used by backend parity tests."""
-    return apply(external, graph, odor_left=odor_left, odor_right=odor_right)
+    def apply(self, brain, odor_left, odor_right, visual_left=0., visual_right=0., touch=0.):
+        raw = np.asarray([odor_left, odor_right, visual_left, visual_right, touch], dtype=float)
+        if not np.isfinite(raw).all() or np.any(raw < 0) or np.any(raw > 1):
+            raise ValueError("Sensory values must be finite in [0,1]")
+        for name, value in zip(PROFILE["channels"], raw):
+            if value and not len(self.groups[name]):
+                raise ValueError(f"{name} requires an annotated sensory group")
+        # Reuse the unchanged odor encoder; zero extra inputs exactly preserve
+        # its current, including on fixtures with overlapping circuit labels.
+        brain.stimulate(float(odor_left), float(odor_right))
+        for name, value, gain in (("visual_left", visual_left, 12.),
+                                  ("visual_right", visual_right, 12.), ("touch", touch, 18.)):
+            if value:
+                brain.external[self.groups[name]] += gain * value
+        return {"profile": PROFILE["id"], "values": dict(zip(PROFILE["channels"], raw.tolist())),
+                "group_manifest_sha256": self.sha256}
