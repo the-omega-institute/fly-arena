@@ -225,3 +225,5 @@ receipt:     e5d230721163763d2ec8f1314cc24a712938c219ca2f8c80659f91bf0b677cdb
 ```
 
 事件时间轴包含气味检测、几何视觉目标观测、口器接触、5 次摄取和出界；完整 `brain-0.npz`、`physics.npz`、`frames.json`、`events.json` 和 `receipt.json` 均保存在本机预览的不可变 run 目录。回放有 3001 帧、48 个固定 canonical 神经元样本，采样活动中有 98,756 个非零值，最大值为 444.4147。receipt 继续明确声明：嗅觉是当前神经输入，视觉和触碰是工程化观测；这条记录证明了长时可审计的生命闭环和数据链，还不证明生物学视觉或触觉已经完成校准。
+
+射线视觉增量也在 4060 的隔离 staging `/tmp/fly-arena-raycast-v1` 中完成了短回放验证。该回放为 1 秒、101 帧、`final_tick=10000`，状态为 `verified`，receipt 为 `f0bad79cc2bb0de4f44eb3dd146992009f12829fe9b5375ff756c61d2aa76d15`。receipt 的视觉传感器版本为 `raycast_engineered_observation_v1`，场景 body manifest 中包含 5 个 food geoms；整段有 178 个非零视觉采样，最大值为 1.0，视觉事件标记为 `raycast_engineered_geometry`。这证明射线观测已经在完整连接组和 MuJoCo 场景中运行并被裁判接受，仍然不把工程化视觉观测冒充为已经校准的视觉神经输入。
