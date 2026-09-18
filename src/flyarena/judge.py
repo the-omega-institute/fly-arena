@@ -161,6 +161,17 @@ def verify(folder: Path, *, expected_request: dict | None = None,
         elif event["type"] == "contact":
             if n != 2 or event["slots"] != [0, 1]:
                 raise ValueError("Invalid contact event")
+        elif event["type"] in {"odor_detected", "visual_target_detected"}:
+            slot, values = event.get("slot"), event.get("values")
+            if not isinstance(slot, int) or not 0 <= slot < n or not isinstance(values, list) or len(values) != 2:
+                raise ValueError("Invalid sensory detection event")
+            if not all(isinstance(value, (int, float)) and math.isfinite(value) and value >= 0 for value in values):
+                raise ValueError("Invalid sensory detection values")
+        elif event["type"] == "food_contact":
+            slot, distance = event.get("slot"), event.get("mouth_distance")
+            if (not isinstance(slot, int) or not 0 <= slot < n or
+                    not isinstance(distance, (int, float)) or not math.isfinite(distance) or distance < 0):
+                raise ValueError("Invalid food contact event")
         else:
             raise ValueError("Unknown event type")
     initial = np.array([f["initial"] for f in scene["food"]])

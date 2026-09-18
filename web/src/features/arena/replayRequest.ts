@@ -1,12 +1,12 @@
-import type {Frame,Scene} from '../../types'
+import type {Frame,ReplayEvent,Scene} from '../../types'
 
 export type ReplayState =
-  | {matchId:string;status:'idle'|'loading';scene:null;frames:Frame[];error:''}
-  | {matchId:string;status:'ready';scene:Scene;frames:Frame[];error:''}
-  | {matchId:string;status:'error';scene:null;frames:Frame[];error:string}
+  | {matchId:string;status:'idle'|'loading';scene:null;frames:Frame[];events:ReplayEvent[];error:''}
+  | {matchId:string;status:'ready';scene:Scene;frames:Frame[];events:ReplayEvent[];error:''}
+  | {matchId:string;status:'error';scene:null;frames:Frame[];events:ReplayEvent[];error:string}
 
 export function emptyReplay(matchId:string,status:'idle'|'loading'):ReplayState {
-  return {matchId,status,scene:null,frames:[],error:''}
+  return {matchId,status,scene:null,frames:[],events:[],error:''}
 }
 
 type FetchReplay = <T>(path:string,options:RequestInit)=>Promise<T>
@@ -23,10 +23,12 @@ export function requestReplay(matchId:string,fetchReplay:FetchReplay,commit:(sta
   ]).then(([scene,frames])=>{
     if (!active) return
     if (!scene || !frames.length) throw new Error('Replay data is empty.')
-    commit({matchId,status:'ready',scene,frames,error:''})
+    // Events are derived from the same recorded frames in the first viewer
+    // pass. The immutable events.json remains available as a research artifact.
+    commit({matchId,status:'ready',scene,frames,events:[],error:''})
   }).catch(error=>{
     if (!active) return
-    commit({matchId,status:'error',scene:null,frames:[],error:error instanceof Error?error.message:String(error)})
+    commit({matchId,status:'error',scene:null,frames:[],events:[],error:error instanceof Error?error.message:String(error)})
     controller.abort()
   })
   return {done,cancel:()=>{active=false;controller.abort()}}
