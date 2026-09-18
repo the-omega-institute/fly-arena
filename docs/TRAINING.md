@@ -14,6 +14,31 @@ Each generation shows individuals, parents, circuit multipliers, mutation budget
 
 The scene seed stays fixed across individuals and generations. Scores describe this environment, not generalization to unseen maps. A zero score or no improvement is a valid result. These searches optimize parameters between matches; they do not add within-match plasticity, learning or a new sensory modality.
 
+## Compare sessions
+
+Expand **Compare training strategies / 比较训练策略** in Train and select up to
+three of your sessions. The shared chart shows each generation's best food score;
+hollow points and dashed segments indicate partially evaluated generations, and
+missing results stay blank. The table reports the starting score, best observed
+score (including the baseline), absolute change, completed/planned evaluations,
+admitted evaluations and the configured limit. It never converts a zero baseline
+into a percentage improvement or replaces negative contest scores with zero.
+
+Condition cards show the founder, map, objective, opponent, seed, duration,
+population and mutation settings. Differences in evaluation conditions or the
+recorded runtime are called out; missing runtime metadata cannot count as a
+confirmed match. Even matching conditions describe individual single-seed runs,
+not statistical evidence that one optimizer generalizes better. Search budgets
+and mutation settings remain visible when they differ.
+
+Click a session name to open its individuals and replays. **Export comparison**
+downloads the selected summaries, conditions and generation history as JSON.
+Comparison uses the existing owner-only training endpoints and starts no jobs.
+`evaluation_context` is the session's existing immutable runtime identifier;
+older responses lacking it remain readable. Evaluated time budget means
+`completed evaluations × seconds per evaluation`, not queue time, wall time,
+recovery attempts or GPU billing; evaluations may finish before their configured horizon.
+
 Plans have 2–6 individuals, 1–8 generations, 1–10 seconds per evaluation, and at most 96 evaluations. Required evaluations are `population × generations × (1 for solo, 2 for competition)` and must fit the explicit budget. At most two unfinished sessions per account; stop unused sessions to release a slot. The existing queue executes simulations in child processes, one at a time per worker. The budget counts admitted evaluation matches; existing recovery attempts can repeat an interrupted match. It is not a GPU-hour or billing limit.
 
 ## Shared human/AI API

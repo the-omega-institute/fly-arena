@@ -51,3 +51,26 @@ test('training bookmarks round-trip and reject malformed session IDs',()=>{
  assert.equal(trainingFocus('#tab=train&training=bad'), '');
  assert.equal(trainingFocus(trainingHash('')), '');
 });
+
+const {summarizeRun,comparisonDifferences,curveScale}=await moduleAt('../src/features/training/comparison.ts');
+const comparisonRun={id:'a',status:'complete',evaluation_context:'engine-a',spec:{name:'Evolution',strategy:'evolution',founder_id:'fly',opponent_id:null,map_id:'scarcity',mode:'forage',duration_seconds:2,seed:42,bridge_profile:'legacy-v1',population:2,generations:3,max_evaluations:6,circuits:['olfactory'],mutation_strength:.08},baseline_fitness:0,evaluations_started:5,evaluations_completed:4,evaluations_total:6,members:[{generation:0,slot:0,fitness:0},{generation:0,slot:1,fitness:.3},{generation:1,slot:0,fitness:.3},{generation:1,slot:1,fitness:null}]};
+test('training comparison preserves incomplete generations, zero baselines and actual evaluation costs',()=>{
+ const result=summarizeRun(comparisonRun);
+ assert.equal(result.best,.3);assert.equal(result.gain,.3);assert.equal(result.budgetedSeconds,8);
+ assert.deepEqual(result.history.map(g=>[g.best,g.complete,g.evaluated]),[[.3,true,2],[.3,false,1],[null,false,0]]);
+ assert.equal(summarizeRun({...comparisonRun,baseline_fitness:null}).gain,null);
+ assert.equal(summarizeRun({...comparisonRun,members:[]}).best,null);
+});
+test('negative contest fitness and declining generations are never clamped into success',()=>{
+ const run={...comparisonRun,baseline_fitness:-1,members:[{generation:0,slot:0,fitness:-1},{generation:0,slot:1,fitness:-2},{generation:1,slot:0,fitness:-3},{generation:1,slot:1,fitness:-4}]};
+ const result=summarizeRun(run);assert.equal(result.best,-1);assert.equal(result.gain,0);assert.equal(result.history[1].best,-3);
+ const scale=curveScale([run]);assert.ok(scale.min< -3);assert.ok(scale.y(-3)>scale.y(-1));
+ assert.ok(Number.isFinite(curveScale([{...run,members:[]}]).y(0)));
+});
+test('strategy comparisons distinguish seeds, maps, founders, opponents and engine versions',()=>{
+ const other={...comparisonRun,id:'b',spec:{...comparisonRun.spec,strategy:'random_search'}};
+ assert.deepEqual(comparisonDifferences([comparisonRun,other]),[]);
+ for(const edit of [{seed:7},{map_id:'maze'},{founder_id:'other'},{duration_seconds:3},{bridge_profile:'sensorimotor-research-v2'},{mode:'contest',opponent_id:'rival'}])assert.ok(comparisonDifferences([comparisonRun,{...other,spec:{...other.spec,...edit}}]).length);
+ assert.ok(comparisonDifferences([comparisonRun,{...other,evaluation_context:'engine-b'}]).includes('Evaluation version'));
+ assert.ok(comparisonDifferences([comparisonRun,{...other,evaluation_context:undefined}]).includes('Evaluation version unavailable'));
+});
