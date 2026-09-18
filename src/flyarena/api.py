@@ -30,6 +30,7 @@ from .store import Store
 from .worker import Worker
 from .research import ExperimentSpec
 from .services.research_service import ResearchService
+from .services.life import LifeLedger, LifeNote
 from .services.training import TrainingService, TrainingSpec, ProposedCandidate
 
 
@@ -74,6 +75,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
 
     training = TrainingService(store, compiler)
     app.state.training = training
+    ledger = LifeLedger(store)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.include_router(auth.router())
 
@@ -149,6 +151,33 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     @app.get("/api/v1/me")
     def me(owner: dict = Depends(identity)):
         return owner
+
+    def optional_identity(request: Request):
+        try:return identity(request)['id']
+        except HTTPException as error:
+            if error.status_code==401:return None
+            raise
+
+    @app.get('/api/v1/lives')
+    def life_list(owner=Depends(optional_identity)):
+        return ledger.listing(owner)
+
+    @app.get('/api/v1/lives/{ident}')
+    def life_get(ident: str, owner=Depends(optional_identity)):
+        result=ledger.get(ident,owner)
+        if result is None:raise HTTPException(404,'Life record not found')
+        return result
+
+    @app.get('/api/v1/lives/{ident}/experiences/{mid}')
+    def life_observation(ident: str, mid: str, owner=Depends(optional_identity)):
+        result=ledger.observation(ident,mid,owner)
+        if result is None:raise HTTPException(404,'Experience not found')
+        return result
+
+    @app.post('/api/v1/lives/{ident}/notes',status_code=201)
+    def life_note(ident: str, body: LifeNote, owner: dict = Depends(identity),
+                  idempotency_key: str | None = Header(default=None)):
+        return {'id':ledger.annotate(ident,owner['id'],body,idempotency_key)}
 
     @app.get("/api/v1/maps")
     def maps():

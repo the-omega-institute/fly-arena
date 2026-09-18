@@ -151,3 +151,17 @@ Use `frames` for positions, scores, drives and recorded neural traces, `events` 
 `POST /api/v1/matches` submits a competition match. `POST /api/v1/experiments` is a separate authenticated research workflow, not a match endpoint. `POST /api/v1/training/{id}/candidates` accepts proposals for an owned external session; it does not execute arbitrary code. Compute creation is explicit and bounded by server-side validation.
 
 For matched-condition scoring, use the same `map_id`, `seed`, `duration_seconds`, `mode`, and `bridge_profile` for every compared subject. The training service reports condition results and evaluation counts; compare only completed, verified matches with the same condition key. A neural trace or score from a different map, seed, duration, slot assignment, or runtime is not a matched comparison.
+
+## Inspect and annotate a life
+
+`GET /api/v1/lives` lists public samples plus your own private candidates when authenticated. `GET /api/v1/lives/{fly_id}` returns the birth FlySpec, optimizer origin (when accessible), ancestors, descendants, evaluation conditions, original scores, replay IDs and researcher notes. Read `/api/v1/lives/{fly_id}/experiences/{match_id}` for existing motion, intake and neural observations; this starts no computation. A failed evaluation has no score, and zero food intake does not imply no movement or no neural activity.
+
+Only the designer can append a note. Send an `Idempotency-Key` header when posting `/api/v1/lives/{fly_id}/notes`:
+
+```json
+{"action":"investigate","reason":"Test this candidate with a longer horizon and additional seeds.","match_id":null,"supersedes":null}
+```
+
+Actions are `retain`, `investigate`, `stop_exploring`, `hypothesis` and `correction`. A correction names the earlier note ID in `supersedes`; it preserves the original. Notes do not alter scores, stop jobs or change rankings. They follow sample visibility; saved/public samples have public notes, but private linked experiences stay hidden until their trajectory is published.
+
+To branch, use the sample ID as a new training plan's `founder_id`, choose an optimizer and explicit evaluation budget, then submit the plan. The child inherits a birth design, not an acquired neural state. See [the life ledger contract](LIFE_LEDGER.md).
