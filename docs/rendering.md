@@ -1,6 +1,6 @@
 # Offline map and match rendering
 
-`scripts/render_replay.py` exports four map previews and a recorded match as a
+`scripts/render_replay.py` exports map previews and a recorded match as a
 1280 × 896 MP4, with simulation time, scores, remaining food and exit status.
 It renders the FlyGym anatomical meshes at their recorded world poses and never
 steps physics or runs a neural simulation. Colored ground lines show recorded
@@ -50,3 +50,12 @@ start, midpoint and end provide a quick inspection alongside the MP4.
 Rendered assets live under ignored `var/renders/`; do not commit large videos or
 replay data. GPU rendering is independent of the current CPU/Numba neural worker
 and does not imply that neural simulation or training uses CUDA.
+
+
+## A single habitat
+
+Use `--map terrarium` to export only Rotting Fruit Grove, without re-rendering earlier maps or running a neural simulation. The new habitat uses the same oriented box/ellipsoid dimensions and colors as the compiled MuJoCo collision scene. Browser surface textures are cosmetic; the GPU export is a physical-scene view and does not imply pixel-identical browser rendering.
+
+```sh
+python scripts/render_replay.py --map terrarium --output var/renders/terrarium
+```

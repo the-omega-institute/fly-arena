@@ -1,0 +1,111 @@
+import math
+
+import mujoco as mj
+import numpy as np
+
+from flyarena.body import Bodies
+from flyarena.scenarios import MAPS, scenario
+
+
+def _obstacle_geoms(bodies):
+    return [i for i in range(bodies.model.ngeom)
+            if (mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, i) or "").startswith("obstacle-")]
+
+
+def test_terrarium_schema_is_symmetric_and_food_stays_on_ground():
+    scene = scenario("terrarium", 19)
+    assert scene["size"] == 28
+    assert scene["habitat"] == "forest-floor"
+    assert all(f["position"][2] == .15 for f in scene["food"])
+    assert all(o["position"][0] or o["position"][1] for o in scene["obstacles"] if o["material"] != "leaf")
+    assert any(o.get("shape") == "ellipsoid" for o in scene["obstacles"])
+    assert any(o.get("shape", "box") == "box" for o in scene["obstacles"])
+    # The obstacle set is mirrored under a half-turn; material and dimensions
+    # remain paired so either contestant sees equivalent geometry.
+    obstacles = scene["obstacles"]
+    keys = {(round(o["position"][0], 4), round(o["position"][1], 4),
+             tuple(o["size"]), o.get("shape", "box"), o["material"])
+            for o in obstacles}
+    for o in obstacles:
+        assert (-o["position"][0], -o["position"][1], tuple(o["size"]),
+                o.get("shape", "box"), o["material"]) in keys
+
+
+def test_terrarium_compiles_fullsize_quats_colors_and_masks():
+    bodies = Bodies(scenario("terrarium", 3), 2, 3)
+    obstacle_ids = _obstacle_geoms(bodies)
+    assert len(obstacle_ids) == len(MAPS["terrarium"]["obstacles"])
+    for geom_id, obstacle in zip(obstacle_ids, MAPS["terrarium"]["obstacles"]):
+        np.testing.assert_allclose(bodies.model.geom_size[geom_id], np.asarray(obstacle["size"]) / 2)
+        np.testing.assert_allclose(bodies.model.geom_quat[geom_id], obstacle.get("quaternion", [1, 0, 0, 0]), atol=2e-4)
+        assert bodies.model.geom_contype[geom_id] == 4
+        assert bodies.model.geom_conaffinity[geom_id] == 3
+        assert bodies.model.geom_rgba[geom_id, 3] == 1
+    assert sum(bodies.model.geom_type[i] == mj.mjtGeom.mjGEOM_ELLIPSOID for i in obstacle_ids) >= 2
+    assert all(bodies.model.geom_conaffinity[i] & 4 for i in range(bodies.model.ngeom)
+               if i not in obstacle_ids and (mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, i) or "").startswith("fly-"))
+
+
+def test_terrarium_ramps_have_real_gentle_ground_to_leaf_profile():
+    bodies = Bodies(scenario("terrarium", 7), 1, 7)
+    obstacle_ids = _obstacle_geoms(bodies)
+    ramp_ids = obstacle_ids[1:3]
+    leaf_id = obstacle_ids[0]
+    leaf_top = bodies.data.geom_xpos[leaf_id, 2] + bodies.model.geom_size[leaf_id, 2]
+    assert .5 < leaf_top <= 1.0
+    for ramp_id in ramp_ids:
+        quat = bodies.data.geom_xmat[ramp_id].reshape(3, 3)
+        angle = math.degrees(math.atan2(abs(quat[2, 0]), abs(quat[0, 0])))
+        assert 4.0 < angle < 7.0
+        # Query the compiled ramp's actual top surface at both ends. This
+        # catches an identity quaternion or wrong size convention.
+        axis = quat[:, 0]
+        half_length = bodies.model.geom_size[ramp_id, 0]
+        center = bodies.data.geom_xpos[ramp_id]
+        # Stay just inside each end so the downward ray intersects the ramp
+        # top rather than the coplanar ground or adjacent leaf edge.
+        ends = [center - axis * (half_length - .2), center + axis * (half_length - .2)]
+        heights = []
+        for point in ends:
+            origin = point + np.array([0, 0, 2.0])
+            direction = np.array([0, 0, -1.0])
+            geomid = np.array([-1], dtype=np.int32)
+            distance = mj.mj_ray(bodies.model, bodies.data, origin, direction, None, 1, -1, geomid)
+            assert distance >= 0
+            assert geomid[0] == ramp_id
+            heights.append(origin[2] - distance)
+        inward = min(range(2), key=lambda i: abs(ends[i][0]))
+        assert heights[inward] > heights[1-inward]
+        assert min(heights) < .05
+        assert max(heights) > .55
+        assert max(heights) <= 1.0
+        assert abs(max(heights) - leaf_top) < .05
+
+
+def test_terrarium_ramp_contact_and_finite_rollout():
+    scene = scenario("terrarium", 11)
+    scene["spawns"] = [[-8, 0, 0], [8, 0, math.pi]]
+    bodies = Bodies(scene, 2, 11)
+    ramp_contacts = 0
+    for _ in range(1000):
+        bodies.step(np.zeros((2, 2)))
+        for contact in bodies.data.contact:
+            names = [mj.mj_id2name(bodies.model, mj.mjtObj.mjOBJ_GEOM, int(g)) or ""
+                     for g in (contact.geom1, contact.geom2)]
+            if any(name in ("obstacle-1", "obstacle-2") for name in names):
+                ramp_contacts += 1
+    assert np.isfinite(bodies.data.qpos).all()
+    assert np.isfinite(bodies.data.qvel).all()
+    assert ramp_contacts > 0
+
+
+def test_default_spawn_and_food_are_clear_of_terrain():
+    bodies = Bodies(scenario('terrarium', 42), 2, 42)
+    obstacles = set(_obstacle_geoms(bodies))
+    assert not any(int(c.geom1) in obstacles or int(c.geom2) in obstacles for c in bodies.data.contact)
+    for patch in scenario('terrarium', 42)['food']:
+        x, y, _ = patch['position']
+        hit = np.array([-1], dtype=np.int32)
+        distance = mj.mj_ray(bodies.model, bodies.data, np.array([x,y,4.]), np.array([0.,0.,-1.]), None, 1, -1, hit)
+        assert distance >= 0
+        assert hit[0] not in obstacles

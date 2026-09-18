@@ -53,7 +53,10 @@ class Exporter:
         self.camera.lookat[:] = [0, 0, 0]
         self.camera.distance = scene["size"] * 1.6
         self.camera.azimuth = 90
-        self.camera.elevation = -65
+        self.camera.elevation = -35 if scene.get("habitat") == "forest-floor" else -65
+        if scene.get("habitat") == "forest-floor":
+            self.camera.azimuth = 125
+            self.camera.lookat[:] = [0, 0, .6]
         self.initial = frame or {
             **self.bodies.snapshot(), "food": [p["initial"] for p in scene["food"]],
             "scores": [0, 0], "eliminated": [False, False]}
@@ -98,9 +101,15 @@ class Exporter:
                 g.matid = -1
             else:
                 g.matid = -1
-                g.rgba[:] = [.10, .17, .17, 1] if g.type == mj.mjtGeom.mjGEOM_PLANE else [.40, .43, .55, 1]
+                if self.scene.get("habitat") == "forest-floor":
+                    if g.type == mj.mjtGeom.mjGEOM_PLANE:
+                        g.rgba[:] = [.20, .16, .10, 1]
+                    elif 0 <= g.objid < self.model.ngeom:
+                        g.rgba[:] = self.model.geom_rgba[g.objid]
+                else:
+                    g.rgba[:] = [.10, .17, .17, 1] if g.type == mj.mjtGeom.mjGEOM_PLANE else [.40, .43, .55, 1]
         h = self.scene["size"] / 2
-        for t in np.arange(-h, h + .1, 2):
+        for t in ([] if self.scene.get("habitat") == "forest-floor" else np.arange(-h, h + .1, 2)):
             self.line([-h, t, .012], [h, t, .012], .012, [.19, .27, .27, 1])
             self.line([t, -h, .012], [t, h, .012], .012, [.19, .27, .27, 1])
         corners = [[-h, -h, .03], [h, -h, .03], [h, h, .03], [-h, h, .03]]
@@ -113,11 +122,11 @@ class Exporter:
             for a, b in zip(points, points[1:]):
                 self.line(a, b, .06, [.7, .88, .72, 1])
         for food, left in zip(self.scene["food"], frame["food"], strict=True):
-            x, y, _ = food["position"]
-            self.geom(mj.mjtGeom.mjGEOM_CYLINDER, [1.1, .015, 0], [x, y, .035], [.35, .29, .14, 1])
+            x, y, z = food["position"]
+            self.geom(mj.mjtGeom.mjGEOM_CYLINDER, [1.1, .015, 0], [x, y, z - .115], [.35, .29, .14, 1])
             if left > 0:
                 r = .8 * np.sqrt(left / food["initial"])
-                self.geom(mj.mjtGeom.mjGEOM_ELLIPSOID, [r, r, .14], [x, y, .12], [.97, .72, .25, 1])
+                self.geom(mj.mjtGeom.mjGEOM_ELLIPSOID, [r, r, .14], [x, y, z - .03], [.97, .72, .25, 1])
         for slot in range(2):
             for a, b in zip(history, history[1:]):
                 self.line([*a["positions"][slot][:2], .07],
@@ -146,12 +155,13 @@ class Exporter:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--replay", type=Path, help="Directory containing scene.json and frames.json")
-    parser.add_argument("--maps", action="store_true", help="Export all four map previews")
+    parser.add_argument("--maps", action="store_true", help="Export all map previews")
+    parser.add_argument("--map", choices=list(MAPS), help="Export only one map preview")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--require-renderer", default="", help="Fail unless GL renderer contains this string")
     args = parser.parse_args()
-    if not args.maps and not args.replay:
-        parser.error("Provide --maps and/or --replay")
+    if not args.maps and not args.map and not args.replay:
+        parser.error("Provide --map, --maps and/or --replay")
     args.output.mkdir(parents=True, exist_ok=True)
     evidence = []
 
@@ -163,8 +173,8 @@ def main():
             raise RuntimeError("Requested GPU renderer is not active")
         return export
 
-    if args.maps:
-        for key in MAPS:
+    if args.maps or args.map:
+        for key in (MAPS if args.maps else [args.map]):
             export = open_export(scenario(key, 42))
             try:
                 imageio.imwrite(args.output / f"map-{key}.png", export.render())

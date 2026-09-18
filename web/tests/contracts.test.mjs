@@ -95,3 +95,25 @@ test('comparison uses all effective conditions and retains implicit legacy condi
  assert.ok(comparisonDifferences([legacy,multiple]).includes('Evaluation conditions'));
  assert.deepEqual(comparisonDifferences([multiple,{...multiple,spec:{...multiple.spec,evaluation_conditions:[...multiple.spec.evaluation_conditions].reverse()}}]),[]);
 });
+
+
+test('terrarium participates in the same bounded training conditions',()=>{
+ assert.equal(planProblem({...trainingPlan,conditions:[{map_id:'terrarium',seed:42}],budget:4}),null);
+ assert.equal(evaluationCount({...trainingPlan,conditions:[{map_id:'terrarium',seed:42}],mode:'contest'}),8);
+});
+
+const {obstacleGeometry}=await moduleAt('../src/features/arena/obstacleGeometry.ts');
+test('terrain viewer retains full box size and converts normalized MuJoCo wxyz rotation',()=>{
+ const angle=.1,q=[Math.cos(angle/2),0,-Math.sin(angle/2),0];
+ const g=obstacleGeometry({position:[-6,0,.34],size:[8.05,5,.12],quaternion:q.map(v=>v*2)});
+ assert.deepEqual(g.position,[-6,0,.34]);assert.deepEqual(g.size,[8.05,5,.12]);assert.equal(g.shape,'box');
+ assert.ok(Math.abs(g.quaternion[1]+Math.sin(angle/2))<1e-12);
+ assert.ok(Math.abs(g.quaternion[3]-Math.cos(angle/2))<1e-12);
+ const [x,y,z,w]=g.quaternion;
+ // World Z of a local +X vector must rise toward the central platform.
+ assert.ok(2*(x*z-w*y)>0);
+ const old=obstacleGeometry({position:[0,0,0],size:[1,2,3]});
+ assert.deepEqual(old.quaternion,[0,0,0,1]);assert.deepEqual(old.size,[1,2,3]);
+ const halfTurn=obstacleGeometry({position:[0,0,0],size:[2,4,6],shape:'ellipsoid',quaternion:[0,0,0,1]});
+ assert.equal(halfTurn.shape,'ellipsoid');assert.deepEqual(halfTurn.quaternion,[0,0,1,0]);
+});

@@ -7,6 +7,7 @@ import type {ArenaLayout,BodyModel,Frame,Scene,Preview} from './types'
 import {useI18n} from './shared/i18n'
 import {sceneThemes} from './shared/theme'
 import {colors} from './types'
+import {Habitat} from './features/arena/Habitat'
 
 function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;frame:Frame;next?:Frame;alpha:number;color:string;slot?:number}){
   const {resolved}=useI18n();const tokens=sceneThemes[resolved]
@@ -37,15 +38,18 @@ function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;fram
 
 function World({scene,frame}:{scene:Scene|ArenaLayout;frame?:Frame}){
   const {resolved}=useI18n();const tokens=sceneThemes[resolved]
+  const habitat=scene.habitat==='forest-floor'||('id' in scene&&scene.id==='terrarium')
   return <>
-    <mesh receiveShadow position={[0,0,-.1]}><boxGeometry args={[scene.size,scene.size,.2]}/><meshStandardMaterial color={tokens.floor} roughness={.95}/></mesh>
-    <Grid args={[scene.size,scene.size]} rotation={[Math.PI/2,0,0]} position={[0,0,.012]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={65} cellThickness={.35} sectionThickness={.6}/>
+    {habitat?<Habitat size={scene.size} obstacles={scene.obstacles}/>:<>
+      <mesh receiveShadow position={[0,0,-.1]}><boxGeometry args={[scene.size,scene.size,.2]}/><meshStandardMaterial color={tokens.floor} roughness={.95}/></mesh>
+      <Grid args={[scene.size,scene.size]} rotation={[Math.PI/2,0,0]} position={[0,0,.012]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={65} cellThickness={.35} sectionThickness={.6}/>
+    </>}
     {scene.ring_radius&&<mesh position={[0,0,.02]}><ringGeometry args={[scene.ring_radius-.09,scene.ring_radius,96]}/><meshBasicMaterial color={tokens.ring} transparent opacity={.65} side={THREE.DoubleSide}/></mesh>}
-    {scene.obstacles.map((o,i)=><mesh key={i} position={o.position as [number,number,number]} castShadow receiveShadow><boxGeometry args={o.size as [number,number,number]}/><meshStandardMaterial color={tokens.obstacle} roughness={.8}/></mesh>)}
+    {!habitat&&scene.obstacles.map((o,i)=><mesh key={i} position={o.position as [number,number,number]} castShadow receiveShadow><boxGeometry args={o.size as [number,number,number]}/><meshStandardMaterial color={tokens.obstacle} roughness={.8}/></mesh>)}
     {scene.food.map((food,i)=>{
       const left=frame?.food?.[i]??food.initial
-      return left>.001&&<group key={food.id} position={[food.position[0],food.position[1],.12]}>
-        <mesh><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={tokens.food} emissive={tokens.foodEmissive} emissiveIntensity={.18} roughness={.4}/></mesh>
+      return left>.001&&<group key={food.id} position={[food.position[0],food.position[1],food.position[2]??.12]}>
+        <mesh castShadow receiveShadow><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={habitat?'#bd7440':tokens.food} emissive={habitat?'#572919':tokens.foodEmissive} emissiveIntensity={habitat?.1:.18} roughness={habitat?.52:.4}/></mesh>
         <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={.3} side={THREE.DoubleSide}/></mesh>
       </group>
     })}
@@ -56,10 +60,13 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
   const {resolved,t}=useI18n();const tokens=sceneThemes[resolved]
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
-  return <Canvas shadows dpr={[1,1.7]} camera={{position:design?[6,-9,5]:[22,-28,26],up:[0,0,1],fov:design?33:40,near:.05,far:250}} gl={{antialias:true,alpha:true}}>
-    <ambientLight intensity={.8}/><hemisphereLight args={[tokens.sky,tokens.ground,1.6]}/>
-    <directionalLight position={[6,-5,12]} intensity={3.2} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-bias={-.0003}/>
-    <directionalLight position={[-7,5,3]} intensity={1.5} color={tokens.fill}/>
+  const habitat=scene?.habitat==='forest-floor'||layout?.habitat==='forest-floor'||layout?.id==='terrarium'
+  const cameraPosition:( [number,number,number])=design?[6,-9,5]:habitat?[17,-25,12]:[22,-28,26]
+  return <Canvas shadows dpr={[1,1.7]} camera={{position:cameraPosition,up:[0,0,1],fov:design?33:habitat?43:40,near:.05,far:250}} gl={{antialias:true,alpha:true}}>
+    <ambientLight intensity={habitat?.65:.8}/><hemisphereLight args={[habitat?'#dbe8d0':tokens.sky,habitat?'#4b4034':tokens.ground,habitat?1.9:1.6]}/>
+    <directionalLight position={habitat?[7,-10,18]:[6,-5,12]} intensity={habitat?3.8:3.2} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-bias={-.0003}/>
+    <directionalLight position={[-7,5,3]} intensity={habitat?1.9:1.5} color={habitat?'#d9b98a':tokens.fill}/>
+    {habitat&&<pointLight position={[-5,4,7]} intensity={1.2} distance={35} color="#b6d29c"/>}
     {layout&&<>
       <World scene={layout}/>
       {layout.spawns.slice(0,participants.length).map((spawn,i)=><group key={i} position={[spawn[0],spawn[1],.08]} rotation={[0,0,spawn[2]]}>
@@ -76,6 +83,6 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
       {scene?.flies.map((fly,i)=>{const p=shown.positions?.[i],n=next?.positions?.[i]||p;if(!p)return null;return <Html key={'label-'+i} position={[p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,(p[2]||0)+1.6]} center style={{pointerEvents:'none'}}><ArenaWorldLabel fly={fly} slot={i} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]}/></Html>})}
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
-    <OrbitControls makeDefault target={design?[0,0,.8]:[0,0,0]} enablePan={!design} minDistance={design?4:10} maxDistance={design?18:75} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
+    <OrbitControls makeDefault target={design?[0,0,.8]:habitat?[0,0,.25]:[0,0,0]} enablePan={!design} minDistance={design?4:habitat?7:10} maxDistance={design?18:75} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
   </Canvas>
 }
