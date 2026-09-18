@@ -9,10 +9,10 @@ Each generation shows individuals, parents, circuit multipliers, mutation budget
 - **Evolution**: retain the previous generation's best individual and generate legal circuit mutations around it. Ties retain the earlier individual. Generation one starts from the chosen founder.
 - **Random search**: every generation retains the original founder and explores new mutations around it. This is a useful comparison against selection across generations.
 - Circuit changes are sampled in log space using the session seed; the compiler enforces the normal mutation budget. Existing edge interventions and intrinsic parameters are preserved. Proposals that exceed the budget are reduced; if no actual legal mutation is found, the session reports failure.
-- **Collect food**: fitness is food consumed in one solo match.
-- **Compete for food**: fitness is mean food advantage against a fixed opponent over two matches with swapped spawn slots. Both evaluations use the same map and seed.
+- **Collect food**: fitness is mean food consumed across the configured evaluation conditions.
+- **Compete for food**: each condition uses two matches against a fixed opponent with swapped spawn slots. Its score is their mean food advantage; fitness is the equal-weight mean of all complete condition scores.
 
-The scene seed stays fixed across individuals and generations. Scores describe this environment, not generalization to unseen maps. A zero score or no improvement is a valid result. These searches optimize parameters between matches; they do not add within-match plasticity, learning or a new sensory modality.
+The map/seed conditions stay fixed across individuals and generations. By default there is one condition. Scores describe these training environments, not held-out generalization. A zero score or no improvement is a valid result. These searches optimize parameters between matches; they do not add within-match plasticity, learning or a new sensory modality.
 
 ## Compare sessions
 
@@ -27,7 +27,7 @@ into a percentage improvement or replaces negative contest scores with zero.
 Condition cards show the founder, map, objective, opponent, seed, duration,
 population and mutation settings. Differences in evaluation conditions or the
 recorded runtime are called out; missing runtime metadata cannot count as a
-confirmed match. Even matching conditions describe individual single-seed runs,
+confirmed match. Even matching conditions describe individual training runs,
 not statistical evidence that one optimizer generalizes better. Search budgets
 and mutation settings remain visible when they differ.
 
@@ -39,7 +39,53 @@ older responses lacking it remain readable. Evaluated time budget means
 `completed evaluations × seconds per evaluation`, not queue time, wall time,
 recovery attempts or GPU billing; evaluations may finish before their configured horizon.
 
-Plans have 2–6 individuals, 1–8 generations, 1–10 seconds per evaluation, and at most 96 evaluations. Required evaluations are `population × generations × (1 for solo, 2 for competition)` and must fit the explicit budget. At most two unfinished sessions per account; stop unused sessions to release a slot. The existing queue executes simulations in child processes, one at a time per worker. The budget counts admitted evaluation matches; existing recovery attempts can repeat an interrupted match. It is not a GPU-hour or billing limit.
+Plans have 2–6 individuals, 1–8 generations, 1–10 seconds per evaluation, and at most 96 evaluations. Required evaluations are `population × generations × conditions × (1 for solo, 2 for competition)` and must fit the explicit budget. At most two unfinished sessions per account; stop unused sessions to release a slot. The existing queue executes simulations in child processes, one at a time per worker. The budget counts admitted evaluation matches; existing recovery attempts can repeat an interrupted match. It is not a GPU-hour or billing limit.
+
+## Multiple maps and seeds
+
+The main environment and seed in the web form define condition 1. **Add evaluation
+condition / 添加评测条件** adds up to three more map/seed pairs. The same map with a
+different seed is allowed; identical pairs are rejected. The evaluation budget
+updates before submission. All candidates in every strategy use the same list.
+
+For example, two individuals × one generation × two conditions × two spawn
+positions requires **8 evaluations**. Each individual has condition cards showing
+its map, seed, completed evaluation count, score, and **behavior and neural replay**
+links. A condition remains unscored until its entire pair completes; a candidate
+remains unscored until all conditions complete. Failed conditions preserve prior
+results and stop the session without manufacturing a fitness value.
+
+Add this optional field to a training request:
+
+```json
+"evaluation_conditions": [
+  {"map_id": "orchard", "seed": 42},
+  {"map_id": "scarcity", "seed": 7}
+]
+```
+
+The explicit list replaces `map_id`/`seed` for evaluation. The top-level `seed`
+still controls built-in mutation sampling. When the list is absent or null, old
+sessions and clients retain exactly their single `map_id`/`seed` behavior. Old
+idempotency keys remain usable with their original plans. No database migration
+is required. Conditions use raw food units (or food-margin units), with equal
+weight per condition; scores are not normalized by food availability.
+
+The ordinary training client can create the same plan:
+
+```sh
+uv run python scripts/train.py --population 2 --generations 1 --budget 8 \
+  --opponent OPPONENT_ID --seconds 1 \
+  --condition orchard:42 --condition scarcity:7
+```
+
+For your own optimizer, create an external-strategy session with these conditions
+in the web form or through `POST /training`, then run
+`python scripts/custom_strategy.py --run SESSION_ID`. The existing proposal API
+is unchanged. Responses add `members[].condition_results`, containing each
+condition, its fitness (or null), completed/total evaluations, and the actual
+match records. Existing aggregate fitness, lineage, save and replay fields remain.
+These are environments used during training; evaluating them is not a held-out test.
 
 ## Shared human/AI API
 

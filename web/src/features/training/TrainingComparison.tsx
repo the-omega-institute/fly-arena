@@ -2,7 +2,7 @@ import {useState} from 'react'
 import {ArrowRight,Download,GitCompareArrows} from 'lucide-react'
 import type {ArenaMap,Fly} from '../../types'
 import {useI18n} from '../../shared/i18n'
-import {comparisonDifferences,curveScale,summarizeRun} from './comparison'
+import {comparisonDifferences,curveScale,summarizeRun,evaluationConditions} from './comparison'
 import type {ComparableRun} from './comparison'
 
 const colors=['#538b76','#bc7253','#8572ac']
@@ -21,7 +21,7 @@ export function TrainingComparison({runs,maps,flies,onOpen}:{runs:ComparableRun[
     const data={sessions:rows.map(({run,...summary})=>({id:run.id,status:run.status,spec:run.spec,
       evaluation_context:run.evaluation_context,...summary,evaluations_started:run.evaluations_started,
       evaluations_completed:run.evaluations_completed,evaluations_planned:run.evaluations_total})),
-      differing_conditions:differences,interpretation:'Descriptive single-seed training results; no generalization claim. Time budget is completed evaluations times configured duration, not actual runtime.'}
+      differing_conditions:differences,interpretation:'Descriptive training-condition results; no held-out generalization claim. Time budget is completed evaluations times configured duration, not actual runtime.'}
     const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}))
     const link=document.createElement('a');link.href=url;link.download='training-comparison.json';link.click();URL.revokeObjectURL(url)
   }
@@ -31,7 +31,7 @@ export function TrainingComparison({runs,maps,flies,onOpen}:{runs:ComparableRun[
       <p>{t('Compare real generation scores and evaluation costs. This view starts no simulations.')}</p>
       {!runs.length?<p>{t('Your training sessions will appear here.')}</p>:<>
         <div className="comparison-select">{runs.map(run=><label key={run.id}><input type="checkbox" checked={ids.includes(run.id)} disabled={!ids.includes(run.id)&&selected.length>=3} onChange={e=>setChosen(e.target.checked?[...selected.map(r=>r.id),run.id]:selected.filter(r=>r.id!==run.id).map(r=>r.id))}/><span>{run.spec.name}<small>{run.id.slice(0,8)}</small></span></label>)}</div>
-        {selected.length<2?<p role="status">{t('Select at least two sessions to compare.')}</p>:<p className={'comparison-note '+(differences.length?'conditions-differ':'')} role="status">{differences.length?<>{t('Different evaluation conditions:')} {differences.map(key=>t(key)).join(' · ')}. {t('Read these as separate experiments.')}</>:t('Same recorded evaluation conditions. These are single-seed training results, not evidence of generalization.')}</p>}
+        {selected.length<2?<p role="status">{t('Select at least two sessions to compare.')}</p>:<p className={'comparison-note '+(differences.length?'conditions-differ':'')} role="status">{differences.length?<>{t('Different evaluation conditions:')} {differences.map(key=>t(key)).join(' · ')}. {t('Read these as separate experiments.')}</>:t('Same recorded evaluation conditions. These are training results, not held-out generalization evidence.')}</p>}
         {rows.length>0&&<>
           <div className="comparison-legend">{rows.map(({run},i)=><span key={run.id} style={{color:colors[i]}}>● {run.spec.name}</span>)}</div>
           <svg className="comparison-chart" viewBox="0 0 700 220" role="img" aria-label={t('Best food score in each generation')}>
@@ -54,7 +54,7 @@ export function TrainingComparison({runs,maps,flies,onOpen}:{runs:ComparableRun[
           <p>{t('Time budget is completed evaluations × configured duration, not wall time or hardware cost. Best score includes the baseline.')}</p>
           <div className="comparison-conditions">{rows.map(({run},i)=><article key={run.id}><strong style={{color:colors[i]}}>{run.spec.name}</strong><dl>
             <div><dt>{t('Starting fly')}</dt><dd>{name(run.spec.founder_id)}</dd></div>
-            <div><dt>{t('Environment')}</dt><dd>{maps.find(m=>m.id===run.spec.map_id)?.[locale==='en'?'english':'name']||run.spec.map_id}</dd></div>
+            <div><dt>{t('Evaluation conditions')}</dt>{evaluationConditions(run.spec).map((c,i)=><dd key={i}>{maps.find(m=>m.id===c.map_id)?.[locale==='en'?'english':'name']||c.map_id} · {t('Seed')} {c.seed}</dd>)}</div>
             <div><dt>{t('Objective')}</dt><dd>{t(run.spec.mode==='contest'?'Compete for food':'Collect food')}</dd></div>
             {run.spec.mode==='contest'&&<div><dt>{t('Fixed opponent')}</dt><dd>{name(run.spec.opponent_id)}</dd></div>}
             <div><dt>{t('Seed')}</dt><dd>{run.spec.seed} · {run.spec.duration_seconds} s</dd></div>

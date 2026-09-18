@@ -111,7 +111,8 @@ def test_budget_idempotency_owner_and_admission_limits(lab):
     with pytest.raises(ValueError):service.create(user['id'],spec,'fixture')
     with pytest.raises(ValueError):service.save(a['id'],user['id'],parent['id'])
 
-def test_training_api_authentication_owner_and_full_controls(lab,monkeypatch):
+@pytest.mark.parametrize('multi',[False,True])
+def test_training_api_authentication_owner_and_full_controls(lab,monkeypatch,multi):
     from fastapi.testclient import TestClient
     from flyarena.api import create_app
     from flyarena.auth import AuthConfig
@@ -121,11 +122,13 @@ def test_training_api_authentication_owner_and_full_controls(lab,monkeypatch):
     monkeypatch.setattr('flyarena.api.require_bridge',lambda profile:None)
     with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
         plan={'founder_id':parent['id'],'population':2,'generations':1,'circuits':['olfactory']}
+        if multi:plan.update(evaluation_conditions=CONDITIONS,max_evaluations=4)
         assert client.post('/api/v1/training',json=plan).status_code==401
         client.headers['Authorization']='Bearer '+user['token']
         created=client.post('/api/v1/training',json=plan,headers={'Idempotency-Key':'first'})
         assert created.status_code==202,created.text
         run=created.json();path='/api/v1/training/'+run['id']
+        assert run['evaluations_total']==(4 if multi else 2)
         assert client.post('/api/v1/training',json=plan,headers={'Idempotency-Key':'first'}).json()['id']==run['id']
         assert client.get('/api/v1/training').json()[0]['id']==run['id']
         assert client.post(path+'/control',json={'action':'pause'}).json()['status']=='paused'
@@ -270,3 +273,97 @@ def test_external_registered_agent_provenance_cannot_be_claimed_in_spec(lab,monk
         result=client.post(path,json=body)
         assert result.status_code==201,result.text
         assert result.json()['reference_kind']=='ai' and result.json()['submission_channel']=='api'
+
+
+CONDITIONS=[{'map_id':'orchard','seed':42},{'map_id':'scarcity','seed':7}]
+
+@pytest.mark.parametrize('strategy',['evolution','random_search','external'])
+def test_multi_condition_scores_drive_generations_for_every_strategy(lab,strategy):
+    store,service,user,parent=lab
+    run=create(lab,strategy=strategy,evaluation_conditions=CONDITIONS,max_evaluations=8)
+    scores=iter([10,0,6,6,6,6,2,2]);requests=[]
+    for _ in range(60):
+        service.tick();detail=service.get(run['id'])
+        if strategy=='external' and detail['open_slots']:
+            generation=detail['proposal_generation'];slot=detail['open_slots'][0]
+            ancestor=parent if generation==0 else max((m for m in detail['members'] if m['generation']==0),key=lambda m:m['fitness'])['fly']
+            service.propose(run['id'],user['id'],proposal(ancestor,generation,slot))
+        if any(m['status']=='queued' for m in store.matches()):
+            ident=complete_next(store,[next(scores)]);requests.append(store.match(ident)['request'])
+        if service.get(run['id'])['status']=='complete':break
+    result=service.get(run['id'])
+    assert result['status']=='complete' and result['evaluations_completed']==8
+    assert [(r['map_id'],r['seed']) for r in requests]==[('orchard',42),('scarcity',7)]*4
+    assert [m['fitness'] for m in result['members']]==[5,6,6,2]
+    assert [[c['fitness'] for c in m['condition_results']] for m in result['members']]==[[10,0],[6,6],[6,6],[2,2]]
+    expected=parent['id'] if strategy=='random_search' else result['members'][1]['fly_id']
+    assert all(m['fly']['spec']['parent_id']==expected for m in result['members'][2:])
+    assert all(f['matches']==0 for f in store.leaderboard())
+
+
+def test_multi_condition_contest_swaps_each_pair_and_waits_for_complete_mean(lab):
+    store,service,user,parent=lab
+    spec=TrainingSpec(founder_id=parent['id'],opponent_id=parent['id'],mode='contest',population=2,generations=1,
+                      evaluation_conditions=CONDITIONS,max_evaluations=8)
+    run=service.create(user['id'],spec,'fixture')
+    outcomes=iter([[5,2],[4,2],[1,5],[3,7]]*2);requests=[]
+    for _ in range(50):
+        service.tick()
+        if any(m['status']=='queued' for m in store.matches()):
+            ident=complete_next(store,next(outcomes));requests.append(store.match(ident)['request'])
+            if len(requests)==1:
+                service.control(run['id'],user['id'],'pause');service.tick()
+                paused=service.get(run['id']);assert paused['status']=='paused'
+                assert paused['members'][0]['fitness'] is None
+                assert paused['members'][0]['condition_results'][0]['fitness'] is None
+                for _ in range(3):service.tick()
+                assert service.get(run['id'])['evaluations_started']==1
+                service=TrainingService(Store(store.root),service.compiler)
+                service.control(run['id'],user['id'],'resume')
+            if len(requests)==2:
+                partial=service.get(run['id'])['members'][0]
+                assert partial['condition_results'][0]['fitness']==.5
+                assert partial['condition_results'][1]['fitness'] is None and partial['fitness'] is None
+        if service.get(run['id'])['status']=='complete':break
+    result=service.get(run['id']);assert result['status']=='complete'
+    assert result['evaluations_completed']==8
+    assert [m['fitness'] for m in result['members']]==[.25,.25]
+    for i in range(0,8,2):assert requests[i]['fly_ids']==list(reversed(requests[i+1]['fly_ids']))
+    assert [(r['map_id'],r['seed']) for r in requests]==[('orchard',42)]*2+[('scarcity',7)]*2+[('orchard',42)]*2+[('scarcity',7)]*2
+
+
+def test_condition_limits_and_historical_idempotency(lab):
+    import json
+    store,service,user,parent=lab
+    plan=TrainingSpec(founder_id=parent['id'],population=2,generations=1,max_evaluations=8)
+    historical=plan.model_dump();historical.pop('evaluation_conditions')
+    run=service.create(user['id'],plan,'fixture','old-key')
+    with store.db() as db:
+        db.execute('UPDATE training_keys SET spec=? WHERE key=?',(json.dumps(historical),'old-key'))
+        db.execute('UPDATE training_runs SET spec=? WHERE id=?',(json.dumps(historical),run['id']))
+    assert service.create(user['id'],historical,'fixture','old-key')['id']==run['id']
+    assert service.get(run['id'])['evaluations_total']==2
+    assert TrainingSpec(**(historical|{'evaluation_conditions':[{'map_id':'maze','seed':i} for i in range(4)]})).evaluations==8
+    for conditions in [[],CONDITIONS*2,[{'map_id':'orchard','seed':i} for i in range(5)],
+                       [{'map_id':'unknown','seed':1}],[{'map_id':'maze','seed':-1}],
+                       [{'map_id':'maze','seed':1.5}],[{'map_id':'maze','seed':True}]]:
+        with pytest.raises(ValueError):TrainingSpec(**(historical|{'evaluation_conditions':conditions}))
+    with pytest.raises(ValueError,match='budget'):
+        TrainingSpec(**(historical|{'evaluation_conditions':CONDITIONS,'mode':'contest','opponent_id':parent['id'],'max_evaluations':7}))
+    with pytest.raises(ValueError,match='another training plan'):
+        service.create(user['id'],historical|{'evaluation_conditions':CONDITIONS},'fixture','old-key')
+
+
+def test_failed_second_condition_preserves_partial_result_without_fitness_or_more_jobs(lab):
+    store,service,_,_=lab
+    run=create(lab,evaluation_conditions=CONDITIONS,max_evaluations=8)
+    for _ in range(3):service.tick()
+    complete_next(store,[2]);service.tick()
+    ident,lease,_=store.claim();store.finish(ident,lease,None,'second condition failed')
+    service.tick();result=service.get(run['id'])
+    assert result['status']=='failed' and 'second condition failed' in result['error']
+    first=result['members'][0]
+    assert first['fitness'] is None
+    assert [c['fitness'] for c in first['condition_results']]==[2,None]
+    for _ in range(3):service.tick()
+    assert service.get(run['id'])['evaluations_started']==2

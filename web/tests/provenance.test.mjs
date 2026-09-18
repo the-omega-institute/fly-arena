@@ -37,6 +37,7 @@ const {PhenotypeLab} = require('./src/features/phenotype/PhenotypeLab.js')
 const {FrozenSubjects} = require('./src/features/phenotype/FrozenSubjects.js')
 const {I18nProvider} = require('./src/shared/i18n.js')
 const {TrainingComparison} = require('./src/features/training/TrainingComparison.js')
+const {ConditionResults} = require('./src/features/training/ConditionResults.js')
 test.after(() => fs.rmSync(output, {recursive:true, force:true}))
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props))
 const noop = () => {}
@@ -53,6 +54,16 @@ test('actual training comparison shows negative results, condition differences a
 });
 test('actual comparison safely handles an account without sessions',()=>{
   assert.match(textOnly(render(TrainingComparison,{runs:[],maps:[],flies:[],onOpen:noop})),/Your training sessions will appear here/);
+});
+test('condition cards keep zero scores, missing means and each recorded replay distinct',()=>{
+ const results=[{condition:{map_id:'orchard',seed:42},fitness:0,evaluations_completed:2,evaluations_total:2,matches:[{id:'a',status:'verified',progress:1},{id:'b',status:'verified',progress:1}]},{condition:{map_id:'scarcity',seed:7},fitness:null,evaluations_completed:1,evaluations_total:2,matches:[{id:'c',status:'verified',progress:1},{id:'d',status:'running',progress:.5}]}];
+ const html=render(ConditionResults,{results,maps:[],onReplay:noop});
+ assert.match(textOnly(html),/Condition 1 · orchard0\.000/);
+ assert.match(textOnly(html),/Condition 2 · scarcity—/);
+ assert.match(textOnly(html),/Seed 7 · 1\/2 evaluated · Awaiting complete condition/);
+ assert.equal((html.match(/<button/g)||[]).length,4);
+ assert.equal((html.match(/disabled=""/g)||[]).length,1);
+ assert.match(textOnly(html),/Behavior and neural replay 2 · 50%/);
 });
 const fly = (id, patch={}) => ({id, owner:'owner', designer:'Arena Lab', name:'Wild Type / 原型', color:'mint',
   artifact_id:'same-artifact', spec:{parent_id:null}, report:{}, reference_kind:null, submission_channel:null, release_id:null, ...patch})
