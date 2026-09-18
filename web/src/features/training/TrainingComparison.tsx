@@ -35,19 +35,20 @@ export function TrainingComparison({runs,maps,flies,onOpen,initiallyOpen=false}:
         {selected.length<2?<p role="status">{t('Select at least two sessions to compare.')}</p>:<p className={'comparison-note '+(differences.length?'conditions-differ':'')} role="status">{differences.length?<>{t('Different evaluation conditions:')} {differences.map(key=>t(key)).join(' · ')}. {t('Read these as separate experiments.')}</>:t('Same recorded evaluation conditions. These are training results, not held-out generalization evidence.')}</p>}
         {rows.length>0&&<>
           <div className="comparison-legend">{rows.map(({run},i)=><span key={run.id} style={{color:colors[i]}}>● {run.spec.name}</span>)}</div>
-          <svg className="comparison-chart" viewBox="0 0 700 220" role="img" aria-label={t('Best food score in each generation')}>
+          <svg className="comparison-chart" viewBox="0 0 700 220" role="img" aria-label={t('Round best and historical best')}>
             {[scale.min,0,scale.max].map((value,i)=><g key={i}><line x1="60" x2="655" y1={scale.y(value)} y2={scale.y(value)} stroke="currentColor" opacity=".15"/><text x="48" y={scale.y(value)+4} textAnchor="end">{value.toFixed(2)}</text></g>)}
-            {Array.from({length:Math.max(...selected.map(r=>r.spec.generations))},(_,generation)=><text key={generation} x={scale.x(generation)} y="202" textAnchor="middle">G{generation+1}</text>)}
+            {Array.from({length:Math.max(...selected.map(r=>r.spec.generations))},(_,generation)=><text key={generation} x={scale.x(generation)} y="202" textAnchor="middle">R{generation+1}</text>)}
             {rows.map(({run,history},i)=><g key={run.id}>{history.map((point,index)=>{
               if(point.best===null)return null
               const prev=history[index-1]
               return <g key={index}>
-                {prev?.best!=null&&<line x1={scale.x(prev.generation)} y1={scale.y(prev.best)} x2={scale.x(index)} y2={scale.y(point.best)} stroke={colors[i]} strokeWidth="2" strokeDasharray={point.complete&&prev.complete?undefined:'4 4'}/>}
-                <circle cx={scale.x(index)} cy={scale.y(point.best)} r="4" fill={point.complete?colors[i]:'var(--paper)'} stroke={colors[i]} strokeWidth="2"><title>{`${run.spec.name} · G${index+1} · ${score(point.best)} · ${point.evaluated}/${run.spec.population}`}</title></circle>
+                {prev?.bestSoFar!=null&&point.bestSoFar!=null&&<line x1={scale.x(prev.generation)} y1={scale.y(prev.bestSoFar)} x2={scale.x(index)} y2={scale.y(point.bestSoFar)} stroke={colors[i]} opacity=".65" strokeWidth="2" strokeDasharray="5 5"/>}
+                {prev?.best!=null&&<line x1={scale.x(prev.generation)} y1={scale.y(prev.best)} x2={scale.x(index)} y2={scale.y(point.best)} stroke={colors[i]} strokeWidth="2" opacity={point.complete&&prev.complete?1:.5}/>}
+                <circle cx={scale.x(index)} cy={scale.y(point.best)} r="4" fill={point.complete?colors[i]:'var(--paper)'} stroke={colors[i]} strokeWidth="2"><title>{`${run.spec.name} · R${index+1} · ${score(point.best)} · ${point.evaluated}/${run.spec.population}`}</title></circle>
               </g>
             })}</g>)}
           </svg>
-          <p>{t('Best food score in each generation')} · {t('Hollow points indicate partially evaluated generations. Missing results remain blank.')}</p>
+          <p>{t('Solid: round best. Dashed: historical best. A worse candidate does not erase earlier results.')}</p><p>{t('Round best and historical best')} · {t('Hollow points indicate partially evaluated generations. Missing results remain blank.')}</p>
           <div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>{t('Session name')}</th><th>{t('Starting food score')}</th><th>{t('Best food score')}</th><th>{t('Change from baseline')}</th><th>{t('Evaluations completed')}</th><th>{t('Evaluated time budget')}</th></tr></thead><tbody>{rows.map(({run,baseline,best,gain,budgetedSeconds},i)=><tr key={run.id}>
             <td><button className="text-link" style={{color:colors[i]}} onClick={()=>onOpen(run.id)}>{run.spec.name}<ArrowRight size={13}/></button><small>{t(algorithmName(run.spec.strategy))}</small><small>{run.status==='complete'?t('Complete'):t('Incomplete session')}</small></td>
             <td>{score(baseline)}</td><td>{score(best)}</td><td>{gain===null?'—':(gain>0?'+':'')+score(gain)}</td><td>{run.evaluations_completed} / {run.evaluations_total}<small>{t('Started')} {run.evaluations_started} · {t('Limit')} {run.spec.max_evaluations}</small></td><td>{budgetedSeconds} s</td>
@@ -59,7 +60,7 @@ export function TrainingComparison({runs,maps,flies,onOpen,initiallyOpen=false}:
             <div><dt>{t('Objective')}</dt><dd>{t(run.spec.mode==='contest'?'Compete for food':'Collect food')}</dd></div>
             {run.spec.mode==='contest'&&<div><dt>{t('Fixed opponent')}</dt><dd>{name(run.spec.opponent_id)}</dd></div>}
             <div><dt>{t('Seed')}</dt><dd>{run.spec.seed} · {run.spec.duration_seconds} s</dd></div>
-            <div><dt>{t('Population')}</dt><dd>{run.spec.population} × {run.spec.generations} {t('Generations')}</dd></div>
+            <div><dt>{t('Population')}</dt><dd>{run.spec.population} × {run.spec.generations} {t(run.spec.strategy==='random_search'?'Search rounds':'Generations')}</dd></div>
             <div><dt>{t('Allow mutations in')}</dt><dd>{run.spec.strategy==='external'?t('Your own optimizer · API'):run.spec.circuits.map(c=>t(c)).join(', ')}</dd></div>
             {run.spec.strategy!=='external'&&<div><dt>{t('Mutation strength')}</dt><dd>{Math.round(run.spec.mutation_strength*100)}%</dd></div>}
           </dl></article>)}</div>

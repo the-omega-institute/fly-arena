@@ -1,3 +1,4 @@
+import {LifeLedger} from './features/life/LifeLedger'
 import {PlaygroundGuide} from './features/guide/PlaygroundGuide'
 import {matchingWildType} from './features/arena/wildtype'
 import {TrainingSandbox} from './features/training/TrainingSandbox'
@@ -44,6 +45,7 @@ export default function App(){
   const [tab,setTabState]=useState<Tab>(readRoute(location.hash).tab)
   const [bridgeProfile,setBridgeProfile]=useState('')
   const [season,setSeason]=useState<Season|null>(null)
+  const [branchFly,setBranchFly]=useState<Fly|null>(null)
   const [flies,setFlies]=useState<Fly[]>([])
   const [maps,setMaps]=useState<ArenaMap[]>([])
   const [matches,setMatches]=useState<Match[]>([])
@@ -82,7 +84,8 @@ export default function App(){
   const [inspectOpen,setInspectOpen]=useState(false)
   const [inspectCircuit,setInspectCircuit]=useState('descending')
   const fileInput=useRef<HTMLInputElement>(null)
-  const selectedFly=flies.find(f=>f.id===selected)
+  const availableFlies=branchFly&&!flies.some(f=>f.id===branchFly.id)?[branchFly,...flies]:flies
+  const selectedFly=availableFlies.find(f=>f.id===selected)
   const [archivedMatch,setArchivedMatch]=useState<Match|null>(null)
   const [archiveError,setArchiveError]=useState<{id:string;message:string}|null>(null)
   const listedMatch=matches.find(m=>m.id===focused)
@@ -188,12 +191,12 @@ export default function App(){
   return <div className="app-shell">
     <header className="header">
       <button className="brand" onClick={()=>setTab('design')} aria-label={t("Fly Arena 首页")}><span className="brand-mark"><Bug size={22} strokeWidth={1.6}/></span><span>fly<span className="brand-light">arena</span><sup>α</sup></span></button>
-      <nav>{([['design',t("设计工坊"),Dna],['train',t('Training sandbox'),GitBranch],['lab',t("表型实验室"),FlaskConical],['arena',t("竞技场"),Swords],['code','AI / API',Code2]] as const).map(([id,label,Icon])=><button className={tab===id?'active':''} key={id} onClick={()=>setTab(id)}><Icon size={15}/>{label}</button>)}</nav>
+      <nav>{([['design',t("设计工坊"),Dna],['train',t('Training sandbox'),GitBranch],['life',t('Life archive'),GitBranch],['lab',t("表型实验室"),FlaskConical],['arena',t("竞技场"),Swords],['code','AI / API',Code2]] as const).map(([id,label,Icon])=><button className={tab===id?'active':''} key={id} onClick={()=>setTab(id)}><Icon size={15}/>{label}</button>)}</nav>
       <div className="header-right"><Preferences/><span className="season-badge"><span className="live-dot"/>{t("GENESIS SEASON")}</span><button className="identity-button" onClick={()=>identity?setShowToken(true):setLogin(true)}><UserRound size={16}/><span>{identity?.name||t("加入实验")}</span></button></div>
     </header>
 
     <main>
-      <div className="page-heading"><div><div className="eyebrow"><span/> {t("AN OPEN EVOLUTIONARY PLAYGROUND")}</div><h1>{tab==='design'?<>{t("小小生命，")}<em>{t("无限可能。")}</em></>:tab==='train'?<>{t('Train a fly,')}<em>{t('grow a lineage.')}</em></>:tab==='arena'?<>{t("让你的设计，")}<em>{t("接受挑战。")}</em></>:tab==='lab'?<>{t("每次进化，")}<em>{t("都有迹可循。")}</em></>:<>{t("你的 AI，")}<em>{t("也是设计师。")}</em></>}</h1><p>{tab==='design'?t("从真实果蝇神经图谱出发。改变连接，塑造本能，创造属于你的数字果蝇。"):tab==='train'?t('Choose a strategy, set a budget, and explore generations through actual competition.'):tab==='arena'?t("同一身体，同一世界。让不同的神经设计，在食物与空间的竞争中相遇。"):tab==='lab'?t("比较设计、回看行为、追踪神经活动。让下一次修改有据可依。"):t("一份 FlySpec，一套开放接口。让任何 AI 设计、评测并提交自己的果蝇。")}</p></div><div className="science-stamp"><span>{t("BUILT ON REAL BIOLOGY")}</span><strong>MaleCNS <i>v1.0</i></strong><small>{season?num(season.connectome.neuron_count):'—'} {t("neurons · Full retained graph")}<ArrowUpRight size={12}/></small></div></div>
+      <div className="page-heading"><div><div className="eyebrow"><span/> {t("AN OPEN EVOLUTIONARY PLAYGROUND")}</div><h1>{tab==='design'?<>{t("小小生命，")}<em>{t("无限可能。")}</em></>:tab==='life'?<>{t('Every life,')}<em>{t('a recorded journey.')}</em></>:tab==='train'?<>{t('Train a fly,')}<em>{t('grow a lineage.')}</em></>:tab==='arena'?<>{t("让你的设计，")}<em>{t("接受挑战。")}</em></>:tab==='lab'?<>{t("每次进化，")}<em>{t("都有迹可循。")}</em></>:<>{t("你的 AI，")}<em>{t("也是设计师。")}</em></>}</h1><p>{tab==='design'?t("从真实果蝇神经图谱出发。改变连接，塑造本能，创造属于你的数字果蝇。"):tab==='life'?t('Explore individuals, experiences and choices. Continue evolution from recorded evidence.'):tab==='train'?t('Choose a strategy, set a budget, and explore generations through actual competition.'):tab==='arena'?t("同一身体，同一世界。让不同的神经设计，在食物与空间的竞争中相遇。"):tab==='lab'?t("比较设计、回看行为、追踪神经活动。让下一次修改有据可依。"):t("一份 FlySpec，一套开放接口。让任何 AI 设计、评测并提交自己的果蝇。")}</p></div><div className="science-stamp"><span>{t("BUILT ON REAL BIOLOGY")}</span><strong>MaleCNS <i>v1.0</i></strong><small>{season?num(season.connectome.neuron_count):'—'} {t("neurons · Full retained graph")}<ArrowUpRight size={12}/></small></div></div>
 
       {error&&<div className="error-banner" role="alert"><span>{error}</span><button onClick={()=>setError('')} aria-label={t("关闭错误")}><X size={16}/></button></div>}
 
@@ -234,9 +237,11 @@ export default function App(){
         <div className="map-grid">{maps.map((m,i)=><button className="map-card" key={m.id} onClick={()=>{setMapId(m.id);setMode(m.id==='ring'?'sumo':'contest');setFocused('');setPlay(false)}}><div className="map-card-top"><span>0{i+1} / {(locale==='en'?m.english:m.name).toUpperCase()}</span><ArrowUpRight size={17}/></div><MapDrawing map={m}/><div className="map-card-bottom"><div><h3>{locale==='en'?m.english:m.name}</h3><p>{m.id==='orchard'?t("感知 · 探索 · 觅食"):m.id==='maze'?t("路径 · 障碍 · 适应"):m.id==='scarcity'?t("稀缺 · 竞争 · 耗尽"):m.id==='terrarium'?(locale==='en'?'Slopes · routes · shared food':'坡地 · 多路 · 共享食物'):t("接触 · 推挤 · 争夺")}</p></div><span className="map-tag">{m.id==='ring'?t("对抗"):t("觅食")}</span></div></button>)}<div className="ai-card"><span className="ai-icon"><Sparkles size={21}/></span><span className="eyebrow">{t("CO-DESIGN WITH AI")}</span><h3>{t("让 AI，")}<br/>{t("设计它的第一只果蝇。")}</h3><p>{t("开放 FlySpec 与 API。")}<br/>{t("你的 agent，可以直接加入。")}</p><button onClick={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}>{t("接入你的 AI")}<ArrowRight size={16}/></button></div></div>
       </>}
 
-      {tab==='arena'&&<ArenaFeature replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={flies} frames={frames} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy||(replay.status==='loading'?'replay':'')} startMatch={startMatch} startSeries={startSeries}/>}
+      {tab==='arena'&&<ArenaFeature replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy||(replay.status==='loading'?'replay':'')} startMatch={startMatch} startSeries={startSeries}/>}
 
-      {tab==='train'&&<TrainingSandbox flies={flies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={fly=>{setSelected(fly.id);setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
+      {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={fly=>{setSelected(fly.id);setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
+
+      {tab==='life'&&<LifeLedger identity={identity} selected={selected} onBranch={fly=>{setBranchFly(fly);setSelected(fly.id);setTab('train')}} onCompete={fly=>{setBranchFly(fly);setSelected(fly.id);const wt=matchingWildType(flies,fly);if(wt)setOpponent(wt.id);setMode('contest');setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
       {tab==='lab'&&<PhenotypeLab flies={flies} identity={identity} selected={selected} experimentId={experimentId} onExperiment={openExperiment} onLogin={()=>setLogin(true)}/>}
 

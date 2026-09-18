@@ -17,9 +17,11 @@ export function summarizeRun(run:ComparableRun){
   const scores=run.members.map(m=>m.fitness).filter(finite)
   const best=scores.length?Math.max(...scores):null
   const baseline=finite(run.baseline_fitness)?run.baseline_fitness:null
+  let bestSoFar:number|null=null
   const history=Array.from({length:run.spec.generations},(_,generation)=>{
     const scores=run.members.filter(m=>m.generation===generation).map(m=>m.fitness).filter(finite)
-    return {generation,best:scores.length?Math.max(...scores):null,
+    if(scores.length)bestSoFar=Math.max(bestSoFar??-Infinity,...scores)
+    return {generation,best:scores.length?Math.max(...scores):null,bestSoFar,
       evaluated:scores.length,complete:scores.length===run.spec.population}
   })
   return {best,baseline,gain:best===null||baseline===null?null:best-baseline,history,

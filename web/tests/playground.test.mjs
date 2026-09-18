@@ -32,8 +32,8 @@ const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtyp
 const {DevelopersFeature}=require('./src/features/developers/DevelopersFeature.js')
 const {I18nProvider,Preferences}=require('./src/shared/i18n.js')
 const dom=new JSDOM('<!doctype html><html><body><main id="root"></main></body></html>',{url:'http://arena.example/'})
-const originals=Object.fromEntries(['window','document','navigator','localStorage','matchMedia','IS_REACT_ACT_ENVIRONMENT','fetch'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
-for(const k of ['window','document','navigator','localStorage'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
+const originals=Object.fromEntries(['window','document','navigator','localStorage','location','history','matchMedia','IS_REACT_ACT_ENVIRONMENT','fetch'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+for(const k of ['window','document','navigator','localStorage','location','history'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
 globalThis.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
 globalThis.IS_REACT_ACT_ENVIRONMENT=true
 globalThis.fetch=()=>{throw Error('An onboarding control unexpectedly requested network/compute')}
@@ -145,4 +145,44 @@ test('public gallery exposes real generations and branches without starting comp
  await click('Use as starting fly');assert.equal(branched[0].id,fly.id)
  assert.deepEqual(requests.map(r=>r[1]),['GET'])
  globalThis.fetch=()=>{throw Error('Unexpected network')}
+})
+
+test('life record inspects a zero result, prepares branches and appends corrections without compute',async()=>{
+ const {LifeLedger}=require('./src/features/life/LifeLedger.js')
+ history.replaceState(null,'','#tab=life&fly='+own.id)
+ const requests=[],branches=[],contests=[],replays=[]
+ const match={id:'c'.repeat(32),status:'verified',request:{map_id:'orchard',mode:'forage',seed:42,duration_seconds:1,fly_ids:[own.id]}}
+ const record={fly:own,can_annotate:true,origin:{strategy:'random_search',round:3,fitness:0,saved:false},ancestors:[wt],descendants:[],notes:[],experiences:[{match,scores:[0],slots:[0],evaluation_context:'runtime'}],learning:{within_match_plasticity:'none',acquired_state_inherited:false}}
+ globalThis.fetch=async(url,options)=>{
+  const method=options?.method||'GET';requests.push([String(url),method])
+  let result
+  if(method==='POST'){
+   assert.ok(String(url).endsWith('/notes'));assert.ok(options.headers['Idempotency-Key'])
+   const note=JSON.parse(options.body);record.notes.push({...note,id:String(record.notes.length+1).repeat(32),created:1});result={id:record.notes.at(-1).id}
+  }else if(String(url).includes('/experiences/'))result={status:'recorded',observations:[{slot:0,food_consumed:0,sampled_path_mm:14.91,final_energy:98.44,total_spikes:1960853,first_intake_record_seconds:null,exit_seconds:null,final_neural_activity:{descending:12}}]}
+  else result=String(url).endsWith('/lives')?[{...own,can_annotate:true}]:structuredClone(record)
+  return {ok:true,json:async()=>result}
+ }
+ await mount(LifeLedger,{identity:{id:'owner',token:'test'},selected:own.id,onBranch:f=>branches.push(f),onCompete:f=>contests.push(f),onReplay:m=>replays.push(m)})
+ assert.match(document.body.textContent,/Search round 3/)
+ assert.match(document.body.textContent,/Score 0.0000/)
+ assert.match(document.body.textContent,/No food consumed during this evaluation window/)
+ await click('Inspect recorded observations');assert.match(document.body.textContent,/14.91 mm/)
+ await click('Behavior and neural replay');assert.equal(replays[0].id,match.id)
+ await click('Continue evolution');await click('Prepare a comparison')
+ assert.equal(branches[0].id,own.id);assert.equal(contests[0].id,own.id)
+ assert.ok(requests.every(([,m])=>m==='GET'))
+ // React loaded before JSDOM uses its change-event fallback; invoke its actual handler.
+ async function explain(value){await act(async()=>{const area=document.querySelector('textarea');const props=Object.keys(area).find(k=>k.startsWith('__reactProps'));area[props].onChange({target:{value}})})}
+ await explain('Test a longer window');await click('Append to life record')
+ assert.match(document.body.textContent,/Test a longer window/)
+ const selects=document.querySelectorAll('.life-notes select')
+ await act(async()=>{selects[0].value='correction';selects[0].dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ const earlier=document.querySelectorAll('.life-notes select')[2]
+ await act(async()=>{earlier.value=record.notes[0].id;earlier.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ await explain('Test multiple seeds too');await click('Append to life record')
+ assert.equal(record.notes.length,2);assert.equal(record.notes[1].supersedes,record.notes[0].id)
+ assert.match(document.body.textContent,/Test a longer window/);assert.match(document.body.textContent,/Test multiple seeds too/)
+ assert.equal(requests.filter(([,m])=>m==='POST').length,2)
+ history.replaceState(null,'','/')
 })

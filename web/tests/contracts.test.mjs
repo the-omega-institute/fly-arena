@@ -117,3 +117,11 @@ test('terrain viewer retains full box size and converts normalized MuJoCo wxyz r
  const halfTurn=obstacleGeometry({position:[0,0,0],size:[2,4,6],shape:'ellipsoid',quaternion:[0,0,0,1]});
  assert.equal(halfTurn.shape,'ellipsoid');assert.deepEqual(halfTurn.quaternion,[0,0,1,0]);
 });
+
+test('random search round best can decline while historical best is retained',()=>{
+ const run={...comparisonRun,spec:{...comparisonRun.spec,strategy:'random_search'},members:[.4032,1.3984,.4032,0,.4032,0].map((fitness,i)=>({generation:Math.floor(i/2),slot:i%2,fitness}))};
+ const result=summarizeRun(run);
+ assert.deepEqual(result.history.map(g=>g.best),[1.3984,.4032,.4032]);
+ assert.deepEqual(result.history.map(g=>g.bestSoFar),[1.3984,1.3984,1.3984]);
+ assert.equal(run.members[5].fitness,0);
+});
