@@ -6,8 +6,10 @@ import json
 import os
 import subprocess
 import secrets
+import tempfile
 import threading
 import time
+from pathlib import Path
 
 import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Query
@@ -23,7 +25,7 @@ from .compiler import BUDGET, Compiler
 from .connectome import Connectome
 from .contracts import CreateIdentity, FlySpec, MatchRequest, TournamentRequest
 from .neural import PROFILE
-from .models import catalog as model_catalog, require_model_bridge
+from .models import catalog as model_catalog, make_brain, require_model_bridge
 from .runner import runtime_manifest
 from .experiments.embodied_sensor import catalog as sensory_catalog
 from .bridge import match_profiles, require_bridge
@@ -208,6 +210,36 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def validate(spec: FlySpec, owner: dict = Depends(identity)):
         with compile_lock:
             return compiler().compile(spec)
+
+    @app.post("/api/v1/flies/preview")
+    def neural_preview(spec: FlySpec, owner: dict = Depends(identity)):
+        """Run short fixed stimuli through the submitted full retained connectome.
+
+        This is deliberately separate from matches: it has no body, score, ranking,
+        or claim of biological calibration. The returned circuit values are actual
+        model state after each stimulus, bound to the submitted FlySpec report.
+        Temporary compiled artifacts are discarded after the preview.
+        """
+        with compile_lock:
+            graph = compiler().graph
+            with tempfile.TemporaryDirectory(prefix="arena-neural-preview-") as folder:
+                root = Path(folder)
+                report = compiler().compile(spec, publish=True, root=root)
+                weights, _ = compiler().load_weights(report["artifact_id"], root)
+                brain = make_brain(spec.model_profile, graph, weights,
+                                   spec.neuron_parameters.model_dump())
+                rows = []
+                for left, right in ((1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.0, 0.0)):
+                    brain.reset()
+                    brain.stimulate(left, right)
+                    brain.advance(50)
+                    rows.append({"stimulus": {"left": left, "right": right},
+                                 "circuits": brain.trace(),
+                                 "total_spikes": (None if brain.total_spikes is None else int(brain.total_spikes))})
+                return {"schema": "neural-design-preview/v1", "artifact_id": report["artifact_id"],
+                        "model_profile": spec.model_profile, "connectome_sha256": graph.manifest["sha256"],
+                        "steps": 50, "stimuli": rows,
+                        "scope": "Actual retained-connectome dynamics under fixed bilateral odor currents; no body or match score."}
 
     @app.post("/api/v1/flies", status_code=201)
     def publish(spec: FlySpec, request: Request, owner: dict = Depends(identity), compare: bool = Query(default=False)):

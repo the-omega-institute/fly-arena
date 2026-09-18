@@ -1451,5 +1451,12 @@ export const catalog = {
   ,"active":{"en":"active","zh-CN":"活动"}
   ,"No annotated neuron classes in this sample.":{"en":"No annotated neuron classes in this sample.","zh-CN":"此样本没有带注释的神经元类别。"}
   ,"All displayed classes":{"en":"All displayed classes","zh-CN":"所有显示类别"}
-  ,"Back to classes":{"en":"Back to classes","zh-CN":"返回类别"}} as const
+  ,"Back to classes":{"en":"Back to classes","zh-CN":"返回类别"}
+  ,"Preview neural response":{"en":"Preview neural response","zh-CN":"预览神经反应"}
+  ,"Neural preview recorded from the retained graph.":{"en":"Neural preview recorded from the retained graph.","zh-CN":"已从保留连接组记录神经预览。"}
+  ,"Design neural preview":{"en":"Design neural preview","zh-CN":"设计后的神经预览"}
+  ,"Fixed bilateral stimuli · actual model state":{"en":"Fixed bilateral stimuli · actual model state","zh-CN":"固定双侧刺激 · 实际模型状态"}
+  ,"This preview runs the submitted FlySpec through the retained connectome. It has no body, score or ranking.":{"en":"This preview runs the submitted FlySpec through the retained connectome. It has no body, score or ranking.","zh-CN":"此预览将提交的 FlySpec 运行在保留连接组上；它没有身体、分数或排名。"}
+  ,"Stimulus":{"en":"Stimulus","zh-CN":"刺激"}
+  ,"50 neural steps per stimulus":{"en":"50 neural steps per stimulus","zh-CN":"每个刺激 50 个神经步"}} as const
 export type MessageKey=keyof typeof catalog
