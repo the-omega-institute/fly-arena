@@ -1438,5 +1438,18 @@ export const catalog = {
   ,"Active in this frame":{"en":"Active in this frame","zh-CN":"当前帧活动"}
   ,"Edges are a display sample; simulation uses the full graph.":{"en":"Edges are a display sample; simulation uses the full graph.","zh-CN":"边是显示样本；仿真使用完整图谱。"}
   ,"Life events":{"en":"Life events","zh-CN":"生命事件"}
-  ,"No threshold event was recorded in this replay window.":{"en":"No threshold event was recorded in this replay window.","zh-CN":"本次回放窗口没有记录到阈值事件。"}} as const
+  ,"No threshold event was recorded in this replay window.":{"en":"No threshold event was recorded in this replay window.","zh-CN":"本次回放窗口没有记录到阈值事件。"}
+  ,"Brain view":{"en":"Brain view","zh-CN":"脑图视图"}
+  ,"Functional region":{"en":"Functional region","zh-CN":"功能区域"}
+  ,"Neuron class":{"en":"Neuron class","zh-CN":"神经元类别"}
+  ,"Local graph":{"en":"Local graph","zh-CN":"局部连接"}
+  ,"Recorded functional region":{"en":"Recorded functional region","zh-CN":"已记录的功能区域"}
+  ,"canonical neurons":{"en":"canonical neurons","zh-CN":"规范神经元"}
+  ,"sampled in this frame":{"en":"sampled in this frame","zh-CN":"本帧采样"}
+  ,"Open neuron classes":{"en":"Open neuron classes","zh-CN":"展开神经元类别"}
+  ,"display neurons":{"en":"display neurons","zh-CN":"显示神经元"}
+  ,"active":{"en":"active","zh-CN":"活动"}
+  ,"No annotated neuron classes in this sample.":{"en":"No annotated neuron classes in this sample.","zh-CN":"此样本没有带注释的神经元类别。"}
+  ,"All displayed classes":{"en":"All displayed classes","zh-CN":"所有显示类别"}
+  ,"Back to classes":{"en":"Back to classes","zh-CN":"返回类别"}} as const
 export type MessageKey=keyof typeof catalog
