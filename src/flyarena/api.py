@@ -114,6 +114,11 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         return {"status": "ok", "connectome_ready": (DATA / "connectome/manifest.json").exists(),
                 "readout_ready": (DATA / "connectome/readout.json").exists(), "version": app.version, "commit": release.get("commit")}
 
+    @app.get("/api/v1/agent-guide", response_class=FileResponse,
+             summary="Read how an AI can design, train and compare flies")
+    def agent_guide():
+        return FileResponse(ROOT / "docs/AI_QUICKSTART.md", media_type="text/markdown")
+
     @app.get("/api/v1/season")
     def season():
         graph = compiler().graph
