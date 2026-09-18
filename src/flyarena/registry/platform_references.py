@@ -15,8 +15,11 @@ def initialize_references(store, compiler):
     graph_sha = compiler.graph.manifest['sha256']
     release = 'canonical-seeds-v1-' + digest({'graph':graph_sha, 'presets':PRESETS, 'profile':'malecns-lif-cpu-v1'})[:16]
     references = {}
-    for role,name,color,mutations in PRESETS:
-        spec = FlySpec(name=name,color=color,connectome_sha256=graph_sha,weight_mutations=mutations)
+    lif_release=release
+    entries=[(*item,'malecns-lif-cpu-v1') for item in PRESETS]+[('wildtype','Rate baseline / 连续模型基线','blue',[],'malecns-rate-cpu-v1')]
+    for role,name,color,mutations,model in entries:
+        release=lif_release if model=='malecns-lif-cpu-v1' else 'rate-baseline-v1-'+digest({'graph':graph_sha,'model':model})[:16]
+        spec = FlySpec(name=name,color=color,connectome_sha256=graph_sha,weight_mutations=mutations,model_profile=model)
         report = compiler.compile(spec,publish=True,root=store.root)
         compiler.load_weights(report['artifact_id'],store.root)
         definition = {'release_id':release,'role':role,'spec':spec.model_dump(by_alias=True),'artifact_id':report['artifact_id']}
@@ -34,5 +37,5 @@ def initialize_references(store, compiler):
                 raise ValueError('Immutable reference definition mismatch')
             db.execute('INSERT OR IGNORE INTO research_references VALUES(?,?,?,?)', (release,role,ident,canonical(definition).decode()))
             db.execute('INSERT OR IGNORE INTO fly_provenance VALUES(?,?,?,?,?)', (ident,role,release,'seed',digest(definition)))
-        references[role] = store.fly(ident)
+        if model=='malecns-lif-cpu-v1':references[role] = store.fly(ident)
     return references

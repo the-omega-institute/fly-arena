@@ -67,7 +67,7 @@ class FlySpec(StrictModel):
     color: Literal["mint", "amber", "violet", "rose", "blue"] = "mint"
     parent_id: str | None = Field(default=None, pattern=r"^[0-9a-f]{32}$")
     connectome_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    model_profile: Literal["malecns-lif-cpu-v1"] = "malecns-lif-cpu-v1"
+    model_profile: Literal["malecns-lif-cpu-v1", "malecns-rate-cpu-v1"] = "malecns-lif-cpu-v1"
     weight_mutations: list[Mutation] = Field(default_factory=list, max_length=64)
     edge_deltas: list[EdgeDelta] = Field(default_factory=list, max_length=100_000)
     neuron_parameters: NeuronParameters = Field(default_factory=NeuronParameters)

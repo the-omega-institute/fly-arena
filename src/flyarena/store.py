@@ -79,8 +79,9 @@ class Store:
                 raise ValueError("Parent fly does not exist")
             if spec.get('parent_id'):
                 parent = json.loads(db.execute('SELECT spec FROM flies WHERE id=?', (spec['parent_id'],)).fetchone()[0])
-                if any(parent.get(k) != spec.get(k) for k in ('connectome_sha256','model_profile')):
-                    raise ValueError('Parent must use the same graph and model profile')
+                from .models import PROFILES
+                if parent.get('connectome_sha256')!=spec.get('connectome_sha256') or spec.get('model_profile') not in PROFILES:
+                    raise ValueError('Parent must use the same graph and a supported model profile')
             if not training and db.execute("SELECT count(*) FROM flies f WHERE owner=? AND NOT EXISTS(SELECT 1 FROM training_members m WHERE m.fly_id=f.id AND m.saved=0)", (owner,)).fetchone()[0] >= 100:
                 raise ValueError("This workspace allows 100 published flies per designer")
             db.execute("INSERT INTO flies VALUES(?,?,?,?,?,?,?,?)", (ident, owner, spec["name"], spec["color"], canonical(spec).decode(),
@@ -156,9 +157,11 @@ class Store:
                 raise ValueError("Queue quota reached: at most 12 unfinished matches per designer")
             artifacts = []
             for fly_id in request["fly_ids"]:
-                fly = db.execute("SELECT artifact_id FROM flies WHERE id=?", (fly_id,)).fetchone()
+                fly = db.execute("SELECT artifact_id,spec FROM flies WHERE id=?", (fly_id,)).fetchone()
                 if not fly:
                     raise ValueError("Contestant does not exist")
+                from .models import require_model_bridge
+                require_model_bridge(json.loads(fly[1]).get('model_profile','malecns-lif-cpu-v1'),request.get('bridge_profile','legacy-v1'))
                 artifacts.append(fly[0])
             db.execute("INSERT INTO matches(id,owner,request,artifacts,runtime_hash,status,created,updated,tournament) VALUES(?,?,?,?,?,'queued',?,?,?)",
                        (ident, owner, canonical(request).decode(), canonical(artifacts).decode(), runtime_hash, now, now, tournament))
@@ -245,8 +248,10 @@ class Store:
                     return self.prior_submission(owner, key, spec, tournament=True)
             artifacts = {}
             for fly in spec['fly_ids']:
-                row = db.execute('SELECT artifact_id FROM flies WHERE id=?',(fly,)).fetchone()
+                row = db.execute('SELECT artifact_id,spec FROM flies WHERE id=?',(fly,)).fetchone()
                 if not row: raise ValueError('Tournament contestant does not exist')
+                from .models import require_model_bridge
+                require_model_bridge(json.loads(row[1]).get('model_profile','malecns-lif-cpu-v1'),spec.get('bridge_profile','legacy-v1'))
                 artifacts[fly] = row[0]
             schedule = []
             for seed in spec['seeds']:

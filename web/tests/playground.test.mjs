@@ -125,7 +125,7 @@ test('optimizer cards select CEM and custom model with clear runtime semantics',
  await mount(AlgorithmPicker,{value:'external',onChange:v=>changes.push(v),name:'My model',onName:v=>names.push(v)})
  assert.equal(document.querySelector('input[type=radio][value=external]').checked,true)
  assert.ok([...document.querySelectorAll('input')].some(i=>i.value==='My model'))
- assert.match(document.body.textContent,/same connectome LIF simulator/)
+ assert.match(document.body.textContent,/selected brain model/)
  const language=document.querySelector('select[aria-label="Language"]')
  await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
  assert.match(document.body.textContent,/自定义算法/)
@@ -185,4 +185,19 @@ test('life record inspects a zero result, prepares branches and appends correcti
  assert.match(document.body.textContent,/Test a longer window/);assert.match(document.body.textContent,/Test multiple seeds too/)
  assert.equal(requests.filter(([,m])=>m==='POST').length,2)
  history.replaceState(null,'','/')
+})
+
+test('brain dynamics can be selected independently of optimizer without computation',async()=>{
+ const {BrainModelPicker,RATE,LIF}=require('./src/features/design/BrainModelPicker.js')
+ globalThis.fetch=()=>{throw Error('Model selection must not enqueue work')}
+ const changed=[]
+ await mount(BrainModelPicker,{value:LIF,onChange:id=>changed.push(id)})
+ const radios=document.querySelectorAll('input[name="brain-model"]')
+ await act(async()=>radios[1].click());assert.deepEqual(changed,[RATE])
+ await mount(BrainModelPicker,{value:RATE,onChange:id=>changed.push(id)})
+ assert.match(document.body.textContent,/frozen LIF motor decoder experimentally/)
+ assert.match(document.body.textContent,/No discrete spikes/)
+ const rateReference={...wt,id:'d'.repeat(32),spec:{...wt.spec,model_profile:RATE}}
+ assert.equal(matchingWildType([rateReference,wt]),wt)
+ assert.equal(matchingWildType([wt,rateReference],{...own,spec:{...own.spec,model_profile:RATE}}),rateReference)
 })

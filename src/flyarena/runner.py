@@ -15,6 +15,7 @@ from .compiler import Compiler
 from .connectome import Connectome
 from .contracts import MatchRequest
 from .neural import Brain, PROFILE
+from .models import PROFILES, make_brain, require_model_bridge
 from .scenarios import RULES, arena_scene
 from .replay import POLICY, REPLAY_RECEIPT
 
@@ -31,10 +32,10 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1") -> di
                 "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba"}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
-    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py"]
+    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
-            "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "rules": RULES,
+            "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
             "replay_policy": dict(POLICY),
             "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
             "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
@@ -65,7 +66,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     for fly in flies:
         weights, artifact = compiler.load_weights(fly["artifact_id"], var)
         params = artifact["phenotype"]["neuron_parameters"]
-        brains.append(Brain(graph, weights, params["tau_scale"], params["threshold_shift_mv"]))
+        model_id=artifact['phenotype']['model']['id']
+        if fly.get('spec',{}).get('model_profile',model_id)!=model_id:raise ValueError('Fly and artifact model mismatch')
+        require_model_bridge(model_id,request.bridge_profile)
+        brains.append(make_brain(model_id,graph,weights,params))
     backends, motors = [], []
     decoder = None
     if v2:
@@ -213,6 +217,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                "readout_sha256": readout["sha256"], "runtime": frozen_runtime,
                "silence_output": silence_output, "final_tick": bodies.tick,
                "total_spikes": [b.total_spikes for b in brains],
+               "model_profiles": [PROFILES["malecns-rate-cpu-v1"] if b.total_spikes is None else PROFILE for b in brains],
                "timing": {"wall_seconds": time.perf_counter() - start,
                           "simulation_wall_seconds": time.perf_counter() - simulation_started,
                           "simulated_seconds": bodies.tick * RULES["physics_dt"]},

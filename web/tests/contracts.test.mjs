@@ -125,3 +125,7 @@ test('random search round best can decline while historical best is retained',()
  assert.deepEqual(result.history.map(g=>g.bestSoFar),[1.3984,1.3984,1.3984]);
  assert.equal(run.members[5].fitness,0);
 });
+
+test('different brain dynamics are explicit comparison conditions',()=>{
+ assert.ok(comparisonDifferences([comparisonRun,{...comparisonRun,id:'rate',model_profile:'malecns-rate-cpu-v1'}]).includes('Brain model'));
+});
