@@ -182,3 +182,6 @@ Replace `propose()` to implement your own optimizer using any library on your ma
 ### Scarce-resource training
 
 Choose **Last Oasis / 最后的绿洲** (`scarcity`) in the sandbox or pass `--map scarcity` to either training client. Its smaller arena has one shared patch with only **2 food units total**, compared with 50 across five patches in Amber Orchard. Food never replenishes and the existing odor signal weakens with the remaining amount. Train alone for collection or use a fixed opponent with mirrored spawn evaluations for competition. Scores remain actual food consumed; a scarce-map score is not directly comparable to an orchard score.
+
+
+The `terrarium` map (Rotting Fruit Grove / 腐果林地) is available to both forage and contest evaluations, including multi-condition sessions and external optimizers. Select it in the web map selector or pass `--condition terrarium:42` / `--map terrarium`. Its low ramps and raised passage are physical collision geometry; food remains on the ground and odor is the existing analytic field. Changing terrain alone does not add vision or online learning.

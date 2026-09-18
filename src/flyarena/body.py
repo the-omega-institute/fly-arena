@@ -23,9 +23,24 @@ class Bodies:
         self.names = [f"fly-{i}" for i in range(count)]
         world = FlatGroundWorld(half_size=scene["size"])
         for index, obstacle in enumerate(scene["obstacles"]):
-            world.mjcf_root.worldbody.add_geom(name=f"obstacle-{index}", type=mj.mjtGeom.mjGEOM_BOX,
-                pos=obstacle["position"], size=np.array(obstacle["size"]) / 2,
-                contype=4, conaffinity=3, friction=[1, .02, .0001])
+            shape = obstacle.get("shape", "box")
+            geom_type = {"box": mj.mjtGeom.mjGEOM_BOX,
+                         "ellipsoid": mj.mjtGeom.mjGEOM_ELLIPSOID}.get(shape)
+            if geom_type is None:
+                raise ValueError(f"Unknown obstacle shape: {shape}")
+            rgba = None
+            if obstacle.get("color"):
+                value = obstacle["color"].lstrip("#")
+                if len(value) != 6:
+                    raise ValueError("Obstacle color must be a six-digit hex value")
+                rgba = tuple(int(value[i:i + 2], 16) / 255 for i in (0, 2, 4)) + (1.0,)
+            kwargs = dict(name=f"obstacle-{index}", type=geom_type,
+                          pos=obstacle["position"], size=np.array(obstacle["size"]) / 2,
+                          quat=obstacle.get("quaternion", [1, 0, 0, 0]),
+                          contype=4, conaffinity=3, friction=[1, .02, .0001])
+            if rgba is not None:
+                kwargs["rgba"] = rgba
+            world.mjcf_root.worldbody.add_geom(**kwargs)
         contact_sensors = {}
         for index, name in enumerate(self.names):
             fly = make_locomotion_fly(name)

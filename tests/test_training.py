@@ -87,7 +87,7 @@ def test_failed_match_stops_training_without_fabricated_fitness(lab):
     assert result['status']=='failed' and 'Simulation failed' in result['error']
     assert result['members'][0]['fitness'] is None and result['evaluations_started']==1
 
-@pytest.mark.parametrize('map_id',['orchard','scarcity'])
+@pytest.mark.parametrize('map_id',['orchard','scarcity','terrarium'])
 def test_contest_uses_swapped_slots_and_food_margin(lab,map_id):
     store,service,_,parent=lab;run=create(lab,mode='contest',opponent_id=parent['id'],map_id=map_id)
     for _ in range(3):service.tick()

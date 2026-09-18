@@ -23,7 +23,7 @@ def evaluation_condition(value):
     """Argparse type for a bounded map:seed condition, also used by agents."""
     try:
         map_id,seed=value.split(':')
-        if map_id not in {'orchard','maze','scarcity','ring'} or not seed.isascii() or not seed.isdigit():raise ValueError
+        if map_id not in {'orchard','maze','scarcity','ring','terrarium'} or not seed.isascii() or not seed.isdigit():raise ValueError
         number=int(seed)
         if number>2**31-1:raise ValueError
         return {'map_id':map_id,'seed':number}
@@ -36,7 +36,7 @@ def main():
     p.add_argument('--founder', help='Starting fly ID; defaults to the canonical reference')
     p.add_argument('--run', help='Observe an existing session instead of starting another')
     p.add_argument('--strategy', choices=['evolution', 'random_search'], default='evolution')
-    p.add_argument('--map', choices=['orchard', 'maze', 'scarcity', 'ring'], default='orchard')
+    p.add_argument('--map', choices=['orchard', 'maze', 'scarcity', 'ring', 'terrarium'], default='orchard')
     p.add_argument('--opponent', help='Fixed opponent; enables mirrored food competition')
     p.add_argument('--circuits', nargs='+', default=['olfactory', 'projection', 'descending'])
     p.add_argument('--population', type=int, default=2)

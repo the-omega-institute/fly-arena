@@ -36,6 +36,26 @@ MAPS = {
         "obstacles": [], "food": [[0, 0]], "ring_radius": 10,
         "modes": ["forage", "contest", "sumo"],
     },
+    "terrarium": {
+        "id": "terrarium", "name": "腐果林地", "english": "Rotting Fruit Grove",
+        "description": "腐叶与果壳之间的缓坡、叶桥和多条觅食路线。", "size": 28,
+        "color": "#789c62", "habitat": "forest-floor",
+        "spawns": [[-11.5, -.8, 0], [11.5, .8, 3.141592653589793]],
+        # The leaf bridge is 0.8 mm high. Two 8 mm ramps meet its edge at
+        # the same height (about 5.7 degrees), leaving the upper and lower
+        # y lanes open as alternate ground routes.
+        "obstacles": [
+            {"position": [0, 0, .4], "size": [4, 5, .8], "material": "leaf", "color": "#6f9f58"},
+            {"position": [-6, 0, .34], "size": [8.05, 5, .12], "quaternion": [.99875, 0, -.04998, 0], "material": "leaf", "color": "#6f9f58"},
+            {"position": [6, 0, .34], "size": [8.05, 5, .12], "quaternion": [.99875, 0, .04998, 0], "material": "leaf", "color": "#6f9f58"},
+            {"position": [-4.5, -6, .65], "size": [2.2, 1.6, 1.3], "shape": "ellipsoid", "material": "rock", "color": "#695844"},
+            {"position": [4.5, 6, .65], "size": [2.2, 1.6, 1.3], "shape": "ellipsoid", "material": "rock", "color": "#695844"},
+            {"position": [-5.5, 6.5, .42], "size": [1.8, 1.5, .8], "shape": "ellipsoid", "material": "fruit", "color": "#b86c3d"},
+            {"position": [5.5, -6.5, .42], "size": [1.8, 1.5, .8], "shape": "ellipsoid", "material": "fruit", "color": "#b86c3d"},
+        ],
+        "food": [[-8, 5], [8, -5], [-10, 8], [10, -8], [-2, 10], [2, -10]],
+        "modes": ["forage", "contest"],
+    },
 }
 
 RULES = {

@@ -12,7 +12,7 @@ export function planProblem(p:PlanLimits):string|null{
   }
   if(p.conditions){
     if(p.conditions.length<1||p.conditions.length>4)return 'Choose one to four evaluation conditions.'
-    if(p.conditions.some(c=>!['orchard','maze','scarcity','ring'].includes(c.map_id)||!Number.isInteger(c.seed)||c.seed<0||c.seed>2147483647))return 'Use a valid map and whole-number seed for every condition.'
+    if(p.conditions.some(c=>!['orchard','maze','scarcity','ring','terrarium'].includes(c.map_id)||!Number.isInteger(c.seed)||c.seed<0||c.seed>2147483647))return 'Use a valid map and whole-number seed for every condition.'
     if(new Set(p.conditions.map(c=>c.map_id+':'+c.seed)).size!==p.conditions.length)return 'Choose distinct map/seed conditions.'
   }
   if(evaluationCount(p)>p.budget)return 'This plan exceeds your evaluation budget.'
