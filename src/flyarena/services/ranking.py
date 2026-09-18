@@ -12,7 +12,9 @@ def scope(match):
 
 
 def rank(flies, matches, *, runtime_hash=None, scenario_id=None, mode=None, season_id='genesis-alpha', bridge_profile=None):
-    matches = [m for m in matches if m['status']=='verified' and scope(m)[0] == season_id and
+    matches = [m for m in matches if m['status']=='verified' and
+               m['request'].get('sensory_profile', 'odor-only-v1') == 'odor-only-v1' and
+               scope(m)[0] == season_id and
                (runtime_hash is None or m['runtime_hash']==runtime_hash) and
                (scenario_id is None or m['request']['map_id']==scenario_id) and
                (mode is None or m['request']['mode']==mode) and
@@ -41,7 +43,9 @@ def rank(flies, matches, *, runtime_hash=None, scenario_id=None, mode=None, seas
 
 def tournament_projection(matches, fly_ids):
     standings = {f:{'fly_id':f,'points':0,'played':0,'wins':0,'draws':0,'losses':0} for f in fly_ids}
-    compatible = len({scope(m) for m in matches}) <= 1
+    sensory_qualified = all(m['request'].get('sensory_profile', 'odor-only-v1') == 'odor-only-v1'
+                            for m in matches)
+    compatible = sensory_qualified and len({scope(m) for m in matches}) <= 1
     for match in matches if compatible else []:
         if match['status'] != 'verified':
             continue
@@ -58,4 +62,6 @@ def tournament_projection(matches, fly_ids):
     status = ('incomplete' if not compatible or any(m['status']=='failed' for m in matches) else 'complete') if terminal else 'running'
     return {'standings':sorted(standings.values(),key=lambda r:(-r['points'],r['fly_id'])),
             'status':status,'ranking_policy':POLICY_ID,
-            'ranking_error':None if compatible else 'Tournament contains incompatible season/runtime/scenario/mode sessions'}
+            'ranking_error':None if compatible else ('Tournament uses an experimental sensory profile'
+                            if not sensory_qualified else
+                            'Tournament contains incompatible season/runtime/scenario/mode sessions')}

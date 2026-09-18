@@ -76,7 +76,8 @@ def run(ident: str):
             from ..runner import runtime_manifest, simulate
             request = json.loads((path/'request.json').read_text())
             match = MatchRequest.model_validate(request['match'])
-            if digest(runtime_manifest(bridge_profile=match.bridge_profile)) != request['runtime_hash']:
+            if digest(runtime_manifest(bridge_profile=match.bridge_profile,
+                                       sensory_profile=match.sensory_profile)) != request['runtime_hash']:
                 raise ValueError('Node runtime changed after admission; submit under the current runtime')
             flies = request['flies']
             if [f['id'] for f in flies] != match.fly_ids:

@@ -25,6 +25,7 @@ from .contracts import CreateIdentity, FlySpec, MatchRequest, TournamentRequest
 from .neural import PROFILE
 from .models import catalog as model_catalog, require_model_bridge
 from .runner import runtime_manifest
+from .experiments.embodied_sensor import catalog as sensory_catalog
 from .bridge import match_profiles, require_bridge
 from .scenarios import MAPS, RULES, scenario, arena_scene
 from .store import Store
@@ -64,15 +65,15 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     app = FastAPI(title="Fly Arena API", version=release['release'].removeprefix('v'), lifespan=lifespan,
                   description="Published connectome designs and trusted embodied matches. All submitted flies and match replays are public in this MVP workspace.")
     app.state.research = research
-    def match_runtime(profile='legacy-v1'):
+    def match_runtime(profile='legacy-v1', sensory_profile='odor-only-v1'):
         from .services.node import configured_node
         node = configured_node()
-        if node and profile == 'legacy-v1':
+        if node and profile == 'legacy-v1' and sensory_profile == 'odor-only-v1':
             try:
-                return node.runtime(profile)
+                return node.runtime(profile, sensory_profile)
             except (ConnectionError, subprocess.TimeoutExpired) as exc:
                 raise HTTPException(503, 'Compute node is temporarily unavailable; try again shortly') from exc
-        return runtime_manifest(bridge_profile=profile)
+        return runtime_manifest(bridge_profile=profile, sensory_profile=sensory_profile)
 
     training = TrainingService(store, compiler)
     app.state.training = training
@@ -130,6 +131,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 "match_profiles": profiles, "id": "genesis-alpha", "name": "GENESIS / 创生季", "connectome": graph.manifest,
                 "model": PROFILE, "models": model_catalog(), "budget": BUDGET, "rules": RULES,
                 "runtime_sha256": digest(runtime_manifest()),
+                "sensory_profiles": sensory_catalog(),
                 "readout": json.loads((DATA / "connectome/readout.json").read_text()),
                 "invite_required": bool(os.environ.get("ARENA_INVITE_CODE")),
                 "privacy": "Published designs and matches are public. API tokens are private."}
@@ -319,7 +321,8 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if prior is not None:
             return prior
         require_bridge(body.bridge_profile)
-        return store.add_match(owner["id"], body.model_dump(), digest(match_runtime(body.bridge_profile)), key=idempotency_key)
+        return store.add_match(owner["id"], body.model_dump(),
+                               digest(match_runtime(body.bridge_profile, body.sensory_profile)), key=idempotency_key)
 
     @app.get("/api/v1/matches/{ident}")
     def match_get(ident: str):
@@ -348,7 +351,8 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if prior is not None:
             return prior
         require_bridge(body.bridge_profile)
-        return store.add_tournament(owner["id"], body.model_dump(), digest(match_runtime(body.bridge_profile)), idempotency_key)
+        return store.add_tournament(owner["id"], body.model_dump(),
+                                    digest(match_runtime(body.bridge_profile, body.sensory_profile)), idempotency_key)
 
     @app.get("/api/v1/tournaments")
     def tournaments():

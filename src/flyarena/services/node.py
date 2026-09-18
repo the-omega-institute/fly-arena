@@ -48,13 +48,15 @@ class Node:
             raise ValueError(response['command_error'])
         return response
 
-    def runtime(self, profile: str) -> dict:
-        cached = self._runtime.get(profile)
+    def runtime(self, profile: str, sensory_profile: str = "odor-only-v1") -> dict:
+        if sensory_profile != "odor-only-v1":
+            raise ValueError("Remote execution does not yet support experimental sensory profiles")
+        cached = self._runtime.get((profile, sensory_profile))
         if cached and time.monotonic()-cached[0] < 30:
             return cached[1]
         remote = self.call('describe', profile)
         from ..runner import runtime_manifest
-        local = runtime_manifest(bridge_profile=profile)
+        local = runtime_manifest(bridge_profile=profile, sensory_profile=sensory_profile)
         # Platform/Python may differ. Scientific sources, graph, rules and readout must match.
         if profile != 'legacy-v1':
             raise ValueError('Remote execution currently supports legacy-v1 matches only')
@@ -62,7 +64,7 @@ class Node:
                     'connectome_sha256', 'readout_weights_sha256'):
             if remote.get(key) != local.get(key):
                 raise ValueError('Compute node needs synchronization: '+key)
-        self._runtime[profile] = (time.monotonic(), remote)
+        self._runtime[(profile, sensory_profile)] = (time.monotonic(), remote)
         return remote
 
     def execute(self, match: dict, flies: list[dict], destination: Path, heartbeat):

@@ -92,6 +92,9 @@ def verify(folder: Path, *, expected_request: dict | None = None,
             raise ValueError(f"Evidence hash mismatch: {name}")
     request = MatchRequest.model_validate(receipt["request"])
     stored_scene = json.loads((folder / "scene.json").read_text())
+    runtime_sensory = receipt["runtime"].get("sensory_profile", {"id": "odor-only-v1"})
+    if runtime_sensory.get("id") != request.sensory_profile:
+        raise ValueError("Receipt sensory profile mismatch")
     pose_ticks = _replay_cadence(receipt, stored_scene)
     if expected_runtime_hash is not None and digest(receipt["runtime"]) != expected_runtime_hash:
         raise ValueError("Execution backend differs from admitted runtime")

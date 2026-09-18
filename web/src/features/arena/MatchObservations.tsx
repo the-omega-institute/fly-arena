@@ -39,14 +39,14 @@ function BrainTheater({frame,season,fly,slot,events,onSeek}:{frame?:Frame;season
   const {t}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
   useEffect(()=>{let active=true;api<Graph>('/connectome/neurons?circuit='+encodeURIComponent(circuit)+'&limit=48').then(v=>{if(active)setGraph(v)}).catch(()=>{if(active)setGraph(null)});return()=>{active=false}},[circuit])
-  const activity=useMemo(()=>new Map((sample?.top_nodes||[]).map(n=>[n.id,n.activity])),[sample])
+  const activity=useMemo(()=>new Map((sample?.sampled_nodes||sample?.top_nodes||[]).map(n=>[n.id,n.activity])),[sample])
   const max=Math.max(1,...activity.values()); const mutations=fly?.spec?.weight_mutations; const edited=Array.isArray(mutations)&&mutations.some(m=>m.selector===circuit)
   const nodes=graph?.neurons||[]; const point=(i:number)=>({x:20+(i%12)*42,y:30+Math.floor(i/12)*30})
   const eventRows=events.filter(e=>e.slot===undefined||e.slot===slot).slice(-12)
   const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact')}[e.type]||e.type)
   return <section className="brain-theater panel">
     <div className="panel-heading"><span><AudioLines size={16}/>{t('Neural theatre')}</span><small>{t('Recorded activity · selectable circuit')}</small></div>
-    <div className="sensory-strip"><div><span>{t('Odor L / R')}</span><strong>{frame?.senses?.[slot]?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong></div><div><span>{t('Visual L / R')}</span><strong>{frame?.senses?.[slot]?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong></div><div><span>{t('Touch')}</span><strong>{frame?.senses?.[slot]?.touch?'ON':'—'}</strong></div><div><span>{t('Nearest food')}</span><strong>{frame?.senses?.[slot]?.nearest_food==null?'—':frame.senses[slot].nearest_food.toFixed(1)+' mm'}</strong></div></div>
+    <div className="sensory-strip"><div><span>{t('Sensory profile')}</span><strong>{frame?.senses?.[slot]?.sensory_profile||'odor-only-v1'}</strong><small>{t('Versioned neural input')}</small></div><div><span>{t('Odor L / R')}</span><strong>{frame?.senses?.[slot]?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong></div><div><span>{t('Visual L / R')}</span><strong>{frame?.senses?.[slot]?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong><small>{frame?.senses?.[slot]?.visual_status?.includes('engineered')?t('geometric observation'):''}</small></div><div><span>{t('Touch')}</span><strong>{frame?.senses?.[slot]?.touch?'ON':'—'}</strong><small>{frame?.senses?.[slot]?.touch_status?.includes('mujoco')?t('MuJoCo contact observation'):''}</small></div><div><span>{t('Nearest food')}</span><strong>{frame?.senses?.[slot]?.nearest_food==null?'—':frame.senses[slot].nearest_food.toFixed(1)+' mm'}</strong></div></div>
     <div className="brain-circuit-tabs">{circuits.map(c=><button key={c.id} className={circuit===c.id?'active':''} onClick={()=>setCircuit(c.id)} style={{color:c.color}}>{t(c.label)}{edited&&circuit===c.id?<small> · {t('edited')}</small>:null}</button>)}</div>
     <div className="brain-graph-wrap">{graph?<svg className="brain-graph" viewBox="0 0 500 160" role="img" aria-label={t('Recorded neural activity graph')}>
       {graph.edges.slice(0,220).map((e,i)=>{const a=nodes.findIndex(n=>n.id===e.pre),b=nodes.findIndex(n=>n.id===e.post);if(a<0||b<0)return null;const pa=point(a),pb=point(b);return <line key={i} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#8b9b8a" strokeOpacity=".16" strokeWidth={Math.min(2,Math.max(.35,e.count/30))}/>})}
@@ -67,11 +67,12 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
   const scorePeak=Math.max(1,...frames.map(f=>f.scores?.[slot]??0))
   const color=colors[participant?.color]||colors.mint
   function download(){
-    const payload={schema_version:'match-observations/v1',match_id:match?.id,request:match?.request,result:match?.result,
-      units:{time:'seconds',position:'mm',circuit_activity:'Hz',energy:'game reserve units',score:'food units'},
-      scope:'Recorded circuit average firing rates and body observations, not individual neuron spike trains.',
+    const payload={schema_version:'match-observations/v2',match_id:match?.id,request:match?.request,result:match?.result,
+      receipt_sha256:match?.result?.receipt_sha256||null,events:visibleEvents,
+      units:{time:'seconds',position:'mm',circuit_activity:'Hz',neuron_activity:'model-native activity',energy:'game reserve units',score:'food units',touch:'MuJoCo contact boolean'},
+      scope:'Recorded circuit averages, fixed canonical neuron samples, sensor provenance and body observations. This export does not contain all 165,122 neuron traces; the immutable run assets remain the research source.',
       participants:scene.flies.map((entry,slot)=>({slot,...entry,spec:flies.find(f=>f.id===entry.id)?.spec||null})),
-      samples:frames.map(({time,tick,positions,scores,energy,drives,traces})=>({time,tick,positions,scores,energy,drives,traces}))}
+      samples:frames.map(({time,tick,positions,scores,energy,food,drives,traces,brain,senses})=>({time,tick,positions,scores,energy,food,drives,traces,brain,senses}))}
     const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}))
     const link=document.createElement('a');link.href=url;link.download=`fly-arena-${match?.id||'match'}-observations.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
   }

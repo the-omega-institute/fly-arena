@@ -85,10 +85,12 @@ class FlySpec(StrictModel):
 
 
 BridgeProfile = Literal["legacy-v1", "sensorimotor-research-v2"]
+SensoryProfile = Literal["odor-only-v1", "engineered-multimodal-v1"]
 
 
 class MatchRequest(StrictModel):
     bridge_profile: BridgeProfile = "legacy-v1"
+    sensory_profile: SensoryProfile = "odor-only-v1"
     fly_ids: list[str] = Field(min_length=1, max_length=2)
     map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium"] = "orchard"
     mode: Literal["forage", "contest", "sumo"] = "contest"
@@ -113,6 +115,7 @@ class CreateIdentity(StrictModel):
 
 class TournamentRequest(StrictModel):
     bridge_profile: BridgeProfile = "legacy-v1"
+    sensory_profile: SensoryProfile = "odor-only-v1"
     name: str = Field(min_length=1, max_length=80)
     fly_ids: list[str] = Field(min_length=2, max_length=8)
     map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium"] = "orchard"
@@ -127,5 +130,6 @@ class TournamentRequest(StrictModel):
         if len(set(self.seeds)) != len(self.seeds) or any(s < 0 or s > 2**31 - 1 for s in self.seeds):
             raise ValueError("Seeds must be distinct nonnegative int32 values")
         MatchRequest(fly_ids=self.fly_ids[:2], map_id=self.map_id, mode=self.mode,
-                     seed=self.seeds[0], duration_seconds=self.duration_seconds, bridge_profile=self.bridge_profile)
+                     seed=self.seeds[0], duration_seconds=self.duration_seconds,
+                     bridge_profile=self.bridge_profile, sensory_profile=self.sensory_profile)
         return self

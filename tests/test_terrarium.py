@@ -109,3 +109,38 @@ def test_default_spawn_and_food_are_clear_of_terrain():
         distance = mj.mj_ray(bodies.model, bodies.data, np.array([x,y,4.]), np.array([0.,0.,-1.]), None, 1, -1, hit)
         assert distance >= 0
         assert hit[0] not in obstacles
+
+
+def test_food_is_a_raycast_target_and_obstacles_occlude_visual_observation():
+    clear = scenario("orchard", 42)
+    clear["spawns"] = [[-7, 0, 0]]
+    clear["food"] = [clear["food"][0]]
+    clear["obstacles"] = []
+    visible = Bodies(clear, 1, 42)
+    clear_signal = visible.visual_food(0, np.array([10.0]))
+    assert max(clear_signal) > 0
+    assert len(visible.food_geom_ids) == 1
+    assert visible.model.geom_contype[next(iter(visible.food_geom_ids.values()))] == 8
+    assert len(visible.rendering_manifest()["food_geoms"]) == 1
+    assert visible.rendering_manifest()["contact_probes"][0]["observation"] == "mujoco_food_contact_observation_v1"
+    assert set(visible.mouth_contact_geom_ids) == {0}
+
+    blocked_scene = scenario("orchard", 42)
+    blocked_scene["spawns"] = [[-7, 0, 0]]
+    blocked_scene["food"] = [blocked_scene["food"][0]]
+    blocked_scene["obstacles"] = [{"position": [-3.5, 0, 1.5], "size": [1, 4, 3]}]
+    blocked = Bodies(blocked_scene, 1, 42)
+    assert max(blocked.visual_food(0, np.array([10.0]))) == 0
+
+
+def test_food_touch_is_read_from_mujoco_contact_buffer():
+    scene = scenario("orchard", 42)
+    scene["food"] = [scene["food"][0]]
+    x, y, _ = scene["food"][0]["position"]
+    scene["spawns"] = [[x - .2, y, 0]]
+    bodies = Bodies(scene, 1, 42)
+    assert bodies.food_contacts(0) == ["food-0"]
+    mouth = bodies.mouth_contact_geom_ids[0]
+    food = bodies.food_geom_ids["food-0"]
+    assert any({int(c.geom1), int(c.geom2)} == {mouth, food} and c.dist <= 0
+               for c in bodies.data.contact)
