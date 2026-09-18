@@ -99,16 +99,30 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     eliminated = np.zeros(len(flies), dtype=bool)
     exit_ticks = [None for _ in flies]
     frames, events = [], []
+    senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "touch": 0.0,
+               "nearest_food": None, "mouth_distance": None} for _ in flies]
+    sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
     contact_ticks = 0
     last_contact = False
     duration_ticks = request.duration_seconds * 10000
     consumption = np.zeros((len(flies), len(remaining)))
 
+    def neural_sample(brain):
+        rates = np.asarray(brain.rates)
+        active = np.flatnonzero(rates > 0)
+        if len(active):
+            active = active[np.argsort(rates[active])[-12:][::-1]]
+        return {"circuits": brain.trace(),
+                "top_nodes": [{"id": str(int(graph.ids[i])), "activity": float(rates[i])} for i in active]}
+
     def snapshot():
         frame = bodies.snapshot()
         frame.update(scores=scores.round(6).tolist(), energy=energy.round(4).tolist(),
                      food=remaining.round(6).tolist(), drives=drives.round(4).tolist(),
-                     traces=[b.trace() for b in brains], eliminated=eliminated.tolist())
+                     traces=[b.trace() for b in brains],
+                     brain=[neural_sample(b) for b in brains],
+                     senses=[dict(s, odor=list(s["odor"]), visual=list(s["visual"])) for s in senses],
+                     eliminated=eliminated.tolist())
         frames.append(frame)
 
     snapshot()
@@ -126,9 +140,45 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 distance2 = np.sum((sources - antenna[:2]) ** 2, axis=1)
                 raw = float(np.sum(strength * np.exp(-distance2 / (2 * RULES["odor_sigma_mm"]**2))))
                 odor.append(raw if v2 else float(np.clip(raw, 0, 1)))
+            position, rotation = bodies.pose(slot)
+            forward = rotation[:, 0][:2]
+            forward /= np.linalg.norm(forward) or 1.0
+            visual = [0.0, 0.0]
+            nearest = None
+            for source, amount_at_source in zip(food_xy, strength):
+                delta = source - position[:2]
+                distance = float(np.linalg.norm(delta))
+                nearest = distance if nearest is None else min(nearest, distance)
+                if distance < 1e-6:
+                    continue
+                unit = delta / distance
+                front = max(0.0, float(np.dot(forward, unit)))
+                side = float(forward[0] * unit[1] - forward[1] * unit[0])
+                signal = float(np.clip(amount_at_source, 0, 1) * front * np.exp(-distance / 16.0))
+                visual[0 if side < 0 else 1] += signal
+            visual = [float(np.clip(v, 0, 1)) for v in visual]
+            mouth = bodies.mouth(slot)
+            mouth_distance = float(np.min(np.linalg.norm(food_xy - mouth[:2], axis=1))) if len(food_xy) else None
+            touch = float(mouth_distance is not None and mouth_distance <= RULES["mouth_radius_mm"] * 1.5)
+            senses[slot] = {"odor": [float(odor[0]), float(odor[1])], "visual": visual,
+                            "touch": touch, "nearest_food": nearest,
+                            "mouth_distance": mouth_distance}
+            if sum(odor) > .04 and not sensory_latches[slot]["odor"]:
+                events.append({"type": "odor_detected", "tick": bodies.tick, "slot": slot,
+                               "values": [float(odor[0]), float(odor[1])]})
+            sensory_latches[slot]["odor"] = sum(odor) > .04
+            if max(visual) > .05 and not sensory_latches[slot]["visual"]:
+                events.append({"type": "visual_target_detected", "tick": bodies.tick, "slot": slot,
+                               "values": visual})
+            sensory_latches[slot]["visual"] = max(visual) > .05
+            if touch and not sensory_latches[slot]["touch"]:
+                events.append({"type": "food_contact", "tick": bodies.tick, "slot": slot,
+                               "mouth_distance": mouth_distance})
+            sensory_latches[slot]["touch"] = bool(touch)
             if v2:
                 backend = backends[slot]
-                backend.stimulate(*encode_odor(*odor))
+                encoded = encode_odor(*odor)
+                backend.stimulate(float(encoded[0]), float(encoded[1]), visual[0], visual[1], touch)
                 backend.advance(RULES["sense_ticks"])
                 command = decoder.command(backend.neural_output(decoder.neurons))
                 drives[slot] = motors[slot].advance(command)
@@ -137,7 +187,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
                 common = (odor[0] + odor[1]) / 2
                 encoded = np.clip([common + 2 * contrast, common - 2 * contrast], 0, 1)
-                brain.stimulate(float(encoded[0]), float(encoded[1]))
+                brain.stimulate(float(encoded[0]), float(encoded[1]), visual[0], visual[1], touch)
                 brain.advance(RULES["sense_ticks"])
                 command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
                 # Fixed low-pass decoder; no access to food or world coordinates.
