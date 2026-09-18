@@ -74,3 +74,24 @@ test('strategy comparisons distinguish seeds, maps, founders, opponents and engi
  assert.ok(comparisonDifferences([comparisonRun,{...other,evaluation_context:'engine-b'}]).includes('Evaluation version'));
  assert.ok(comparisonDifferences([comparisonRun,{...other,evaluation_context:undefined}]).includes('Evaluation version unavailable'));
 });
+
+const {evaluationCount}=await moduleAt('../src/features/training/plan.ts');
+const {evaluationConditions}=await moduleAt('../src/features/training/comparison.ts');
+test('every map/seed and mirrored position is charged before training starts',()=>{
+ const conditions=[{map_id:'orchard',seed:42},{map_id:'scarcity',seed:7}];
+ assert.equal(evaluationCount({...trainingPlan,conditions}),8);
+ assert.ok(planProblem({...trainingPlan,conditions}));
+ assert.equal(planProblem({...trainingPlan,conditions,budget:8}),null);
+ assert.equal(evaluationCount({...trainingPlan,conditions,mode:'contest'}),16);
+ for(const invalid of [[],[...conditions,...conditions],[{map_id:'maze',seed:NaN}],[{map_id:'unknown',seed:42}],Array.from({length:5},(_,seed)=>({map_id:'maze',seed}))])assert.ok(planProblem({...trainingPlan,conditions:invalid,budget:96}));
+ assert.equal(planProblem({...trainingPlan,conditions:Array.from({length:4},(_,seed)=>({map_id:'maze',seed})),budget:16}),null);
+});
+test('comparison uses all effective conditions and retains implicit legacy conditions',()=>{
+ const legacy=comparisonRun;
+ assert.deepEqual(evaluationConditions(legacy.spec),[{map_id:'scarcity',seed:42}]);
+ const explicit={...legacy,spec:{...legacy.spec,evaluation_conditions:[{map_id:'scarcity',seed:42}]}};
+ assert.deepEqual(comparisonDifferences([legacy,explicit]),[]);
+ const multiple={...explicit,spec:{...explicit.spec,evaluation_conditions:[...explicit.spec.evaluation_conditions,{map_id:'maze',seed:7}]}};
+ assert.ok(comparisonDifferences([legacy,multiple]).includes('Evaluation conditions'));
+ assert.deepEqual(comparisonDifferences([multiple,{...multiple,spec:{...multiple.spec,evaluation_conditions:[...multiple.spec.evaluation_conditions].reverse()}}]),[]);
+});

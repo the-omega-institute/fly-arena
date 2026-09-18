@@ -36,6 +36,11 @@ def initialize(db):
     ''')
 
 
+class EvaluationCondition(StrictModel):
+    map_id: Literal['orchard','maze','scarcity','ring']
+    seed: int = Field(ge=0, le=2**31-1, strict=True)
+
+
 class TrainingSpec(StrictModel):
     name: str = Field(default='My evolution', min_length=1, max_length=64)
     founder_id: str = Field(pattern=r'^[0-9a-f]{32}$')
@@ -50,11 +55,20 @@ class TrainingSpec(StrictModel):
     mode: Literal['forage','contest'] = 'forage'
     duration_seconds: int = Field(default=2,ge=1,le=10)
     seed: int = Field(default=42,ge=0,le=2**31-1)
+    evaluation_conditions: list[EvaluationCondition] | None = Field(default=None,min_length=1,max_length=4)
     bridge_profile: Literal['legacy-v1','sensorimotor-research-v2'] = 'legacy-v1'
 
     @property
-    def trials(self):
+    def positions_per_condition(self):
         return 1 if self.mode=='forage' else 2
+
+    @property
+    def conditions(self):
+        return self.evaluation_conditions or [EvaluationCondition(map_id=self.map_id, seed=self.seed)]
+
+    @property
+    def trials(self):
+        return len(self.conditions)*self.positions_per_condition
 
     @property
     def evaluations(self):
@@ -67,9 +81,29 @@ class TrainingSpec(StrictModel):
         elif not self.circuits:raise ValueError('Choose at least one circuit')
         if len(set(self.circuits))!=len(self.circuits):raise ValueError('Choose distinct circuits')
         if self.mode=='contest' and self.opponent_id is None:raise ValueError('Choose a fixed opponent')
+        if len({(c.map_id,c.seed) for c in self.conditions})!=len(self.conditions):
+            raise ValueError('Choose distinct map/seed conditions')
         if self.evaluations>self.max_evaluations:
             raise ValueError(f'This plan needs {self.evaluations} evaluations; budget is {self.max_evaluations}')
         return self
+
+
+def condition_results(spec, matches):
+    """Only complete condition groups get a score; retain every match for replay."""
+    results=[]
+    for index, condition in enumerate(spec.conditions):
+        group=matches[index*spec.positions_per_condition:(index+1)*spec.positions_per_condition]
+        verified=sum(m is not None and m['status']=='verified' for m in group)
+        fitness=None
+        if len(group)==spec.positions_per_condition and verified==spec.positions_per_condition:
+            scores=[m['result']['scores'][position] -
+                    (m['result']['scores'][1-position] if spec.mode=='contest' else 0)
+                    for position,m in enumerate(group)]
+            if all(math.isfinite(score) for score in scores):fitness=sum(scores)/len(scores)
+        results.append(dict(condition=condition.model_dump(),fitness=fitness,
+                            evaluations_completed=verified,evaluations_total=spec.positions_per_condition,
+                            matches=group))
+    return results
 
 
 class ProposedCandidate(StrictModel):
@@ -130,7 +164,10 @@ class TrainingService:
             if key:
                 prior=db.execute('SELECT * FROM training_keys WHERE owner=? AND key=?',(owner,key)).fetchone()
                 if prior:
-                    if prior['spec']!=raw:raise ValueError('Idempotency key already used for another training plan')
+                    # Historical plans have no evaluation_conditions field. Compare
+                    # parsed plans so their original idempotency keys still work.
+                    if TrainingSpec.model_validate_json(prior['spec']).model_dump()!=spec.model_dump():
+                        raise ValueError('Idempotency key already used for another training plan')
                     return self.get(prior['run_id'])
             for fly_id in [spec.founder_id]+([spec.opponent_id] if spec.mode=='contest' else []):
                 row=db.execute('SELECT spec FROM flies WHERE id=?',(fly_id,)).fetchone()
@@ -152,6 +189,7 @@ class TrainingService:
         for member in members:
             member['fly']=self.store.fly(member['fly_id'])
             member['matches']=[matches[r['match_id']] for r in evaluations if r['generation']==member['generation'] and r['slot']==member['slot']]
+            member['condition_results']=condition_results(spec,member['matches'])
         completed=sum(m is not None and m['status']=='verified' for m in matches.values())
         result.update(members=members,evaluations_total=spec.evaluations,evaluations_started=len(evaluations),evaluations_completed=completed,
                       progress=completed/spec.evaluations)
@@ -259,9 +297,10 @@ class TrainingService:
             if any(m['status']=='failed' for m in matches):
                 raise ValueError('Evaluation failed: '+next(m['error'] or m['id'] for m in matches if m['status']=='failed'))
             if member['fitness'] is None and len(matches)==spec.trials and all(m['status']=='verified' for m in matches):
-                # Contest fitness is the mean food margin in the two swapped slots.
-                scores=[m['result']['scores'][trial]-(m['result']['scores'][1-trial] if spec.mode=='contest' else 0) for trial,m in enumerate(matches)]
-                if not all(math.isfinite(score) for score in scores):raise ValueError('Non-finite evaluation score')
+                # Equal weight per complete condition; contest conditions each
+                # contain the two mirrored positions, never a partial pair.
+                scores=[r['fitness'] for r in member['condition_results']]
+                if any(score is None for score in scores):raise ValueError('Non-finite evaluation score')
                 member['fitness']=sum(scores)/len(scores)
                 with self.store.db() as db:db.execute('UPDATE training_members SET fitness=? WHERE run_id=? AND generation=? AND slot=?',(member['fitness'],run['id'],member['generation'],member['slot']))
         # Read control again: a user may pause while compilation/recording is in flight.
@@ -296,8 +335,10 @@ class TrainingService:
             return
         member=next(m for m in current if m['fitness'] is None)
         trial=len(member['matches']);ids=[member['fly_id']]
-        if spec.mode=='contest':ids=[member['fly_id'],spec.opponent_id] if trial==0 else [spec.opponent_id,member['fly_id']]
-        request=MatchRequest(fly_ids=ids,map_id=spec.map_id,mode=spec.mode,seed=spec.seed,duration_seconds=spec.duration_seconds,bridge_profile=spec.bridge_profile).model_dump()
+        condition=spec.conditions[trial//spec.positions_per_condition]
+        position=trial%spec.positions_per_condition
+        if spec.mode=='contest':ids=[member['fly_id'],spec.opponent_id] if position==0 else [spec.opponent_id,member['fly_id']]
+        request=MatchRequest(fly_ids=ids,map_id=condition.map_id,mode=spec.mode,seed=condition.seed,duration_seconds=spec.duration_seconds,bridge_profile=spec.bridge_profile).model_dump()
         # Admission checks the control flag again within the same DB transaction.
         match=self.store.add_match(run['owner'],request,run['runtime_hash'],training=(run['id'],generation,member['slot'],trial))
         if match:

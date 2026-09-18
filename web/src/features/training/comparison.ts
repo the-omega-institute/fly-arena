@@ -1,8 +1,12 @@
+export type EvaluationCondition={map_id:string;seed:number}
+export function evaluationConditions(spec:{map_id:string;seed:number;evaluation_conditions?:EvaluationCondition[]|null}):EvaluationCondition[]{
+  return spec.evaluation_conditions??[{map_id:spec.map_id,seed:spec.seed}]
+}
 export type ComparableRun = {
   id:string; status:string; evaluation_context?:string;
   spec:{name:string;strategy:string;founder_id:string;opponent_id:string|null;map_id:string;
     mode:string;duration_seconds:number;seed:number;bridge_profile:string;population:number;
-    generations:number;max_evaluations:number;circuits:string[];mutation_strength:number};
+    generations:number;max_evaluations:number;circuits:string[];mutation_strength:number;evaluation_conditions?:EvaluationCondition[]|null};
   baseline_fitness:number|null; evaluations_started:number; evaluations_completed:number;
   evaluations_total:number; members:{generation:number;slot:number;fitness:number|null}[];
 }
@@ -24,9 +28,10 @@ export function summarizeRun(run:ComparableRun){
 
 export function comparisonDifferences(runs:ComparableRun[]):string[]{
   if(runs.length<2)return []
-  const fields=[['founder_id','Starting fly'],['map_id','Environment'],['mode','Objective'],
+  const fields=[['founder_id','Starting fly'],['mode','Objective'],
     ['duration_seconds','Seconds per evaluation'],['seed','Seed'],['bridge_profile','Match scientific profile']] as const
   const differences:string[]=fields.filter(([field])=>new Set(runs.map(r=>r.spec[field])).size>1).map(([,label])=>label)
+  if(new Set(runs.map(r=>JSON.stringify(evaluationConditions(r.spec).map(c=>[c.map_id,c.seed]).sort()))).size>1)differences.push('Evaluation conditions')
   if(runs.some(r=>r.spec.mode==='contest')&&new Set(runs.map(r=>r.spec.opponent_id)).size>1)differences.push('Fixed opponent')
   if(runs.some(r=>!r.evaluation_context))differences.push('Evaluation version unavailable')
   else if(new Set(runs.map(r=>r.evaluation_context)).size>1)differences.push('Evaluation version')
