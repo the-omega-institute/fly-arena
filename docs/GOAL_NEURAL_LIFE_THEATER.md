@@ -433,3 +433,9 @@ judge:                event-conservation-v1
 API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读取这些只读精选资产。这样部署实例即使没有源 SQLite，也会把实际验证过的比赛列在首页并提供相同的三维场景、时间轴、事件和 provenance；公开资产不会成为可写训练会话。同步通过 `scripts/sync_mac.py var/research/replay-gallery-v1` 在维护窗口中显式执行，不会把 `var/` 默认打进源代码包。
 
 当前本地已为 `aca9ac97af8a4cfcb863c3b45da5e857` 的 attempt 2 生成 68,547,647 字节精选包；它保持 30 秒双体竞争、slot 1 摄取和独立 receipt，不把旧回放与新回放拼接。NyxID 节点查询在 2026-09-19 仍因 `nyx-api.chrono-ai.fun` DNS 不可达而未能执行远端同步，因此没有声称 Mac Studio 或 4060 已更新；待连接恢复后按上述显式资产包流程同步并重新做 API smoke。
+
+## 精选回放保留参赛设计
+
+只读回放现在携带双方 FlySpec、工件 ID、预算和父代 ID。生成包前核对参赛者顺序、工件身份、请求与原比赛 receipt；前端神经剧场、修改摘要、谱系提示和观测导出优先使用这份记录，即使部署端果蝇库为空也可解释设计。它不会把这些样本写入账号或可训练果蝇库。
+
+使用真实双体样本完成了隔离 API 验证：临时 Store 的比赛数为 0，列表、详情、scene、59 MB frames、events、receipt 均返回 200。该验证使用进程内 ASGI 请求，不代表远端部署或浏览器视觉验收完成。新增回归覆盖空果蝇库、同 ID 不同参数的库记录、缺失资产声明及参赛工件不匹配；31 项相关后端测试、52 项前端测试和生产构建通过。

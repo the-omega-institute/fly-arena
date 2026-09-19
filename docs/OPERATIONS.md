@@ -38,3 +38,9 @@ The app-only service `institute.omega.fly-arena-alpha` has been installed with `
 The optional `--public-tunnel` flag is staged only. Automatic approval review rejected public exposure; do not enable it until the user explicitly approves making the web app, published designs/replays and beta registration API reachable to anyone with the URL. The tunnel does not expose SSH, raw local folders or a credential manager.
 
 Remote smoke examples are created by `scripts/remote_smoke.py`; the token stays inside the script’s environment. All five initial API runs and its AI paired series completed successfully. A copy of their receipts/results/timings is under `docs/evidence/`.
+
+Selected bundles also include the contestants' saved FlySpecs and mutation
+budgets, matched to the receipt's participant order and artifact identities.
+The neural theatre and observation export prefer these snapshots over the live
+fly library. The receipt's canonical ID (`source.receipt_sha256`) and the hash
+of its file bytes (`source.receipt_file_sha256`) are recorded separately.

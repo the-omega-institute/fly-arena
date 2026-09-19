@@ -205,3 +205,22 @@ test('observations follow the selected second fly and show its real parent and z
   assert.doesNotMatch(html,/NaN|Infinity/)
   assert.match(html,/aria-pressed="true"[^>]*>.*Slot 2 · Descendant/)
 })
+
+test('portable replay shows the recorded design without a library and prefers it over a live copy', () => {
+  const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+  const recorded={id:'portable',name:'Nectar',color:'mint',artifact_id:'frozen-artifact',
+    spec:{parent_id:'parent-recorded',connectome_sha256:'frozen-connectome',model_profile:'malecns-lif-cpu-v1',
+      weight_mutations:[{selector:'olfactory',scale:1.1}],edge_deltas:[],neuron_parameters:{tau_scale:1.05,threshold_shift_mv:0.1}},
+    report:{budget_used:12,budget_limit:100}}
+  const live=fly(recorded.id,{spec:{...recorded.spec,weight_mutations:[{selector:'olfactory',scale:1.9}]}})
+  for(const library of [[],[live]]){
+    const html=render(MatchObservations,{scene:{flies:[recorded]},frames:[],flies:library,selectedId:recorded.id,
+      season:null,match:{id:'match',participants:[recorded]}})
+    const text=textOnly(html)
+    assert.match(text,/olfactory ×1.100/)
+    assert.match(text,/τ ×1.050/)
+    assert.match(text,/12.0 \/ 100/)
+    assert.match(text,/parent-r/)
+    assert.doesNotMatch(text,/×1.900|No saved FlySpec|NaN/)
+  }
+})
