@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from 'react'
 import {ArrowDownToLine,AudioLines,GitBranch} from 'lucide-react'
 import {api} from '../../api'
-import type {Fly,Frame,Match,ReplayEvent,Scene,Season} from '../../types'
+import type {Fly,Frame,Match,ReplayEvent,ReplayParticipant,Scene,Season} from '../../types'
 import {colors} from '../../types'
 import {useI18n} from '../../shared/i18n'
 
@@ -51,7 +51,7 @@ type Graph={neurons:{id:string;type:string;side?:string|null;class?:string;nt?:s
 type ReplayReceipt={schema?:string;sha256?:string;connectome_sha256?:string;neuron_count?:number;edge_count?:number;request?:{bridge_profile?:string;sensory_profile?:string};runtime?:{machine?:string;python?:string;mujoco?:string;bridge_profile?:string;readout_weights_sha256?:string;model?:{id?:string};sensory_profile?:{id?:string}}}
 type BrainView='region'|'class'|'local'
 
-function BrainTheater({frame,frames,season,fly,slot,events,onSeek}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:Fly;slot:number;events:ReplayEvent[];onSeek:(time:number)=>void}) {
+function BrainTheater({frame,frames,season,fly,slot,events,onSeek}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:ReplayParticipant;slot:number;events:ReplayEvent[];onSeek:(time:number)=>void}) {
   const {t,locale}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null); const [selectedEvent,setSelectedEvent]=useState<ReplayEvent|null>(null)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
   const sampleIds=useMemo(()=>{
@@ -102,8 +102,10 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     api<ReplayReceipt>('/matches/'+encodeURIComponent(match.id)+'/receipt',{signal:controller.signal}).then(value=>{if(active)setReceipt(value)}).catch(()=>{if(active)setReceipt(null)})
     return()=>{active=false;controller.abort()}
   },[match?.id])
-  const participant=scene.flies[slot],fly=flies.find(f=>f.id===participant?.id)
-  const parent=flies.find(f=>f.id===fly?.spec.parent_id)
+  // Exported designs belong to this run; they take precedence over the live library.
+  const recordedFlies:ReplayParticipant[]=[...(match?.participants||[]),...flies]
+  const participant=scene.flies[slot],fly=recordedFlies.find(f=>f.id===participant?.id)
+  const parent=recordedFlies.find(f=>f.id===fly?.spec.parent_id)
   const circuits=season?.connectome.circuits||[]
   const visibleEvents=useMemo(()=>events.length?events:scene.flies.flatMap((_,index)=>deriveEvents(frames,index)),[events,frames,scene.flies])
   function download(){
@@ -111,14 +113,14 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
       receipt_sha256:match?.result?.receipt_sha256||null,events:visibleEvents,
       units:{time:'seconds',position:'mm',circuit_activity:'Hz',neuron_activity:'model-native activity',energy:'game reserve units',score:'food units',touch:'MuJoCo contact boolean'},
       scope:'Recorded circuit averages, fixed canonical neuron samples, sensor provenance and body observations. This export does not contain all 165,122 neuron traces; the immutable run assets remain the research source.',
-      participants:scene.flies.map((entry,slot)=>({slot,...entry,spec:flies.find(f=>f.id===entry.id)?.spec||null})),
+      participants:scene.flies.map((entry,slot)=>({slot,...entry,spec:recordedFlies.find(f=>f.id===entry.id)?.spec||null})),
       samples:frames.map(({time,tick,positions,scores,energy,food,drives,traces,brain,senses})=>({time,tick,positions,scores,energy,food,drives,traces,brain,senses}))}
     const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}))
       const link=document.createElement('a');link.href=url;link.download=`fly-arena-${match?.id||'match'}-observations.json`;link.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
   }
   function participantCard(index:number){
     const entry=scene.flies[index]
-    const subjectFly=flies.find(f=>f.id===entry?.id)
+    const subjectFly=recordedFlies.find(f=>f.id===entry?.id)
     const color=colors[entry?.color]||colors.mint
     const circuitPeak=(id:string)=>Math.max(1,...frames.map(f=>f.traces?.[index]?.[id]??0))
     const scorePeak=Math.max(1,...frames.map(f=>f.scores?.[index]??0))
@@ -130,10 +132,10 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
       <BrainTheater frame={frame} frames={frames} season={season} fly={subjectFly} slot={index} events={visibleEvents} onSeek={onSeek}/>
     </div>
   }
-  const connectomeIds=[...new Set(scene.flies.map(entry=>flies.find(f=>f.id===entry.id)?.spec.connectome_sha256).filter(Boolean))]
-  const modelIds=[...new Set(scene.flies.map(entry=>flies.find(f=>f.id===entry.id)?.spec.model_profile).filter(Boolean))]
+  const connectomeIds=[...new Set(scene.flies.map(entry=>recordedFlies.find(f=>f.id===entry.id)?.spec.connectome_sha256).filter(Boolean))]
+  const modelIds=[...new Set(scene.flies.map(entry=>recordedFlies.find(f=>f.id===entry.id)?.spec.model_profile).filter(Boolean))]
   const mutationSummary=scene.flies.map((entry,index)=>{
-    const subject=flies.find(f=>f.id===entry.id)
+    const subject=recordedFlies.find(f=>f.id===entry.id)
     const spec=subject?.spec
     if(!spec)return `${t('Slot')} ${index+1}: ${t('No saved FlySpec')}`
     const mutations=Array.isArray(spec.weight_mutations)?spec.weight_mutations:[]
@@ -151,7 +153,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     <details className="replay-provenance" open><summary>{t('Replay provenance')} <small>{receipt?t('Receipt loaded'):t('Receipt unavailable')}</small></summary><div className="provenance-grid"><div><span>{t('Map / mode / seed')}</span><strong>{request?`${request.map_id} · ${request.mode} · ${request.seed}`:t('Unavailable')}</strong></div><div><span>{t('Duration')}</span><strong>{request?`${request.duration_seconds} s`:t('Unavailable')}</strong></div><div><span>{t('Connectome')}</span><strong title={connectomeIds[0]||''}>{connectomeIds.length===1?connectomeIds[0]?.slice(0,16):connectomeIds.length?`${connectomeIds.length} ${t('variants')}`:t('Unavailable')}</strong></div><div><span>{t('Model')}</span><strong>{modelIds.length===1?modelIds[0]:modelIds.length?`${modelIds.length} ${t('variants')}`:runtime?.model?.id||t('Unavailable')}</strong></div><div><span>{t('Sensory profile')}</span><strong>{request?.sensory_profile||runtime?.sensory_profile?.id||t('Unavailable')}</strong></div><div><span>{t('Runtime')}</span><strong>{runtime?.mujoco||t('Unavailable')} · {runtime?.machine||'—'}</strong></div><div><span>{t('Decoder')}</span><strong>{runtime?.readout_weights_sha256?runtime.readout_weights_sha256.slice(0,16):t('Unavailable')}</strong></div><div><span>{t('Receipt')}</span><strong title={receipt?.sha256||match?.result?.receipt_sha256||''}>{(receipt?.sha256||match?.result?.receipt_sha256||'').slice(0,16)||t('Unavailable')}</strong></div><div className="provenance-wide"><span>{t('Design mutations')}</span>{mutationSummary.map((summary,index)=><strong key={index}>{summary}</strong>)}</div></div><small className="provenance-note">{t('Values come from the match request, saved FlySpec and immutable receipt. Missing runtime fields stay unavailable.')}</small></details>
     <div className="observation-subjects" role="group" aria-label={t('Observed fly')}>{scene.flies.map((entry,i)=><button key={i} className={!compare&&slot===i?'active':''} aria-pressed={!compare&&slot===i} onClick={()=>{setCompare(false);setSlot(i)}}><i style={{background:colors[entry.color]}}/>{t('Slot')} {i+1} · {entry.name}<small>{entry.id.slice(0,8)}</small></button>)}{scene.flies.length>1&&<button className={'comparison-toggle '+(compare?'active':'')} aria-pressed={compare} onClick={()=>setCompare(value=>!value)}>{compare?t('Focus one fly'):t('Compare participants')}</button>}</div>
     {compare?<div className="observation-comparison">{scene.flies.map((_,index)=>participantCard(index))}</div>:participantCard(slot)}
-    <div className="observation-lineage"><GitBranch size={16}/><span>{t('Parent design')}: <strong>{fly?.spec.parent_id?`${parent?.name||t('Unavailable')} · ${fly.spec.parent_id.slice(0,8)}`:fly?t('Founder / no parent'):t('Not recorded')}</strong></span><span>{t('Mutation budget')}: {shown(fly?.report.budget_used)} / {fly?.report.budget_limit??'—'}</span></div>
+    <div className="observation-lineage"><GitBranch size={16}/><span>{t('Parent design')}: <strong>{fly?.spec.parent_id?`${parent?.name||t('Unavailable')} · ${fly.spec.parent_id.slice(0,8)}`:fly?t('Founder / no parent'):t('Not recorded')}</strong></span><span>{t('Mutation budget')}: {shown(fly?.report?.budget_used)} / {fly?.report?.budget_limit??'—'}</span></div>
     <p className="observation-note">{frames.length} {t('recorded samples')} · {frames[0]?.time.toFixed(2)}–{frames.at(-1)?.time.toFixed(2)} s · {t('Circuit averages; each chart uses its own scale. Energy is a game reserve, not metabolic measurement.')}</p>
   </section>
 }
