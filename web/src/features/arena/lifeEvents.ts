@@ -20,7 +20,7 @@ export function lifeEventPage(events:ReplayEvent[],page:number) {
 }
 
 export function lifeEventPageAtTime(events:ReplayEvent[],time:number) {
-  const next=events.findIndex(event=>event.tick*.0001>time)
+  const next=events.findIndex(event=>event.tick/10000>time)
   const current=next===-1?events.length-1:Math.max(0,next-1)
   return Math.floor(Math.max(0,current)/LIFE_EVENT_PAGE_SIZE)
 }

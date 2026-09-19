@@ -9,7 +9,7 @@ export function LifeEventTimeline({events,slot,time,onSelect,label}:{events:Repl
   useEffect(()=>setPage(0),[events,slot,kind])
   const filtered=useMemo(()=>lifeEvents(events,slot,kind),[events,slot,kind])
   const shown=lifeEventPage(filtered,page)
-  const next=filtered.findIndex(event=>event.tick*.0001>time)
+  const next=filtered.findIndex(event=>event.tick/10000>time)
   const lastObserved=filtered[(next===-1?filtered.length:next)-1]
   return <div className="event-timeline life-event-navigation">
     <div className="life-event-toolbar"><strong>{t('Life events')}</strong>

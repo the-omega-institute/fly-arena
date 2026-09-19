@@ -86,6 +86,8 @@ test('playhead location finds the containing event page at start, middle and end
   assert.equal(lifeEventPageAtTime(events,13),1)
   assert.equal(lifeEventPageAtTime(events,100),3)
   assert.equal(lifeEventPageAtTime([],4),0)
+  const boundary=[...Array.from({length:12},(_,i)=>({tick:i,type:'intake'})),{tick:300,type:'intake'}]
+  assert.equal(lifeEventPageAtTime(boundary,.03),1) // Exact recorded decimal time, without multiplication drift.
 })
 
 test('event seeking uses actual post-event samples at 20 Hz, 100 Hz and irregular cadence',()=>{
