@@ -28,7 +28,7 @@ from .neural import PROFILE
 from .models import catalog as model_catalog, require_model_bridge
 from .runner import runtime_manifest
 from .experiments.embodied_sensor import catalog as sensory_catalog
-from .bridge import match_profiles, require_bridge
+from .bridge import match_profiles, require_bridge, training_profiles, require_training_bridge
 from .scenarios import MAPS, RULES, scenario, arena_scene
 from .store import Store
 from .worker import Worker
@@ -135,6 +135,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 "runtime_sha256": digest(runtime_manifest()),
                 "sensory_profiles": sensory_catalog(),
                 "training_sensory_profiles": sensory_catalog(),
+                "training_bridge_profiles": training_profiles(),
                 "training_fitness_objectives": FITNESS_OBJECTIVES,
                 "gallery_copy_available": True,
                 "readout": json.loads((DATA / "connectome/readout.json").read_text()),
@@ -260,7 +261,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
 
     @app.post("/api/v1/training", status_code=202)
     def training_create(body: TrainingSpec, owner: dict = Depends(identity), idempotency_key: str | None = Header(default=None)):
-        require_bridge(body.bridge_profile)
+        require_training_bridge(body.bridge_profile)
         with compile_lock:
             ids = [body.founder_id] + ([body.opponent_id] if body.mode == 'contest' else [])
             for fly_id in ids:

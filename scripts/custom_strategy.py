@@ -69,6 +69,7 @@ def main():
     parser.add_argument('--map',choices=['orchard','maze','scarcity','ring','terrarium','enclosure'],default='orchard')
     parser.add_argument('--fitness-objective', choices=['food','sustained-foraging-v1'], default='food', help='Candidate selection objective; sustained foraging uses intake timing and recorded posture')
     parser.add_argument('--sensory-profile', default='odor-only-v1', help='Sensory profile from the server season catalog; fixed across evaluations')
+    parser.add_argument('--bridge-profile', choices=['legacy-v1','sensorimotor-research-v2'], default='legacy-v1', help='Sensorimotor setup from training_bridge_profiles; research v2 requires LIF and odor-only input')
     parser.add_argument('--seed',type=int,default=42)
     parser.add_argument('--key',default=uuid.uuid4().hex)
     parser.add_argument('--save-best',action='store_true')
@@ -100,7 +101,7 @@ def main():
                 'name':args.name,'optimizer_name':args.name,'strategy':'external','founder_id':founder,
                 'circuits':[], 'population':args.population,'generations':args.generations,
                 'max_evaluations':args.budget,'duration_seconds':args.seconds,'map_id':args.map,
-                'seed':args.seed,'mode':'forage','bridge_profile':'legacy-v1', **({'sensory_profile':args.sensory_profile} if args.sensory_profile!='odor-only-v1' else {}), **({'fitness_objective':args.fitness_objective} if args.fitness_objective!='food' else {}),
+                'seed':args.seed,'mode':'forage','bridge_profile':args.bridge_profile, **({'sensory_profile':args.sensory_profile} if args.sensory_profile!='odor-only-v1' else {}), **({'fitness_objective':args.fitness_objective} if args.fitness_objective!='food' else {}),
             })
         if run['spec']['strategy']!='external':parser.error('This session is managed by a built-in strategy.')
         ident=run['id'];path='/training/'+ident
