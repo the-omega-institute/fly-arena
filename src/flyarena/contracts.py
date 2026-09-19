@@ -85,7 +85,7 @@ class FlySpec(StrictModel):
 
 
 BridgeProfile = Literal["legacy-v1", "sensorimotor-research-v2"]
-SensoryProfile = Literal["odor-only-v1", "engineered-multimodal-v1", "engineered-multimodal-v2", "engineered-touch-response-v1", "engineered-contact-context-v1", "engineered-contact-support-v1"]
+SensoryProfile = Literal["odor-only-v1", "engineered-multimodal-v1", "engineered-multimodal-v2", "engineered-touch-response-v1", "engineered-contact-context-v1", "engineered-contact-support-v1", "engineered-kernel-contact-v1"]
 
 
 class MatchRequest(StrictModel):

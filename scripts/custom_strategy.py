@@ -69,7 +69,7 @@ def main():
     parser.add_argument('--map',choices=['orchard','maze','scarcity','ring','terrarium','enclosure'],default='orchard')
     parser.add_argument('--fitness-objective', choices=['food','sustained-foraging-v1'], default='food', help='Candidate selection objective; sustained foraging uses intake timing and recorded posture')
     parser.add_argument('--sensory-profile', default='odor-only-v1', help='Sensory profile from the server season catalog; fixed across evaluations')
-    parser.add_argument('--bridge-profile', choices=['legacy-v1','sensorimotor-research-v2'], default='legacy-v1', help='Sensorimotor setup from training_bridge_profiles; research v2 requires LIF and odor-only input')
+    parser.add_argument('--bridge-profile', choices=['legacy-v1','sensorimotor-research-v2'], default='legacy-v1', help='Sensorimotor setup from training_bridge_profiles; research v2 requires LIF and a compatible sensory profile')
     parser.add_argument('--seed',type=int,default=42)
     parser.add_argument('--key',default=uuid.uuid4().hex)
     parser.add_argument('--save-best',action='store_true')

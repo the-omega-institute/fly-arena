@@ -27,7 +27,8 @@ def complete_next(store,scores):
     return ident
 
 
-def test_training_can_evaluate_ready_research_assets_without_match_qualification(lab, monkeypatch, tmp_path):
+@pytest.mark.parametrize('sensory', ['odor-only-v1','engineered-kernel-contact-v1'])
+def test_training_can_evaluate_ready_research_assets_without_match_qualification(lab, monkeypatch, tmp_path, sensory):
     from fastapi.testclient import TestClient
     from flyarena.api import create_app
     from flyarena.auth import AuthConfig
@@ -42,7 +43,7 @@ def test_training_can_evaluate_ready_research_assets_without_match_qualification
     with TestClient(create_app(with_worker=False, store=store, auth_config=AuthConfig())) as client:
         client.headers['Authorization'] = 'Bearer ' + user['token']
         body = {'founder_id': parent['id'], 'population': 2, 'generations': 1,
-                'circuits': ['olfactory'], 'bridge_profile': 'sensorimotor-research-v2'}
+                'circuits': ['olfactory'], 'bridge_profile': 'sensorimotor-research-v2', 'sensory_profile': sensory}
         response = client.post('/api/v1/training', json=body)
         assert response.status_code == 202, response.text
         ident = response.json()['id']
@@ -50,6 +51,9 @@ def test_training_can_evaluate_ready_research_assets_without_match_qualification
             service.tick()  # Two candidates, then the first queued evaluation.
         match = store.matches()[0]
         assert match['request']['bridge_profile'] == body['bridge_profile']
+        assert match['request']['sensory_profile'] == sensory
+        assert sensory in training_profiles()[1]['sensory_profiles']
+        assert 'engineered-kernel-contact-v1' not in training_profiles()[0]['sensory_profiles']
         # Ordinary matches still follow their independent admission policy.
         response = client.post('/api/v1/matches', json={
             'fly_ids': [parent['id']], 'mode': 'forage', 'bridge_profile': body['bridge_profile']})

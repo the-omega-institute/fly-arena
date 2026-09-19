@@ -59,8 +59,14 @@ SUPPORT_CONTACT_PROFILE = {
               "aggregation": "Lateral anatomical contacts excluding upward terrain support at tarsal segments below thorax; world-up normal >= sqrt(0.5). Side/underside, non-tarsal and opponent contacts retained; support targets recorded separately."},
     "qualification": "experimental support-aware tactile mapping; no biological calibration or stable behavior claim",
 }
-SEPARATED_CONTACT_PROFILES = {CONTACT_CONTEXT_PROFILE["id"], SUPPORT_CONTACT_PROFILE["id"]}
-PROFILES = {p["id"]: p for p in (PROFILE, ENVIRONMENT_PROFILE, TOUCH_RESPONSE_PROFILE, CONTACT_CONTEXT_PROFILE, SUPPORT_CONTACT_PROFILE)}
+KERNEL_CONTACT_PROFILE = {
+    **SUPPORT_CONTACT_PROFILE, "id": "engineered-kernel-contact-v1",
+    "odor": {"background_mv": 0.0, "gain_mv": 48.0, "encoder": "bilateral-current-v2"},
+    "qualification": "experimental visual, taste and lateral contact currents added to kernel-bridge odor input; no biological calibration or behavioral qualification",
+}
+SUPPORT_CONTACT_PROFILES = {SUPPORT_CONTACT_PROFILE["id"], KERNEL_CONTACT_PROFILE["id"]}
+SEPARATED_CONTACT_PROFILES = {CONTACT_CONTEXT_PROFILE["id"], *SUPPORT_CONTACT_PROFILES}
+PROFILES = {p["id"]: p for p in (PROFILE, ENVIRONMENT_PROFILE, TOUCH_RESPONSE_PROFILE, CONTACT_CONTEXT_PROFILE, SUPPORT_CONTACT_PROFILE, KERNEL_CONTACT_PROFILE)}
 ENVIRONMENT_PROFILES = {ENVIRONMENT_PROFILE["id"], TOUCH_RESPONSE_PROFILE["id"], *SEPARATED_CONTACT_PROFILES}
 
 
@@ -68,20 +74,24 @@ def catalog():
     return [
         {"id": "odor-only-v1", "name": "Bilateral odor only", "ready": True},
         *[{"id": profile["id"], "name": name, "ready": True,
-           "ranking_eligible": False, "bridge_profiles": ["legacy-v1"],
+           "ranking_eligible": False, "bridge_profiles": ["sensorimotor-research-v2" if profile is KERNEL_CONTACT_PROFILE else "legacy-v1"],
            "reason": "Engineered sensory currents; unranked sandbox runs only."}
           for profile, name in ((PROFILE, "Experimental vision + food touch"),
                                 (ENVIRONMENT_PROFILE, "Experimental vision + food / obstacle / opponent touch"),
                                 (TOUCH_RESPONSE_PROFILE, "Experimental touch response · 8 mV"),
                                 (CONTACT_CONTEXT_PROFILE, "Experimental taste + left / right touch"),
-                                (SUPPORT_CONTACT_PROFILE, "Experimental taste + lateral touch without foot support"))],
+                                (SUPPORT_CONTACT_PROFILE, "Experimental taste + lateral touch without foot support"),
+                                (KERNEL_CONTACT_PROFILE, "Experimental kernel vision + taste + lateral touch"))],
     ]
 
 
 def validate_profile(bridge_profile, sensory_profile):
     if sensory_profile not in ("odor-only-v1", *PROFILES):
         raise ValueError("Unknown sensory profile")
-    if sensory_profile in PROFILES and bridge_profile != "legacy-v1":
+    if sensory_profile == KERNEL_CONTACT_PROFILE["id"]:
+        if bridge_profile != "sensorimotor-research-v2":
+            raise ValueError("Kernel sensory input requires sensorimotor-research-v2")
+    elif sensory_profile in PROFILES and bridge_profile != "legacy-v1":
         raise ValueError("Experimental sensory input currently supports legacy-v1 only")
 
 
@@ -124,7 +134,14 @@ class EmbodiedSensor:
         }
         self.sha256 = digest(self.manifest)
 
-    def apply(self, brain, odor_left, odor_right, visual_left=0., visual_right=0., touch=0., *, taste=0., touch_left=0., touch_right=0.):
+    def apply(self, brain, odor_left, odor_right, visual_left=0., visual_right=0., touch=0., *, taste=0., touch_left=0., touch_right=0., backend=None):
+        kernel = self.profile["id"] == KERNEL_CONTACT_PROFILE["id"]
+        if kernel:
+            from ..backend import CPUBrainBackend
+            if not isinstance(backend, CPUBrainBackend) or backend.brain is not brain:
+                raise ValueError("Kernel sensory input requires this brain's CPU backend")
+        elif backend is not None:
+            raise ValueError("Legacy sensory input cannot use a kernel backend")
         separated = self.profile["id"] in SEPARATED_CONTACT_PROFILES
         if separated and touch != 0:
             raise ValueError("Use taste and lateral touch for the separated contact profile")
@@ -139,7 +156,9 @@ class EmbodiedSensor:
                 raise ValueError(f"{name} requires an annotated sensory group")
         # Reuse the unchanged odor encoder; zero extra inputs exactly preserve
         # its current, including on fixtures with overlapping circuit labels.
-        brain.stimulate(float(odor_left), float(odor_right))
+        # The research backend has a distinct 48 mV, zero-background odor input.
+        # Never replace it with the legacy 8 + 40 mV stimulation method.
+        (backend if kernel else brain).stimulate(float(odor_left), float(odor_right))
         gains = {"visual_left": self.profile["visual"]["gain_mv"],
                  "visual_right": self.profile["visual"]["gain_mv"],
                  "touch": self.profile["touch"]["gain_mv"]}

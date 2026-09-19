@@ -1,7 +1,7 @@
 """Independent admission of a trusted worker's evidence, never its winner field."""
 from __future__ import annotations
 
-from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILE
+from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILES
 
 import json
 import math
@@ -180,7 +180,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                 contact_values = [sense["touch"]]
                 if separated:
                     sides = sense.get("contact_environment_sides", {})
-                    supports = sense.get("contact_support") if request.sensory_profile == SUPPORT_CONTACT_PROFILE["id"] else []
+                    supports = sense.get("contact_support") if request.sensory_profile in SUPPORT_CONTACT_PROFILES else []
                     if not isinstance(supports, list) or any(not isinstance(t, str) or t not in targets or not t.startswith("obstacle-") for t in supports):
                         raise ValueError("Invalid terrain support observations")
                     if (set(sides) != {"left", "right", "center"} or
