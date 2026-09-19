@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from flyarena.common import digest, file_sha, write_json
-from flyarena.experiments.embodied_sensor import EmbodiedSensor, PROFILE, ENVIRONMENT_PROFILE
+from flyarena.experiments.embodied_sensor import EmbodiedSensor, PROFILE, ENVIRONMENT_PROFILE, TOUCH_RESPONSE_PROFILE, ENVIRONMENT_PROFILES
 from flyarena.neural import Brain
 from flyarena.rate import RateBrain
 
@@ -76,7 +76,7 @@ def test_full_connectome_uses_official_tactile_and_side_annotations():
         assert np.all(g.side[encoder.groups[name]]==sign)
 
 
-@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE])
+@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE, TOUCH_RESPONSE_PROFILE])
 def test_real_physics_records_inputs_and_encoder_manifest(tmp_path, monkeypatch, profile):
     from test_replay_parity import tiny_assets
     from flyarena.connectome import Connectome
@@ -95,12 +95,16 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path, monkeypatch,
     graph=Connectome(data);artifact=Compiler(graph).compile(
         FlySpec(name='fixture',connectome_sha256=manifest['sha256']),publish=True,root=var)
     fly=dict(id='a'*32,name='fixture',color='mint',artifact_id=artifact['artifact_id'])
-    if profile == ENVIRONMENT_PROFILE:
+    if profile["id"] in ENVIRONMENT_PROFILES:
         # A declared fixture places an anatomical body against a real wall;
         # the full integration below must carry that MuJoCo contact to the brain.
         from flyarena.scenarios import arena_scene
         scene = arena_scene('enclosure', 42)
         scene['spawns'] = [[11.8, 0, 0]]
+        # Keep food outside this contact fixture: a stronger neural response
+        # may otherwise move the body onto food, which is a genuine contact.
+        scene['food'] = [{**food, 'position': [100.+5*i, 100., food['position'][2]]}
+                         for i, food in enumerate(scene['food'])]
         monkeypatch.setattr('flyarena.runner.arena_scene', lambda *args: dict(scene))
         monkeypatch.setattr('flyarena.judge.receipt_scene', lambda *args: dict(scene))
     request=MatchRequest(fly_ids=[fly['id']],mode='forage',duration_seconds=1,sensory_profile=profile['id'])
@@ -118,7 +122,7 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path, monkeypatch,
         assert encoded['group_manifest_sha256']==digest(scene['sensory_encoder'])
         assert encoded['values']['visual_left']==sense['visual'][0]
         assert encoded['values']['touch']==sense['touch']
-    if profile == ENVIRONMENT_PROFILE:
+    if profile["id"] in ENVIRONMENT_PROFILES:
         contacts = [f['senses'][0] for f in frames[1:] if f['senses'][0]['contact_environment']]
         assert contacts
         assert all(c['neural_input']['values']['touch'] == 1 for c in contacts)
@@ -129,7 +133,7 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path, monkeypatch,
         assert any(f['senses'][0]['visual'][0]>0 for f in frames)
 
 
-@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE])
+@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE, TOUCH_RESPONSE_PROFILE])
 def test_experimental_results_do_not_change_public_ranking(profile):
     from flyarena.services.ranking import rank,tournament_projection
     ids=['a'*32,'b'*32];flies=[{'id':i} for i in ids]
@@ -140,8 +144,30 @@ def test_experimental_results_do_not_change_public_ranking(profile):
     assert all(r['played']==0 for r in tournament_projection([match],ids)['standings'])
 
 
-@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE])
+@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE, TOUCH_RESPONSE_PROFILE])
 def test_research_bridge_cannot_silently_inherit_experimental_input(profile):
     from flyarena.contracts import MatchRequest
     with pytest.raises(ValueError,match='legacy-v1 only'):
         MatchRequest(fly_ids=['a'*32],mode='forage',bridge_profile='sensorimotor-research-v2',sensory_profile=profile['id'])
+
+
+@pytest.mark.parametrize('cls',[Brain,RateBrain])
+def test_opt_in_touch_current_changes_the_target_population_without_touching_other_inputs(cls):
+    g=graph();baseline,subject=cls(g),cls(g)
+    EmbodiedSensor(g,ENVIRONMENT_PROFILE['id']).apply(baseline,.2,.4,.7,.1,1.)
+    candidate=EmbodiedSensor(g,TOUCH_RESPONSE_PROFILE['id'])
+    candidate.apply(subject,.2,.4,.7,.1,1.)
+    baseline.advance(1000);subject.advance(1000)
+    np.testing.assert_array_equal(subject.rates[:6],baseline.rates[:6])
+    assert not baseline.rates[6:].any()
+    assert (subject.rates[6:]>0).all()
+    assert candidate.manifest['profile']['touch']['gain_mv']==8.
+    assert ENVIRONMENT_PROFILE['touch']['gain_mv']==PROFILE['touch']['gain_mv']==.1
+    assert not candidate.profile['ranking_eligible']
+    # No contact reproduces the original input/state exactly, including rate models.
+    baseline.reset();subject.reset()
+    EmbodiedSensor(g,ENVIRONMENT_PROFILE['id']).apply(baseline,.2,.4,.7,.1,0.)
+    candidate.apply(subject,.2,.4,.7,.1,0.)
+    baseline.advance(1000);subject.advance(1000)
+    for key,value in baseline.checkpoint().items():
+        np.testing.assert_array_equal(value,subject.checkpoint()[key])

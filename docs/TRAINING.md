@@ -229,7 +229,7 @@ This example fits a small MLP to observed log circuit multipliers and fitness, r
 
 ## Public evolution gallery
 
-Visitors can open Evolution without logging in and compare explicitly published, completed sessions. Charts retain flat and worsening scores. Each generation exposes candidate weights, parents, budget, actual scores and neural/behavior replays. **Use as starting fly** prepares a new session; it never enqueues work until Start training is pressed.
+Visitors can open Evolution without logging in and compare explicitly published, completed sessions. Charts retain flat and worsening scores. Each generation exposes candidate weights, parents, budget, actual scores and neural/behavior replays. **Save a copy and prepare training** asks you to sign in, saves an owned copy of the full published design, then selects it in a new training plan. The copy preserves its public parent and the source environment, seed, duration and sensory profile. Only **Start training** submits computation. Deployments that do not advertise `gallery_copy_available` show the gallery as read-only.
 
 `POST /api/v1/training/{id}/publish` shares the completed session's designs, scores and replay references; only the owner may publish. `GET /api/v1/training-showcase` and `GET /api/v1/training-showcase/{id}` require no login. Unpublished training remains owner-only. Publication removes account identifiers and operational fields from the response. Local model configuration is never uploaded. Users choose publication explicitly after completion.
 
@@ -245,3 +245,27 @@ matches, tournaments, training conditions and both agent CLI examples. Contact
 with the wall is resolved by MuJoCo; it does not reset the fly or supply an
 automatic turn. Compare sustained movement and feeding as well as scores:
 remaining inside the habitat can also mean that a design got stuck.
+
+
+## Sensory conditions in evolution
+
+Choose **Sensory input profile / 感觉输入模式** when creating a session. Every generation, map/seed condition and mirrored contest position uses the recorded profile. Opening a saved candidate for competition carries the session's bridge, senses and first evaluation condition into the arena. Branching a candidate or public example also restores its sensory/environment settings.
+
+`TrainingSpec.sensory_profile` accepts the same IDs as matches. Its historical default is `odor-only-v1`. Experimental vision/touch profiles currently require `legacy-v1`; incompatible combinations are rejected before evaluation. The API binds the selected profile to the actual compute node runtime. Different sensory profiles are shown as different conditions when comparing algorithms.
+
+Both agent clients accept the same option:
+
+```bash
+python scripts/train.py --founder FLY_ID --map enclosure --seconds 3 --sensory-profile engineered-touch-response-v1
+python scripts/custom_strategy.py --founder FLY_ID --map enclosure --seconds 3 --sensory-profile engineered-touch-response-v1 --plugin my_optimizer.py
+```
+
+For a direct API request, add `"sensory_profile":"engineered-touch-response-v1"` to `POST /api/v1/training`. Reattaching with `--run` uses the recorded plan and does not change conditions. This makes sensory conditions available to optimization; it does not establish that a profile or algorithm improves behavior. The 8 mV profile is an engineering experiment, not biological calibration.
+
+`GET /api/v1/season` advertises `training_sensory_profiles`. Older servers without that field show only odor training in the new UI, and the UI omits the new request field for compatibility. No selected experimental input is silently replaced with an odor-only request.
+
+### Continue from a portable public specimen
+
+`POST /api/v1/training-showcase/{run_id}/flies/{fly_id}/copy` requires an Arena identity. It accepts the published run and specimen IDs, compiles the complete FlySpec, and returns a new owned fly whose `spec.parent_id` is the public specimen. Repeating the same request for the same identity returns the same copy; another identity gets its own copy. No training, match or Lab experiment is scheduled by copying. Use the returned `id` as `founder_id` in a separate training request.
+
+The public specimen remains read-only. Its life record exposes the published training origin, available ancestors and recorded experiences even when the deployment has only portable gallery files and no source database. A specimen page links to the source trajectory for saving a copy before training or competition. The saved copy does not inherit unrecorded within-match state.

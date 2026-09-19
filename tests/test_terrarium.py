@@ -263,3 +263,52 @@ def test_food_contact_eligibility_is_per_fly_and_handles_no_food():
     scene['food'] = []
     empty = Bodies(scene, 2, 42)
     assert empty.feeding_eligibility().shape == (2, 0)
+
+
+def test_obstacle_force_reaches_locomotion_observation():
+    from flygym_demo.complex_terrain.hybrid_controller import HybridControllerObservation
+    from flygym.anatomy import LEGS, BodySegment
+
+    scene = scenario("enclosure", 42)
+    scene["spawns"] = [[11.8, 0, 0]]
+    scene["food"] = []
+    bodies = Bodies(scene, 1, 42)
+    segments = [BodySegment(f"{leg}_{link}") for leg in LEGS
+                for link in ("tibia", "tarsus1", "tarsus2")]
+    observed_obstacle_force = False
+    for _ in range(100):
+        bodies.step(np.array([[1., 1.]]))
+        # One fly, no food: all forces on these anatomical links are from
+        # the floor or obstacles. Compare against the actual contact buffer.
+        total = bodies.sim.get_bodysegment_contact_forces(
+            "fly-0", segments, ground_only=False).reshape(6, 3, 3)
+        obs = HybridControllerObservation.from_sim(bodies.sim, "fly-0")
+        if bodies.environment_contacts(0) and np.linalg.norm(total) > 1e-6:
+            observed_obstacle_force = True
+            np.testing.assert_allclose(obs.stumbling_contact_forces, total, atol=1e-10)
+    assert observed_obstacle_force
+    # The floor sensors still exist; registering terrain must not disable
+    # FlyGym's single-floor sensor setup while attaching contestants.
+    assert bodies.sim.get_ground_contact_info("fly-0")[0].shape == (6,)
+
+
+def test_locomotion_terrain_feedback_excludes_opponents_and_food():
+    from flygym_demo.complex_terrain.hybrid_controller import HybridControllerObservation
+    from flygym.anatomy import LEGS, BodySegment
+
+    scene = scenario("orchard", 42)
+    scene["obstacles"] = []
+    scene["spawns"] = [[0, 0, 0], [0, 0, math.pi]]
+    bodies = Bodies(scene, 2, 42)
+    assert bodies.contact_between_flies()
+    segments = [BodySegment(f"{leg}_{link}") for leg in LEGS
+                for link in ("tibia", "tarsus1", "tarsus2")]
+    assert set(bodies.sim._internal_ground_geom_ids).isdisjoint(bodies.food_geom_ids.values())
+    assert set(bodies.sim._internal_ground_geom_ids).isdisjoint(bodies.geom_slots)
+    for name in bodies.names:
+        observed = HybridControllerObservation.from_sim(bodies.sim, name)
+        total = bodies.sim.get_bodysegment_contact_forces(name, segments, ground_only=False)
+        assert np.linalg.norm(total) > 0
+        # Initial feet are above the floor. Only the overlapping opponent
+        # exerts forces, which must not be reclassified as terrain feedback.
+        np.testing.assert_array_equal(observed.stumbling_contact_forces, 0)

@@ -12,7 +12,7 @@ import numpy as np
 from pydantic import Field, model_validator
 
 from ..common import canonical
-from ..contracts import CircuitId, FlySpec, MatchRequest, StrictModel
+from ..contracts import CircuitId, FlySpec, MatchRequest, SensoryProfile, StrictModel
 
 
 def initialize(db):
@@ -60,6 +60,7 @@ class TrainingSpec(StrictModel):
     seed: int = Field(default=42,ge=0,le=2**31-1)
     evaluation_conditions: list[EvaluationCondition] | None = Field(default=None,min_length=1,max_length=4)
     bridge_profile: Literal['legacy-v1','sensorimotor-research-v2'] = 'legacy-v1'
+    sensory_profile: SensoryProfile = 'odor-only-v1'
 
     @property
     def positions_per_condition(self):
@@ -79,6 +80,8 @@ class TrainingSpec(StrictModel):
 
     @model_validator(mode='after')
     def bounded(self):
+        from ..experiments.embodied_sensor import validate_profile
+        validate_profile(self.bridge_profile, self.sensory_profile)
         if not self.name.strip():raise ValueError('Name cannot be blank')
         if self.strategy == 'external':self.circuits = []
         elif not self.circuits:raise ValueError('Choose at least one circuit')
@@ -246,6 +249,23 @@ class TrainingService:
         # Publishing explicitly shares designs, lineage, scores and replay links.
         # Strip account identifiers and operational fields at every nested level.
         return self._public(self.get(ident))
+
+    def copy_published(self, ident, fly_id, owner, *, agent_channel=False):
+        """Save a new owned fly with the public specimen as its actual parent."""
+        run=self.showcase(ident)
+        if run is None:raise ValueError('Published training session not found')
+        member=next((m for m in run.get('members',[]) if m.get('fly_id')==fly_id),None)
+        if member is None:raise ValueError('Fly is not in this published session')
+        sample=member['fly'];source=FlySpec.model_validate(sample['spec'])
+        parent=self.store.fly(fly_id)
+        if parent is None or parent['artifact_id']!=sample['artifact_id'] or FlySpec.model_validate(parent['spec'])!=source:
+            raise ValueError('Published parent does not match the available source')
+        spec=source.model_copy(update={'parent_id':fly_id})
+        report=self.compiler().compile(spec,publish=True,root=self.store.root)
+        if report['artifact_id']!=sample['artifact_id']:
+            raise ValueError('Published design is incompatible with the current compiler')
+        return self.store.add_fly(owner,spec.model_dump(by_alias=True),report,
+            submission_channel='api',agent_channel=agent_channel,copy_key=f'gallery-copy:{ident}:{fly_id}')
 
     def _public(self,value):
         """Remove account and worker fields from a published or bundled run."""
@@ -482,7 +502,7 @@ class TrainingService:
         condition=spec.conditions[trial//spec.positions_per_condition]
         position=trial%spec.positions_per_condition
         if spec.mode=='contest':ids=[member['fly_id'],spec.opponent_id] if position==0 else [spec.opponent_id,member['fly_id']]
-        request=MatchRequest(fly_ids=ids,map_id=condition.map_id,mode=spec.mode,seed=condition.seed,duration_seconds=spec.duration_seconds,bridge_profile=spec.bridge_profile).model_dump()
+        request=MatchRequest(fly_ids=ids,map_id=condition.map_id,mode=spec.mode,seed=condition.seed,duration_seconds=spec.duration_seconds,bridge_profile=spec.bridge_profile,sensory_profile=spec.sensory_profile).model_dump()
         # Admission checks the control flag again within the same DB transaction.
         match=self.store.add_match(run['owner'],request,run['runtime_hash'],training=(run['id'],generation,member['slot'],trial))
         if match:

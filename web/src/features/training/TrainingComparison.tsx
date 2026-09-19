@@ -55,6 +55,7 @@ export function TrainingComparison({runs,maps,flies,onOpen,initiallyOpen=false}:
           </tr>)}</tbody></table></div>
           <p>{t('Time budget is completed evaluations × configured duration, not wall time or hardware cost. Best score includes the baseline.')}</p>
           <div className="comparison-conditions">{rows.map(({run},i)=><article key={run.id}><strong style={{color:colors[i]}}>{run.spec.name}</strong><dl>
+            <div><dt>{t('Sensory profile')}</dt><dd>{run.spec.sensory_profile||'odor-only-v1'}</dd></div>
             <div><dt>{t('Brain model')}</dt><dd>{run.model_profile||'malecns-lif-cpu-v1'}</dd></div>
             <div><dt>{t('Starting fly')}</dt><dd>{name(run.spec.founder_id)}</dd></div>
             <div><dt>{t('Evaluation conditions')}</dt>{evaluationConditions(run.spec).map((c,i)=><dd key={i}>{maps.find(m=>m.id===c.map_id)?.[locale==='en'?'english':'name']||c.map_id} · {t('Seed')} {c.seed}</dd>)}</div>

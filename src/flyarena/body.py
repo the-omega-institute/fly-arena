@@ -22,6 +22,7 @@ class Bodies:
     def __init__(self, scene: dict, count: int, seed: int):
         self.names = [f"fly-{i}" for i in range(count)]
         world = FlatGroundWorld(half_size=scene["size"])
+        terrain_geoms = []
         for index, obstacle in enumerate(scene["obstacles"]):
             shape = obstacle.get("shape", "box")
             geom_type = {"box": mj.mjtGeom.mjGEOM_BOX,
@@ -40,7 +41,7 @@ class Bodies:
                           contype=4, conaffinity=3, friction=[1, .02, .0001])
             if rgba is not None:
                 kwargs["rgba"] = rgba
-            world.mjcf_root.worldbody.add_geom(**kwargs)
+            terrain_geoms.append(world.mjcf_root.worldbody.add_geom(**kwargs))
         # Food sources are explicit MuJoCo targets. The same sphere is used
         # for ray visibility and for a small, mouth-only contact pair. Food
         # does not collide with legs or terrain: its conaffinity is reserved
@@ -93,6 +94,13 @@ class Bodies:
                 sensor.name = f"{name}/{sensor.name}"
             contact_sensors[name] = world.legpos_to_groundcontactsensors_by_fly[name]
         world.legpos_to_groundcontactsensors_by_fly = contact_sensors
+        # The hybrid gait controller filters leg forces through ground_geoms.
+        # Register our terrain before Simulation maps those IDs, otherwise
+        # physical obstacle collisions are invisible to stumbling correction.
+        # Do this after attaching flies: FlatGroundWorld's floor sensors need
+        # one ground geom, and existing obstacle contact masks/pairs must stay
+        # unchanged. Food probes and other flies are not terrain.
+        world.ground_geoms.extend(terrain_geoms)
         self.sim = Simulation(world, timestep=RULES["physics_dt"])
         self.model, self.data = self.sim.mj_model, self.sim.mj_data
         self.controllers = []
@@ -212,13 +220,8 @@ class Bodies:
                 eligible[slot] = nearby & np.array([f in touched for f in food_ids], dtype=bool)
         return eligible
 
-    def environment_contacts(self, slot: int) -> list[str]:
-        """Actual anatomical contact with obstacles or opponents, excluding ground.
-
-        Ground support and the invisible feeding probe are not environmental
-        touch. This binary observation does not infer receptors or laterality.
-        """
-        touched = set()
+    def _environment_contacts(self, slot: int):
+        """Yield actual anatomical contacts, excluding food probes and ground."""
         probe = self.mouth_contact_geom_ids[slot]
         for contact in self.data.contact:
             if contact.dist > 0:
@@ -235,10 +238,49 @@ class Bodies:
             opponent = self.geom_slots.get(other)
             name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_GEOM, other) or ""
             if opponent is not None and opponent != slot:
-                touched.add(self.names[opponent])
+                yield contact, self.names[opponent]
             elif name.startswith("obstacle-"):
-                touched.add(name)
-        return sorted(touched)
+                yield contact, name
+
+    def environment_contacts(self, slot: int) -> list[str]:
+        return sorted({name for _, name in self._environment_contacts(slot)})
+
+    def is_support_contact(self, slot: int, contact, target: str) -> bool:
+        """Experimental foot/support partition; no physics or forces are changed.
+
+        Only a tarsal contact with terrain, below the thorax and with a normal
+        towards the fly within 45 degrees of world up, counts as support.
+        Side/underside contacts, other body parts and opponents remain tactile.
+        """
+        if not target.startswith("obstacle-"):
+            return False
+        first, second = int(contact.geom1), int(contact.geom2)
+        own = first if self.geom_slots.get(first) == slot else second
+        name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_GEOM, own) or ""
+        if "_tarsus" not in name:
+            return False
+        normal_z = float(contact.frame[2]) * (1 if own == second else -1)
+        return normal_z >= 2 ** -.5 and float(contact.pos[2]) < float(self.data.xpos[self.body_ids[slot], 2])
+
+    def support_contacts(self, slot: int) -> list[str]:
+        return sorted({name for contact, name in self._environment_contacts(slot)
+                       if self.is_support_contact(slot, contact, name)})
+
+    def lateral_environment_contacts(self, slot: int, *, exclude_support: bool = False) -> dict[str, list[str]]:
+        """Contact side in the current thorax frame, not an inferred receptor.
+
+        Local +Y is left. Points within 0.05 mm of the midline are recorded
+        as center; an engineered encoder may send those to both sides.
+        """
+        position, rotation = self.pose(slot)
+        result = {side: set() for side in ('left', 'right', 'center')}
+        for contact, name in self._environment_contacts(slot):
+            if exclude_support and self.is_support_contact(slot, contact, name):
+                continue
+            lateral = float((rotation.T @ (contact.pos - position))[1])
+            side = 'left' if lateral > .05 else 'right' if lateral < -.05 else 'center'
+            result[side].add(name)
+        return {side: sorted(names) for side, names in result.items()}
 
     def step(self, drives: np.ndarray):
         # Observe all flies before writing any controls; advance the shared world once.

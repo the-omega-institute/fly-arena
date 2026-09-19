@@ -476,3 +476,67 @@ def test_bundled_replay_is_listed_without_source_database(lab):
         assert client.get(f'/api/v1/matches/{match_id}').json()['status']=='verified'
         assert client.get(f'/api/v1/matches/{match_id}/scene').json()=={'flies':[]}
         assert client.get(f'/api/v1/matches/{match_id}/receipt').status_code==200
+
+
+@pytest.mark.parametrize('sensory', ['odor-only-v1', 'engineered-multimodal-v2', 'engineered-touch-response-v1'])
+def test_training_keeps_senses_across_generations_conditions_and_mirrored_positions(lab, sensory):
+    store, service, _, parent = lab
+    run = create(lab, mode='contest', opponent_id=parent['id'], sensory_profile=sensory,
+                 evaluation_conditions=[{'map_id':'orchard','seed':42}, {'map_id':'enclosure','seed':43}],
+                 max_evaluations=16)
+    for _ in range(50):
+        service.tick()
+        if any(m['status']=='queued' for m in store.matches()):
+            complete_next(store, [1, 0])  # Explicit lifecycle fixture, not scientific scores.
+        if service.get(run['id'])['status']=='complete':break
+    result=service.get(run['id'])
+    assert result['status']=='complete'
+    matches=[match for member in result['members'] for match in member['matches']]
+    assert len(matches)==16
+    assert all(match['request']['sensory_profile']==sensory for match in matches)
+    assert {m['request']['map_id'] for m in matches}=={'orchard','enclosure'}
+    assert result['spec']['sensory_profile']==sensory
+
+
+def test_training_rejects_incompatible_senses_and_preserves_historical_default(lab):
+    _, _, _, parent = lab
+    legacy=TrainingSpec(founder_id=parent['id'])
+    assert legacy.sensory_profile=='odor-only-v1'
+    with pytest.raises(ValueError,match='legacy-v1'):
+        TrainingSpec(founder_id=parent['id'], bridge_profile='sensorimotor-research-v2',
+                     sensory_profile='engineered-touch-response-v1')
+    with pytest.raises(ValueError):
+        TrainingSpec(founder_id=parent['id'],sensory_profile='invented')
+
+
+def test_training_api_binds_selected_senses_to_node_and_queued_match(lab, monkeypatch):
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    from flyarena.common import digest
+    store, service, user, parent = lab
+    monkeypatch.setattr('flyarena.api.Connectome',lambda:service.compiler().graph)
+    monkeypatch.setattr('flyarena.api.require_bridge',lambda profile:None)
+    calls=[]
+    sensory='engineered-touch-response-v1'
+    runtime={'platform':'fixture-node','sensory_profile':{'id':sensory}}
+    def node_runtime(bridge, senses):
+        calls.append((bridge,senses));return runtime
+    monkeypatch.setattr('flyarena.services.node.configured_node',lambda:SimpleNamespace(runtime=node_runtime))
+    def no_local(**kw):raise AssertionError('Selected node must provide training runtime')
+    monkeypatch.setattr('flyarena.api.runtime_manifest',no_local)
+    with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
+        client.headers['Authorization']='Bearer '+user['token']
+        payload={'founder_id':parent['id'],'population':2,'generations':1,'circuits':['olfactory'], 'sensory_profile':sensory}
+        response=client.post('/api/v1/training',json=payload,headers={'Idempotency-Key':'senses'})
+        assert response.status_code==202,response.text
+        assert calls==[('legacy-v1',sensory)]
+        run=response.json()
+        assert run['evaluation_context']==digest(runtime)
+        for _ in range(3):service.tick()
+        match=next(m for m in store.matches() if m['status']=='queued')
+        assert match['request']['sensory_profile']==sensory
+        assert match['runtime_hash']==digest(runtime)
+        changed={**payload,'sensory_profile':'odor-only-v1'}
+        assert client.post('/api/v1/training',json=changed,headers={'Idempotency-Key':'senses'}).status_code==422

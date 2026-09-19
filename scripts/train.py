@@ -43,6 +43,7 @@ def main():
     p.add_argument('--generations', type=int, default=2)
     p.add_argument('--budget', type=int, default=4)
     p.add_argument('--seconds', type=int, default=1)
+    p.add_argument('--sensory-profile', default='odor-only-v1', help='Sensory profile from the server season catalog; fixed across evaluations')
     p.add_argument('--seed', type=int, default=42)
     p.add_argument('--condition', action='append', type=evaluation_condition,
                    help='Evaluation MAP:SEED; repeat up to four times. Overrides --map/--seed for evaluation only.')
@@ -74,7 +75,7 @@ def main():
                 'strategy': a.strategy, 'map_id': a.map, 'mode': 'contest' if a.opponent else 'forage',
                 'circuits': a.circuits, 'population': a.population, 'generations': a.generations,
                 'max_evaluations': a.budget, 'duration_seconds': a.seconds, 'seed': a.seed,
-                'bridge_profile': 'legacy-v1', 'evaluation_conditions': a.condition,
+                'bridge_profile': 'legacy-v1', **({'sensory_profile':a.sensory_profile} if a.sensory_profile!='odor-only-v1' else {}), 'evaluation_conditions': a.condition,
             })
         path = '/training/'+run['id']
         print('Session:', run['id'], flush=True)

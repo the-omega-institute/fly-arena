@@ -12,14 +12,14 @@ import type {Strategy} from './algorithms'
 import {TrainingComparison} from './TrainingComparison'
 import {ConditionResults} from './ConditionResults'
 import type {ConditionResult} from './ConditionResults'
-import {evaluationConditions} from './comparison'
+import {evaluationConditions,type ComparableRun} from './comparison'
 import type {EvaluationCondition} from './comparison'
-import {evaluationCount,planProblem,memberRole,trainingFocus,trainingHash} from './plan'
+import {evaluationCount,planProblem,memberRole,trainingFocus,trainingHash,competitionSetup} from './plan'
 
-type Plan={evaluation_conditions?:EvaluationCondition[]|null;name:string;founder_id:string;opponent_id:string|null;strategy:Strategy;optimizer_name?:string;circuits:string[];mutation_strength:number;population:number;generations:number;max_evaluations:number;map_id:string;mode:'forage'|'contest';duration_seconds:number;seed:number;bridge_profile:string}
+type Plan={evaluation_conditions?:EvaluationCondition[]|null;name:string;founder_id:string;opponent_id:string|null;strategy:Strategy;optimizer_name?:string;circuits:string[];mutation_strength:number;population:number;generations:number;max_evaluations:number;map_id:string;mode:'forage'|'contest';duration_seconds:number;seed:number;bridge_profile:string;sensory_profile?:string}
 type Member={condition_results?:ConditionResult[];generation:number;slot:number;fly_id:string;saved:number;fitness:number|null;fly:Fly;matches:Match[]}
 type Training={id:string;evaluation_context?:string;spec:Plan;status:string;control:string;error:string|null;members:Member[];evaluations_total:number;evaluations_started:number;evaluations_completed:number;progress:number;best_fly_id:string|null;baseline_fitness:number|null;proposal_generation:number|null;open_slots:number[]}
-type CompetitionSetup={map_id:string;seed:number;duration_seconds:number;opponent_id?:string|null}
+type CompetitionSetup={map_id:string;seed:number;duration_seconds:number;opponent_id?:string|null;bridge_profile:string;sensory_profile:string}
 type Props={flies:Fly[];identity:Identity|null;selected:string;season:Season|null;maps:ArenaMap[];onLogin:()=>void;onSaved:(fly:Fly)=>Promise<void>;onCompete:(fly:Fly,setup?:CompetitionSetup,reference?:Fly)=>void;onReplay:(match:Match)=>void}
 const terminal=(status:string)=>['complete','failed','stopped'].includes(status)
 const statusKey:Record<string,string>={awaiting_candidates:'Waiting for your optimizer',queued:'Queued',running:'Training',paused:'Paused',pausing:'Pausing after evaluation',stopping:'Stopping after evaluation',stopped:'Stopped',complete:'Complete',failed:'Failed'}
@@ -30,6 +30,10 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   const [opponent,setOpponent]=useState(flies.find(f=>f.id!==founder)?.id||'')
   const [name,setName]=useState('Evolution 01')
   const [map,setMap]=useState('orchard')
+  const [sensoryProfile,setSensoryProfile]=useState('odor-only-v1')
+  const sensoryOptions=season?.training_sensory_profiles??[{id:'odor-only-v1',name:'Bilateral odor only',ready:true}]
+  const sensoryReady=sensoryOptions.some(p=>p.id===sensoryProfile&&p.ready)
+  const sensoryLabel=(id:string)=>t(sensoryOptions.find(p=>p.id===id)?.name||id)
   const [mode,setMode]=useState<'forage'|'contest'>('forage')
   const [strategy,setStrategy]=useState<Strategy>('evolution')
   const [optimizerName,setOptimizerName]=useState('My custom optimizer')
@@ -87,9 +91,10 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   async function act(key:string,fn:()=>Promise<void>){setBusy(key);setError('');setMessage('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
   function accept(run:Training){revision.current++;setRuns(old=>[run,...old.filter(r=>r.id!==run.id)]);setLoadedOwner(identity?.id||null);if(focus!==run.id)setFocus(run.id)}
   async function start(){
+    if(!sensoryReady){setError(t('Selected sensory input is unavailable for training.'));return}
     if(!identity){onLogin();return}
     await act('create',async()=>{
-      const run=await api<Training>('/training',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({name,founder_id:founder,opponent_id:mode==='contest'?opponent:null,strategy,optimizer_name:strategy==='external'?optimizerName:'',circuits,mutation_strength:strength,population,generations,max_evaluations:budget,map_id:map,mode,duration_seconds:duration,seed,evaluation_conditions:extraConditions.length?conditions:null,bridge_profile:'legacy-v1'})},identity)
+      const run=await api<Training>('/training',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({name,founder_id:founder,opponent_id:mode==='contest'?opponent:null,strategy,optimizer_name:strategy==='external'?optimizerName:'',circuits,mutation_strength:strength,population,generations,max_evaluations:budget,map_id:map,mode,duration_seconds:duration,seed,evaluation_conditions:extraConditions.length?conditions:null,bridge_profile:'legacy-v1',...(season?.training_sensory_profiles?{sensory_profile:sensoryProfile}:{})})},identity)
       accept(run);setGeneration(null)
     })
   }
@@ -97,9 +102,20 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   async function save(member:Member,next:'library'|'compete'|'parent'|'branch'='library'){if(current)await act(member.fly_id,async()=>{
     const fly=await api<Fly>(`/training/${current.id}/save`,{method:'POST',body:JSON.stringify({fly_id:member.fly_id})},identity)
     await onSaved(fly);accept(await api<Training>(`/training/${current.id}`,{},identity));setMessage(t('Individual saved to your library.'))
-    if(next==='compete'||next==='parent')onCompete(fly,{map_id:current.spec.map_id,seed:current.spec.seed,duration_seconds:current.spec.duration_seconds,opponent_id:current.spec.mode==='contest'?current.spec.opponent_id:null},next==='parent'?current.members.find(parent=>parent.fly_id===member.fly.spec.parent_id)?.fly:undefined)
-    if(next==='branch'){setFounder(fly.id);setName((fly.name.slice(0,44)+' · '+t('New branch')).slice(0,64));setFocus('');setGeneration(null);setMessage(t('Choose a strategy and budget for this descendant.'));requestAnimationFrame(()=>setup.current?.scrollIntoView({block:'start'}))}
+    if(next==='compete'||next==='parent')onCompete(fly,competitionSetup(current.spec),next==='parent'?current.members.find(parent=>parent.fly_id===member.fly.spec.parent_id)?.fly:undefined)
+    if(next==='branch'){restoreEnvironment(current.spec);setFounder(fly.id);setName((fly.name.slice(0,44)+' · '+t('New branch')).slice(0,64));setFocus('');setGeneration(null);setMessage(t('Choose a strategy and budget for this descendant.'));requestAnimationFrame(()=>setup.current?.scrollIntoView({block:'start'}))}
   })}
+  async function copyExample(sample:Fly,spec:ComparableRun['spec'],runId:string){
+    if(!identity){onLogin();return}
+    await act('copy:'+sample.id,async()=>{
+      const fly=await api<Fly>(`/training-showcase/${runId}/flies/${sample.id}/copy`,{method:'POST'},identity)
+      await onSaved(fly);restoreEnvironment(spec);setExampleFounder(fly);setFounder(fly.id)
+      setName((fly.name.slice(0,44)+' · '+t('New branch')).slice(0,64));setFocus('');setGeneration(null)
+      setMessage(t('Copy saved with its public parent. Choose a strategy and budget, then start training.'))
+      requestAnimationFrame(()=>setup.current?.scrollIntoView({block:'start'}))
+    })
+  }
+  function restoreEnvironment(spec:{map_id:string;seed:number;duration_seconds:number;sensory_profile?:string;evaluation_conditions?:EvaluationCondition[]|null}){const conditions=evaluationConditions(spec);setMap(conditions[0].map_id);setSeed(conditions[0].seed);setDuration(spec.duration_seconds);setSensoryProfile(spec.sensory_profile||'odor-only-v1');setExtraConditions(conditions.slice(1))}
   function exportRun(){if(!current)return;const url=URL.createObjectURL(new Blob([JSON.stringify(current,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='training-'+current.id+'.json';link.click();URL.revokeObjectURL(url)}
   const generationsHistory=current?Array.from({length:current.spec.generations},(_,i)=>{
     const group=current.members.filter(m=>m.generation===i),scored=group.filter(m=>m.fitness!==null)
@@ -114,6 +130,9 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <AlgorithmPicker value={strategy} onChange={setStrategy} name={optimizerName} onName={setOptimizerName}/>
       <div className="training-pair"><label>{t('Environment')}<select value={map} onChange={e=>setMap(e.target.value)}>{maps.map(m=><option key={m.id} value={m.id}>{locale==='en'?m.english:m.name}</option>)}</select></label><label>{t('Objective')}<select value={mode} onChange={e=>setMode(e.target.value as typeof mode)}><option value="forage">{t('Collect food')}</option><option value="contest">{t('Compete for food')}</option></select></label></div>
       <p className="training-hint">{t(maps.find(m=>m.id===map)?.description||'')}</p>
+      <label htmlFor="training-sensory-profile">{t('Sensory input profile')}<select id="training-sensory-profile" value={sensoryProfile} onChange={e=>setSensoryProfile(e.target.value)}>{sensoryOptions.map(p=><option key={p.id} value={p.id} disabled={!p.ready}>{t(p.name||p.id)}</option>)}</select></label>
+      <p className="training-hint">{t('Every candidate uses these senses in evaluation and subsequent competition.')}</p>
+      {!season?.training_sensory_profiles&&<p className="training-hint">{t('This server currently offers odor-only training.')}</p>}
       {mode==='contest'&&<label>{t('Fixed opponent')}<select value={opponent} onChange={e=>setOpponent(e.target.value)}><option value="">{t('Choose a fly')}</option>{availableFlies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>}
       {strategy!=='external'&&<><fieldset className="training-circuits"><legend>{t('Allow mutations in')}</legend>{season?.connectome.circuits.map(c=><label key={c.id}><input type="checkbox" checked={circuits.includes(c.id)} onChange={e=>setCircuits(old=>e.target.checked?[...old,c.id]:old.filter(id=>id!==c.id))}/><span style={{color:c.color}}/> {t(c.label)}</label>)}</fieldset>
       <label>{t('Mutation strength')} <b>{(strength*100).toFixed(0)}%</b><input type="range" min=".01" max=".3" step=".01" value={strength} onChange={e=>setStrength(+e.target.value)}/></label></>}
@@ -133,17 +152,17 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <label>{t('Evaluation budget')}<input type="number" min="2" max="96" value={budget} onChange={e=>setBudget(+e.target.value)}/></label>
       <div className={'training-budget '+(needed>budget?'over':'')}><strong>{needed} / {budget}</strong><span>{t('evaluations planned / limit')}</span><small>{population} × {generations} × {conditions.length}{mode==='contest'?' × 2':''} · {t(mode==='contest'?'Both spawn positions in every condition.':'One solo evaluation per condition and individual.')}</small></div>
       <p className="training-hint">{t('Simulations run in a queue and may take minutes. Closing this page does not stop training.')}</p>
-      <button className="primary wide" disabled={!!busy||!profile||!!problem} onClick={start}>{busy==='create'?<Loader2 size={16} className="spin"/>:<Play size={16}/>} {t('Start training')}<ArrowRight size={16}/></button>
+      <button className="primary wide" disabled={!!busy||!profile||!sensoryReady||!!problem} onClick={start}>{busy==='create'?<Loader2 size={16} className="spin"/>:<Play size={16}/>} {t('Start training')}<ArrowRight size={16}/></button>
       {problem&&<p className="training-hint" role="status">{t(problem)}</p>}
       {!profile&&<p className="training-hint">{t('Training simulation is unavailable on this server.')}</p>}
     </aside>
     <div className="training-main">
       {error&&<p className="training-error" role="alert">{error}</p>}{message&&<p className="training-message" role="status"><Check size={16}/>{message}</p>}
-      <TrainingShowcase maps={maps} onReplay={onReplay} revision={showcaseRevision} onBranch={fly=>{setExampleFounder(fly);setFounder(fly.id);setName((fly.name.slice(0,44)+' · '+t('New branch')).slice(0,64));setFocus('');setGeneration(null);setMessage(t('Choose a strategy and budget for this descendant.'));requestAnimationFrame(()=>setup.current?.scrollIntoView({block:'start'}))}}/>
+      <TrainingShowcase maps={maps} onReplay={onReplay} revision={showcaseRevision} copyAvailable={!!season?.gallery_copy_available} busy={!!busy} onBranch={copyExample}/>
       <TrainingComparison key={identity?.id||'guest'} runs={visibleRuns} maps={maps} flies={flies} onOpen={id=>{setFocus(id);setGeneration(null)}}/>
       <div className="training-tabs"><button className={!current?'active':''} onClick={()=>setFocus('')}>{t('New session')}</button>{visibleRuns.map(r=><button key={r.id} className={current?.id===r.id?'active':''} onClick={()=>{setFocus(r.id);setGeneration(null)}}>{r.spec.name}<small>{t(statusKey[r.status]||r.status)}</small></button>)}</div>
       {!current?<><div className="arena-stage training-map"><div className="stage-heading"><span>{t('YOUR TRAINING GROUND')}</span><span>{t('Seed')} {seed}</span></div><div className="arena-canvas"><MapPreview mapId={map} seed={seed} bridgeProfile="legacy-v1" participants={mode==='forage'?[selectedFly]:[selectedFly,flies.find(f=>f.id===opponent)]}/></div></div><div className="panel training-welcome"><GitBranch size={28}/><h2>{t('Give your fly a few generations.')}</h2><p>{t('Choose a strategy and a small budget. Compare descendants through actual matches, inspect their behavior, and keep the ones you want to compete with.')}</p><div><span>01 · {t('Design')}</span><ArrowRight size={16}/><span>02 · {t('Train')}</span><ArrowRight size={16}/><span>03 · {t('Compete')}</span></div></div></>:<>
-        <section className="panel training-overview"><div className="panel-heading"><span><GitBranch size={17}/>{current.spec.name}</span><span className="training-status">{t(statusKey[current.status]||current.status)}</span></div><div className="training-context"><span>{t(algorithmName(current.spec.strategy))}</span><span>{(locale==='en'?maps.find(map=>map.id===current.spec.map_id)?.english:maps.find(map=>map.id===current.spec.map_id)?.name)||current.spec.map_id}</span><span>{t(current.spec.mode==='forage'?'Collect food':'Compete for food')}</span><span>{t('Seed')} {current.spec.seed} · {current.spec.duration_seconds} {t('s')}</span></div><div className="training-summary"><div><span>{t('Evaluations completed')}</span><strong>{current.evaluations_completed}<small> / {current.evaluations_total}</small></strong></div><div><span>{t('Best food score')}</span><strong>{best==null?'—':best.toFixed(2)}</strong></div><div><span>{t('Starting food score')}</span><strong>{current.baseline_fitness===null?'—':current.baseline_fitness.toFixed(2)}</strong></div></div><div className="training-progress"><span style={{width:current.progress*100+'%'}}/></div><div className="training-controls"><small>{t(current.spec.mode==='contest'?'Fitness is the mean of complete condition margins, each averaged across both positions.':'Fitness is the mean food consumed across all complete conditions.')} {t('Training results do not affect the public leaderboard.')}</small>{!terminal(current.status)&&<>{current.control==='pause'?<button className="secondary" disabled={!!busy} onClick={()=>control('resume')}><Play size={14}/>{t('Resume')}</button>:<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('pause')}><Pause size={14}/>{t('Pause')}</button>}<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('stop')}><Square size={13}/>{t('Stop')}</button></>}</div>{current.error&&<p className="training-error">{current.error}</p>}</section>
+        <section className="panel training-overview"><div className="panel-heading"><span><GitBranch size={17}/>{current.spec.name}</span><span className="training-status">{t(statusKey[current.status]||current.status)}</span></div><div className="training-context"><span>{t(algorithmName(current.spec.strategy))}</span><span>{t('Sensory profile')} · {sensoryLabel(current.spec.sensory_profile||'odor-only-v1')}</span><span>{(locale==='en'?maps.find(map=>map.id===current.spec.map_id)?.english:maps.find(map=>map.id===current.spec.map_id)?.name)||current.spec.map_id}</span><span>{t(current.spec.mode==='forage'?'Collect food':'Compete for food')}</span><span>{t('Seed')} {current.spec.seed} · {current.spec.duration_seconds} {t('s')}</span></div><div className="training-summary"><div><span>{t('Evaluations completed')}</span><strong>{current.evaluations_completed}<small> / {current.evaluations_total}</small></strong></div><div><span>{t('Best food score')}</span><strong>{best==null?'—':best.toFixed(2)}</strong></div><div><span>{t('Starting food score')}</span><strong>{current.baseline_fitness===null?'—':current.baseline_fitness.toFixed(2)}</strong></div></div><div className="training-progress"><span style={{width:current.progress*100+'%'}}/></div><div className="training-controls"><small>{t(current.spec.mode==='contest'?'Fitness is the mean of complete condition margins, each averaged across both positions.':'Fitness is the mean food consumed across all complete conditions.')} {t('Training results do not affect the public leaderboard.')}</small>{!terminal(current.status)&&<>{current.control==='pause'?<button className="secondary" disabled={!!busy} onClick={()=>control('resume')}><Play size={14}/>{t('Resume')}</button>:<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('pause')}><Pause size={14}/>{t('Pause')}</button>}<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('stop')}><Square size={13}/>{t('Stop')}</button></>}</div>{current.error&&<p className="training-error">{current.error}</p>}</section>
         {current.status==='complete'&&<div className="training-publish"><button className="secondary" disabled={!!busy} onClick={()=>act('publish',async()=>{await api(`/training/${current.id}/publish`,{method:'POST'},identity);setShowcaseRevision(v=>v+1);setMessage(t('Trajectory published in the gallery.'))})}>{t('Publish trajectory')}</button><p>{t('Shares this completed session, every candidate design, score and replay with all visitors.')}</p></div>}
         <div className="training-context">{evaluationConditions(current.spec).map((condition,i)=><span key={i}>{t('Condition')} {i+1} · {maps.find(m=>m.id===condition.map_id)?.[locale==='en'?'english':'name']||condition.map_id} · {t('Seed')} {condition.seed}</span>)}</div>
         <div className="training-tools"><code>{current.id}</code><button className="secondary" onClick={exportRun}><Download size={14}/>{t('Export results and lineage')}</button></div>

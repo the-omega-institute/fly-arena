@@ -1,3 +1,4 @@
+import {ReplayCamera} from './features/arena/ReplayCamera'
 import {ArenaWorldLabel} from './features/arena/ArenaWorldLabel'
 import {useEffect,useMemo,useRef} from 'react'
 import {Canvas,useFrame} from '@react-three/fiber'
@@ -56,7 +57,7 @@ function World({scene,frame}:{scene:Scene|ArenaLayout;frame?:Frame}){
   </>
 }
 
-export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles,layout,participants=[]}:{layout?:ArenaLayout;participants?:{name:string;color:string}[];preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
+export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles,layout,participants=[],followSelected=false}:{followSelected?:boolean;layout?:ArenaLayout;participants?:{name:string;color:string}[];preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
   const {resolved,t}=useI18n();const tokens=sceneThemes[resolved]
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
@@ -83,6 +84,7 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
       {scene?.flies.map((fly,i)=>{const p=shown.positions?.[i],n=next?.positions?.[i]||p;if(!p)return null;return <Html key={'label-'+i} position={[p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,(p[2]||0)+1.6]} center style={{pointerEvents:'none'}}><ArenaWorldLabel fly={fly} slot={i} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]}/></Html>})}
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
-    <OrbitControls makeDefault target={design?[0,0,.8]:habitat?[0,0,.25]:[0,0,0]} enablePan={!design} minDistance={design?4:habitat?7:10} maxDistance={design?18:75} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
+    {scene&&shown&&<ReplayCamera scene={scene} frame={shown} next={next} alpha={alpha} selectedId={selectedId} follow={followSelected} overview={cameraPosition}/>}
+    <OrbitControls makeDefault target={design?[0,0,.8]:habitat?[0,0,.25]:[0,0,0]} enablePan={!design&&!followSelected} minDistance={design||followSelected?4:habitat?7:10} maxDistance={design?18:75} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
   </Canvas>
 }

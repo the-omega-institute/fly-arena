@@ -35,3 +35,7 @@
   .life-theater-layout>.arena-stage{position:relative;top:auto}
   .life-theater-layout>.observations{max-height:none;overflow:visible}
 }
+
+.event-response-window{display:flex;align-items:center;gap:10px;font-size:11px;margin:10px 0;color:var(--text-muted)}.event-response-window select{width:auto;max-width:65%;padding:6px 10px;font-size:11px}
+
+.replay-story{background:var(--surface-soft);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px}.replay-story strong{font-size:13px}.replay-story p{font-size:12px;line-height:1.7;margin:8px 0;color:var(--text-muted)}.replay-story a{font-size:12px;color:var(--text);text-decoration:underline;text-underline-offset:3px}

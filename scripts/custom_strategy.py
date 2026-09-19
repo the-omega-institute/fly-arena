@@ -67,6 +67,7 @@ def main():
     parser.add_argument('--budget',type=int,default=4)
     parser.add_argument('--seconds',type=int,default=1)
     parser.add_argument('--map',choices=['orchard','maze','scarcity','ring','terrarium','enclosure'],default='orchard')
+    parser.add_argument('--sensory-profile', default='odor-only-v1', help='Sensory profile from the server season catalog; fixed across evaluations')
     parser.add_argument('--seed',type=int,default=42)
     parser.add_argument('--key',default=uuid.uuid4().hex)
     parser.add_argument('--save-best',action='store_true')
@@ -98,7 +99,7 @@ def main():
                 'name':args.name,'optimizer_name':args.name,'strategy':'external','founder_id':founder,
                 'circuits':[], 'population':args.population,'generations':args.generations,
                 'max_evaluations':args.budget,'duration_seconds':args.seconds,'map_id':args.map,
-                'seed':args.seed,'mode':'forage','bridge_profile':'legacy-v1',
+                'seed':args.seed,'mode':'forage','bridge_profile':'legacy-v1', **({'sensory_profile':args.sensory_profile} if args.sensory_profile!='odor-only-v1' else {}),
             })
         if run['spec']['strategy']!='external':parser.error('This session is managed by a built-in strategy.')
         ident=run['id'];path='/training/'+ident
