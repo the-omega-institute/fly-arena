@@ -19,7 +19,8 @@ import {evaluationCount,planProblem,memberRole,trainingFocus,trainingHash} from 
 type Plan={evaluation_conditions?:EvaluationCondition[]|null;name:string;founder_id:string;opponent_id:string|null;strategy:Strategy;optimizer_name?:string;circuits:string[];mutation_strength:number;population:number;generations:number;max_evaluations:number;map_id:string;mode:'forage'|'contest';duration_seconds:number;seed:number;bridge_profile:string}
 type Member={condition_results?:ConditionResult[];generation:number;slot:number;fly_id:string;saved:number;fitness:number|null;fly:Fly;matches:Match[]}
 type Training={id:string;evaluation_context?:string;spec:Plan;status:string;control:string;error:string|null;members:Member[];evaluations_total:number;evaluations_started:number;evaluations_completed:number;progress:number;best_fly_id:string|null;baseline_fitness:number|null;proposal_generation:number|null;open_slots:number[]}
-type Props={flies:Fly[];identity:Identity|null;selected:string;season:Season|null;maps:ArenaMap[];onLogin:()=>void;onSaved:(fly:Fly)=>Promise<void>;onCompete:(fly:Fly)=>void;onReplay:(match:Match)=>void}
+type CompetitionSetup={map_id:string;seed:number;duration_seconds:number;opponent_id?:string|null}
+type Props={flies:Fly[];identity:Identity|null;selected:string;season:Season|null;maps:ArenaMap[];onLogin:()=>void;onSaved:(fly:Fly)=>Promise<void>;onCompete:(fly:Fly,setup?:CompetitionSetup)=>void;onReplay:(match:Match)=>void}
 const terminal=(status:string)=>['complete','failed','stopped'].includes(status)
 const statusKey:Record<string,string>={awaiting_candidates:'Waiting for your optimizer',queued:'Queued',running:'Training',paused:'Paused',pausing:'Pausing after evaluation',stopping:'Stopping after evaluation',stopped:'Stopped',complete:'Complete',failed:'Failed'}
 
@@ -96,7 +97,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   async function save(member:Member,next:'library'|'compete'|'branch'='library'){if(current)await act(member.fly_id,async()=>{
     const fly=await api<Fly>(`/training/${current.id}/save`,{method:'POST',body:JSON.stringify({fly_id:member.fly_id})},identity)
     await onSaved(fly);accept(await api<Training>(`/training/${current.id}`,{},identity));setMessage(t('Individual saved to your library.'))
-    if(next==='compete')onCompete(fly)
+    if(next==='compete')onCompete(fly,{map_id:current.spec.map_id,seed:current.spec.seed,duration_seconds:current.spec.duration_seconds,opponent_id:current.spec.mode==='contest'?current.spec.opponent_id:null})
     if(next==='branch'){setFounder(fly.id);setName((fly.name.slice(0,44)+' · '+t('New branch')).slice(0,64));setFocus('');setGeneration(null);setMessage(t('Choose a strategy and budget for this descendant.'));requestAnimationFrame(()=>setup.current?.scrollIntoView({block:'start'}))}
   })}
   function exportRun(){if(!current)return;const url=URL.createObjectURL(new Blob([JSON.stringify(current,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='training-'+current.id+'.json';link.click();URL.revokeObjectURL(url)}
