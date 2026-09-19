@@ -26,6 +26,13 @@ function compile(folder){
 }
 compile('src')
 const require=createRequire(path.join(out,'package.json'));require.extensions['.css']=()=>{}
+// Real controls/data are exercised below; WebGL rasterization is a separate acceptance step.
+let spatialCanvasProps=null
+const spatialCanvasFile=require.resolve('./src/features/arena/AnatomicalBrainCanvas.js')
+require.cache[spatialCanvasFile]={id:spatialCanvasFile,filename:spatialCanvasFile,loaded:true,exports:{AnatomicalBrainCanvas:props=>{
+ spatialCanvasProps=props
+ return React.createElement('div',{'data-spatial-canvas':true},props.nodes.filter(n=>n.position).map(n=>React.createElement('button',{key:n.id,'aria-label':'Spatial neuron '+n.id,'data-activity':n.activity===null?'missing':String(n.activity),onClick:()=>props.onFocus(n.id)},n.id)))
+}}}
 const {PlaygroundGuide}=require('./src/features/guide/PlaygroundGuide.js')
 const {WildTypeChallenge}=require('./src/features/arena/WildTypeChallenge.js')
 const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtype.js')
@@ -811,4 +818,75 @@ test('local neuron selection opens its own history and peak seeks the surroundin
  await click('Go to recorded peak · 10.00 Hz / 2.00 s');assert.equal(seeks.at(-1),2)
  await act(async()=>{const el=document.querySelector('select[aria-label="Focus neuron"]');el.value='c';el.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
  assert.match(document.querySelector('.neuron-activity-trace').textContent,/did not record this neuron/)
+})
+
+const {anatomySpace,spatialNodes,validateAnatomy}=require('./src/features/arena/anatomy.js')
+const {AnatomicalBrain}=require('./src/features/arena/AnatomicalBrain.js')
+const anatomyFixture=sha=>({schema:'connectome-anatomy/v1',connectome_sha256:sha,neuron_count:3,position_count:2,missing_position_count:1,positions:[0,0,0,10,20,30]})
+const positionedGraph={neurons:[{id:'a',class:'input',position:[0,0,0]},{id:'b',class:'projection',position:[10,20,30]},{id:'c',class:'other',position:null}],edges:connectedGraph.edges}
+test('anatomy keeps uniform source geometry and missing positions distinct from silence',()=>{
+ const data=validateAnatomy(anatomyFixture('a'.repeat(64)),'a'.repeat(64)),space=anatomySpace(data)
+ assert.deepEqual(space.center,[5,10,15]);assert.equal(space.extent,15)
+ const nodes=spatialNodes(positionedGraph,space,new Map([['a',0],['b',8],['c',4]]))
+ assert.deepEqual(nodes[0],{id:'a',position:[-1/3,-2/3,-1],activity:0})
+ assert.equal(nodes[2].position,null);assert.equal(nodes[2].activity,4)
+ assert.equal(spatialNodes(positionedGraph,space,new Map())[0].activity,null)
+ assert.throws(()=>validateAnatomy(data,'b'.repeat(64)))
+ assert.throws(()=>validateAnatomy({...data,position_count:3},data.connectome_sha256))
+ assert.throws(()=>validateAnatomy({...data,positions:[NaN,0,0,10,20,30]},data.connectome_sha256))
+ assert.deepEqual([...anatomySpace({...data,positions:[],position_count:0}).positions],[])
+})
+test('anatomical brain uses matching static coordinates, selects real neurons and retains missing-position traces',async()=>{
+ const sha='c'.repeat(64),requests=[],seeks=[]
+ globalThis.fetch=async url=>{requests.push(String(url));return String(url).startsWith('/api/')?{ok:false}:{ok:true,json:async()=>anatomyFixture(sha)}}
+ const frames=[0,1].map((time,i)=>({time,brain:[{sampled_nodes:[{id:'a',activity:i*12},{id:'b',activity:i*5},{id:'c',activity:i*7}]}]}))
+ const props={connectome:sha,graph:positionedGraph,activity:new Map([['a',0],['b',0],['c',0]]),scale:12,frames,slot:0,time:0,onSeek:t=>seeks.push(t)}
+ await mount(AnatomicalBrain,props)
+ assert.deepEqual(requests,['/api/v1/connectome/anatomy','/examples/anatomy/'+sha+'.json'])
+ assert.match(document.querySelector('.anatomical-brain-counts').textContent,/2 actual soma positions.*1 neurons without coordinates/)
+ assert.equal(spatialCanvasProps.space.positions.length,6)
+ assert.equal(document.querySelector('[aria-label="Spatial neuron a"]').dataset.activity,'0')
+ await click('Spatial neuron b');assert.equal(document.querySelector('select[aria-label="Focus neuron"]').value,'b')
+ await click('Go to recorded peak · 5.00 Hz / 1.00 s');assert.equal(seeks.at(-1),1)
+ await click('XZ');assert.equal(spatialCanvasProps.angle,'xz')
+ await mount(AnatomicalBrain,{...props,time:1,activity:new Map([['a',12],['b',5],['c',7]])})
+ assert.equal(spatialCanvasProps.focus,'b');assert.equal(spatialCanvasProps.scale,12)
+ assert.equal(document.querySelector('[aria-label="Spatial neuron b"]').dataset.activity,'5')
+ await act(async()=>{const select=document.querySelector('select[aria-label="Focus neuron"]');select.value='c';select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.equal(spatialCanvasProps.focus,'c');assert.equal(document.querySelector('[aria-label="Spatial neuron c"]'),null)
+ assert.match(document.querySelector('.anatomical-brain-position').textContent,/Unavailable/)
+ await click('Go to recorded peak · 7.00 Hz / 1.00 s');assert.equal(seeks.at(-1),1)
+ // Same anatomy can be reused across participants, but activity must change.
+ await mount(AnatomicalBrain,{...props,activity:new Map(),slot:1})
+ assert.equal(document.querySelector('[aria-label="Spatial neuron b"]').dataset.activity,'missing')
+ assert.equal(requests.length,2)
+})
+test('anatomical view rejects another connectome and discards a late response after switching replay',async()=>{
+ let resolveOld
+ const old='d'.repeat(64),next='e'.repeat(64)
+ globalThis.fetch=async url=>String(url).startsWith('/api/')?new Promise(resolve=>{resolveOld=resolve}):{ok:true,json:async()=>anatomyFixture(old)}
+ const props={connectome:old,graph:positionedGraph,activity:new Map(),scale:1,frames:[],slot:0,time:0,onSeek:noop}
+ await mount(AnatomicalBrain,props)
+ globalThis.fetch=async()=>({ok:true,json:async()=>anatomyFixture('f'.repeat(64))})
+ await mount(AnatomicalBrain,{...props,connectome:next})
+ assert.match(document.body.textContent,/Matching anatomical coordinates are unavailable/)
+ assert.equal(document.querySelector('[data-spatial-canvas]'),null)
+ await act(async()=>resolveOld({ok:true,json:async()=>anatomyFixture(old)}))
+ assert.equal(document.querySelector('[data-spatial-canvas]'),null)
+ assert.ok(document.querySelector('.local-brain-canvas'),'structural inspection remains usable')
+})
+
+test('anatomical replay starts with all recorded circuits and can focus and restore a circuit',async()=>{
+ const {BrainTheater}=require('./src/features/arena/MatchObservations.js')
+ const sha='9'.repeat(64),descending={neurons:[{id:'d',class:'descending',position:[5,10,15]}],edges:[]}
+ globalThis.fetch=async()=>({ok:true,json:async()=>anatomyFixture(sha)})
+ const fly={...own,spec:{...spec,connectome_sha256:sha},artifact_id:'own-artifact',brain_graph:{schema:'brain-neighborhood/v1',artifact_id:'own-artifact',connectome_sha256:sha,circuits:{olfactory:positionedGraph,descending}}}
+ const frame={time:1,brain:[{sampled_nodes:[{id:'a',activity:1},{id:'d',activity:15}]}]}
+ await mount(BrainTheater,{fly,frame,frames:[frame],season:{connectome:{circuits:[{id:'olfactory',label:'Olfactory receptors'},{id:'descending',label:'Descending neurons'}]}},slot:0,events:[],activityScale:20,nodeScale:20,onSeek:noop})
+ await click('Anatomical space · 3D')
+ assert.deepEqual(spatialCanvasProps.nodes.map(n=>n.id),['a','b','c','d'])
+ await click('Spatial neuron d')
+ assert.equal(document.querySelector('.neuron-activity-trace').dataset.neuronId,'d')
+ await click('Descending neurons');assert.deepEqual(spatialCanvasProps.nodes.map(n=>n.id),['d'])
+ await click('All recorded circuits');assert.deepEqual(spatialCanvasProps.nodes.map(n=>n.id),['a','b','c','d'])
 })

@@ -14,6 +14,8 @@ import {eventSampleWindow} from './lifeEvents'
 import {BehaviorChapters} from './BehaviorChapters'
 import {ResponseStory} from './ResponseStory'
 import {LocalBrainGraph} from './LocalBrainGraph'
+import {AnatomicalBrain} from './AnatomicalBrain'
+import {mergeNeighborhoods} from './anatomy'
 import {NeuronActivityTrace} from './NeuronActivityTrace'
 import {SharedResources} from './SharedResources'
 
@@ -47,10 +49,11 @@ function deriveEvents(frames:Frame[],slot:number):ReplayEvent[] {
 
 type Graph=NeuralGraph
 type ReplayReceipt={replay_policy?:{event_ticks?:number};schema?:string;sha256?:string;connectome_sha256?:string;neuron_count?:number;edge_count?:number;request?:{bridge_profile?:string;sensory_profile?:string};runtime?:{rules?:{id?:string;feeding_contact?:string;physics_dt?:number;sense_ticks?:number};machine?:string;python?:string;mujoco?:string;bridge_profile?:string;readout_weights_sha256?:string;model?:{id?:string};sensory_profile?:{id?:string}}}
-type BrainView='region'|'class'|'local'
+type BrainView='region'|'class'|'local'|'anatomy'
 
 export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,nodeScale,matchId}:{matchId?:string;frame?:Frame;frames:Frame[];season:Season|null;fly?:ReplayParticipant;slot:number;events:ReplayEvent[];activityScale:number;nodeScale:number;onSeek:(time:number)=>void}) {
   const {t,locale}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [designWeights,setDesignWeights]=useState(false); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null); const [selectedEvent,setSelectedEvent]=useState<ReplayEvent|null>(null); const [responseMs,setResponseMs]=useState(100)
+  const [anatomyGraph,setAnatomyGraph]=useState<Graph|null>(null);const [spatialAll,setSpatialAll]=useState(true)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
   const sampleIds=useMemo(()=>{
     const ids=(sample?.sampled_nodes||sample?.top_nodes||[]).map(node=>node.id).filter(Boolean)
@@ -61,9 +64,10 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
   // Match-list polling creates fresh objects. Equal recorded graph content
   // must not clear the neuron/class the user is inspecting every 2.5 seconds.
   const frozenGraphContent=useMemo(()=>JSON.stringify(frozenGraph??null),[frozenGraph])
+  const anatomyContent=useMemo(()=>JSON.stringify(frozenGraph&&snapshot?mergeNeighborhoods(snapshot.circuits):null),[frozenGraph,snapshot])
   useEffect(()=>{
-    let active=true;const controller=new AbortController();setGraph(null);setSelectedClass(null);setDesignWeights(false)
-    if(frozenGraphContent!=='null'){setGraph(JSON.parse(frozenGraphContent) as Graph);setDesignWeights(true);return()=>{active=false;controller.abort()}}
+    let active=true;const controller=new AbortController();setGraph(null);setAnatomyGraph(null);setSelectedClass(null);setDesignWeights(false)
+    if(frozenGraphContent!=='null'){setGraph(JSON.parse(frozenGraphContent) as Graph);setAnatomyGraph(JSON.parse(anatomyContent) as Graph|null);setDesignWeights(true);return()=>{active=false;controller.abort()}}
     const query='/connectome/neurons?circuit='+encodeURIComponent(circuit)+(sampleIds?'&ids='+encodeURIComponent(sampleIds)+'&limit=80':'&limit=80')
     async function load(){
       if(matchId&&fly&&sampleIds){
@@ -71,14 +75,14 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
           const snapshot=await api<BrainDesignGraph>('/matches/'+encodeURIComponent(matchId)+'/brain/'+slot+'?ids='+encodeURIComponent(sampleIds),{signal:controller.signal})
           if(snapshot.artifact_id!==fly.artifact_id||snapshot.connectome_sha256!==fly.spec.connectome_sha256)throw new Error('Replay brain identity mismatch')
           if(!snapshot.circuits[circuit])throw new Error('Replay circuit unavailable')
-          if(active){setGraph(snapshot.circuits[circuit]);setDesignWeights(true)}
+          if(active){setGraph(snapshot.circuits[circuit]);setAnatomyGraph(mergeNeighborhoods(snapshot.circuits));setDesignWeights(true)}
           return
         }catch{if(!active)return}
       }
       try{const value=await api<Graph>(query,{signal:controller.signal});if(active)setGraph(value)}catch{if(active)setGraph(null)}
     }
     void load();return()=>{active=false;controller.abort()}
-  },[circuit,sampleIds,frozenGraphContent,matchId,slot,fly?.artifact_id,fly?.spec.connectome_sha256])
+  },[circuit,sampleIds,frozenGraphContent,anatomyContent,matchId,slot,fly?.artifact_id,fly?.spec.connectome_sha256])
 
   const activity=useMemo(()=>new Map((sample?.sampled_nodes||sample?.top_nodes||[]).map(n=>[n.id,n.activity])),[sample])
   const mutations=fly?.spec?.weight_mutations; const edited=Array.isArray(mutations)&&mutations.some(m=>m.selector===circuit)
@@ -88,14 +92,16 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
   useEffect(()=>setSelectedEvent(null),[slot,frames])
   return <section className="brain-theater panel">
     <div className="panel-heading"><span><AudioLines size={16}/>{t('Neural theatre')}</span><small>{t('Recorded activity · selectable circuit')}</small></div>
-    <div className="brain-circuit-tabs">{circuits.map(c=><button key={c.id} className={circuit===c.id?'active':''} onClick={()=>{setCircuit(c.id);setView('region')}} style={{color:c.color}}>{t(c.label)}{edited&&circuit===c.id?<small> · {t('edited')}</small>:null}</button>)}</div>
-    <div className="brain-layer-tabs" role="tablist" aria-label={t('Brain view')}><button className={view==='region'?'active':''} onClick={()=>setView('region')}>{t('Functional region')}</button><button className={view==='class'?'active':''} onClick={()=>setView('class')}>{t('Neuron class')}</button><button className={view==='local'?'active':''} onClick={()=>setView('local')}>{t('Local graph')}</button></div>
+    <div className="brain-circuit-tabs">{circuits.map(c=><button key={c.id} className={circuit===c.id&&!(view==='anatomy'&&spatialAll)?'active':''} onClick={()=>{setCircuit(c.id);setSpatialAll(false);setView(prior=>prior==='anatomy'?'anatomy':'region')}} style={{color:c.color}}>{t(c.label)}{edited&&circuit===c.id?<small> · {t('edited')}</small>:null}</button>)}</div>
+    <div className="brain-layer-tabs" role="tablist" aria-label={t('Brain view')}><button className={view==='region'?'active':''} onClick={()=>setView('region')}>{t('Functional region')}</button><button className={view==='class'?'active':''} onClick={()=>setView('class')}>{t('Neuron class')}</button><button className={view==='local'?'active':''} onClick={()=>setView('local')}>{t('Local graph')}</button><button className={view==='anatomy'?'active':''} onClick={()=>{setSpatialAll(true);setView('anatomy')}}>{locale==='zh-CN'?'解剖空间 · 3D':'Anatomical space · 3D'}</button></div>
     {view==='region'&&<BrainActivityOverview circuits={circuits} activity={sample?.circuits||frame?.traces?.[slot]||{}} scale={activityScale} mutations={Array.isArray(mutations)?mutations:[]} time={frame?.time} onOpen={id=>{setCircuit(id);setSelectedClass(null);setView('class')}}/>}
     {view==='region'&&<div className="brain-region-summary"><div><strong>{t(circuits.find(c=>c.id===circuit)?.label||circuit)}</strong><span>{t('Recorded functional region')}</span></div><div><strong>{season?.connectome.circuits.find(c=>c.id===circuit)?.neuron_count?.toLocaleString()||'—'}</strong><span>{t('canonical neurons')}</span></div><div><strong>{nodes.filter(n=>activity.has(n.id)).length}</strong><span>{t('sampled in this frame')}</span></div><button onClick={()=>setView('class')}>{t('Open neuron classes')} →</button></div>}
     {view==='class'&&<div className="brain-class-list">{classes.length?classes.map(([name,summary])=><button key={name} className={selectedClass===name?'active':''} onClick={()=>{setSelectedClass(name);setView('local')}}><span><strong>{name}</strong><small>{summary.recorded}/{summary.count} {locale==='zh-CN'?'已记录':'recorded'} · {summary.active} {t('active')}</small></span><b>{summary.peak===null?'—':summary.peak.toFixed(2)}</b></button>):<p className="empty">{t('No annotated neuron classes in this sample.')}</p>}</div>}
     {view==='local'&&<div className="brain-local-heading"><span>{selectedClass||t('All displayed classes')}</span><button onClick={()=>setView('class')}>{t('Back to classes')}</button></div>}
-    {view==='local'&&graph&&!designWeights&&<p className="training-hint">{locale==='zh-CN'?'当前显示基础连接结构；这份回放的设计权重尚未载入。活动仍来自实际回放记录。':'Showing canonical connection structure; this replay’s design weights are unavailable. Activity still comes from the recorded replay.'}</p>}
+    {(view==='local'||view==='anatomy')&&graph&&!designWeights&&<p className="training-hint">{locale==='zh-CN'?'当前显示基础连接结构；这份回放的设计权重尚未载入。活动仍来自实际回放记录。':'Showing canonical connection structure; this replay’s design weights are unavailable. Activity still comes from the recorded replay.'}</p>}
     {view==='local'&&(graph?<LocalBrainGraph graph={graph} activity={activity} scale={nodeScale} selectedClass={selectedClass} renderActivity={neuronId=><NeuronActivityTrace neuronId={neuronId} frames={frames} slot={slot} time={frame?.time??0} onSeek={onSeek}/>}/>:<p className="empty">{t('Loading canonical neuron sample…')}</p>)}
+    {view==='anatomy'&&anatomyGraph&&<div className="anatomical-brain-tools"><button aria-pressed={spatialAll} onClick={()=>setSpatialAll(true)}>{locale==='zh-CN'?'全部已记录回路':'All recorded circuits'}</button><span>{spatialAll?(locale==='zh-CN'?'选择上方回路可聚焦其邻域':'Select a circuit above to focus its neighborhood'):t(circuits.find(c=>c.id===circuit)?.label||circuit)}</span></div>}
+    {view==='anatomy'&&(graph?<AnatomicalBrain connectome={fly?.spec.connectome_sha256} graph={spatialAll&&anatomyGraph?anatomyGraph:graph} activity={activity} scale={nodeScale} frames={frames} slot={slot} time={frame?.time??0} onSeek={onSeek}/>:<p className="empty">{t('Loading canonical neuron sample…')}</p>)}
     <div className="sensory-strip"><div><span>{t('Sensory profile')}</span><strong>{frame?.senses?.[slot]?.sensory_profile||'odor-only-v1'}</strong><small>{t('Versioned neural input')}</small></div><div><span>{t('Odor L / R')}</span><strong>{frame?.senses?.[slot]?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong></div><div><span>{t('Visual L / R')}</span><strong>{frame?.senses?.[slot]?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong><small>{frame?.senses?.[slot]?.visual_status?.includes('engineered')?t('geometric observation'):''}</small></div><div><span>{t('Touch')}</span><strong>{frame?.senses?.[slot]?.touch?'ON':'—'}</strong><small>{frame?.senses?.[slot]?.touch_status?.includes('mujoco')?t('MuJoCo contact observation'):''}</small></div><div><span>{t('Nearest food')}</span><strong>{frame?.senses?.[slot]?.nearest_food==null?'—':frame.senses[slot].nearest_food.toFixed(1)+' mm'}</strong></div></div>
     {frame?.senses?.[slot]?.contact_environment!==undefined&&<div className="sensory-strip"><div><span>{t('Contacted environment')}</span><strong>{frame.senses[slot].contact_environment?.join(' · ')||t('No contact')}</strong><small>{t('Ground support excluded')}</small></div><div><span>{t('Tactile population activity')}</span><strong>{frame.senses[slot].tactile_activity==null?'—':frame.senses[slot].tactile_activity.toFixed(3)}</strong><small>{t('Recorded population mean · model activity')}</small></div></div>}
     {frame?.senses?.[slot]?.contact_support!==undefined&&<div className="sensory-strip support-contact" aria-label={locale==='zh-CN'?'支撑与侧向接触':'Support and lateral contact'}><div><span>{locale==='zh-CN'?'足部向上支撑':'Upward foot support'}</span><strong>{frame.senses[slot].contact_support?.join(' · ')||t('No contact')}</strong><small>{locale==='zh-CN'?'实际地形接触；这一模式不把支撑送入左右避障触觉。':'Actual terrain contact; this profile excludes support from lateral avoidance input.'}</small></div><div><span>{locale==='zh-CN'?'送入左右触觉的接触':'Contacts sent to lateral touch'}</span><strong>{[...new Set(Object.values(frame.senses[slot].contact_environment_sides||{}).flat())].join(' · ')||t('No contact')}</strong><small>{locale==='zh-CN'?'侧撞、下表面卡住、身体与对手接触仍保留。':'Side, underside, non-foot and opponent contact remain.'}</small></div></div>}

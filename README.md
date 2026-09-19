@@ -4,7 +4,7 @@
 
 Implemented research preview: React/Three.js design workbench, immutable FlySpec compiler, full retained MaleCNS neural simulation, server-owned reference provenance, matched WT/official/design experiments in the Phenotype Lab, shared-world FlyGym/MuJoCo competitions, anatomical replay, and an agent API. **This is an experimental connectome-constrained game, not a validated reproduction of natural fly intelligence.** Research experiments and legacy competitions have separate admission and evidence paths.
 
-The current graph retains **165,122 Traced neurons, 25,563,197 directed neuron-pair connections, and 124,025,046 synaptic contacts** from MaleCNS v1.0. Anatomical connectivity is real; weights/signs and neural dynamics follow a declared simplified model. Inputs are bilateral odor currents. The engineered descending-neuron readout and locomotion transfer are fixed across subjects within a selected profile. The body has two bilateral locomotion action channels. Vision, online plasticity, natural aggression, and a qualified GPU neural backend are not implemented.
+The current graph retains **165,122 Traced neurons, 25,563,197 directed neuron-pair connections, and 124,025,046 synaptic contacts** from MaleCNS v1.0. Anatomical connectivity is real; weights/signs and neural dynamics follow a declared simplified model. The default input is bilateral odor current; opt-in experimental profiles add geometric visual observations and food/environment contact currents. The engineered descending-neuron readout and locomotion transfer are fixed across subjects within a selected profile. The body has two bilateral locomotion action channels. A biological retina, online plasticity, natural aggression, and a qualified GPU neural backend are not implemented.
 
 ![Design workbench](docs/screenshots/design.png)
 
@@ -59,6 +59,32 @@ Advanced interventions support exact pre/post **class, type, side (`L`/`R`) and 
 
 The MVP workspace publishes designs, research reports and verified replays. Default local mode uses a designer bearer token; the optional NyxID adapter supports browser sessions or separate Arena agent tokens, but **no live NyxID integration has been activated for this research preview**. Optional local registration gating uses `ARENA_INVITE_CODE`. Per designer there are limits of 100 designs, 12 pending matches and 12 unfinished research experiments. These are beta controls, not a complete production anti-abuse system.
 
+## Inspect your fly’s brain during replay
+
+In the Arena neural theatre, choose **Anatomical space · 3D / 解剖空间 · 3D**.
+Drag to rotate, scroll to zoom, or use the XY/XZ views. The gray cloud uses actual
+MaleCNS soma coordinates. The default foreground shows all recorded circuit neighborhoods; choose a
+circuit to focus it. Unrecorded neighbors appear around the selected neuron. Select a node to inspect connection direction,
+your actual model weights and its activity history; **Go to recorded peak** seeks
+the body and brain together. Changing circuits keeps the spatial view open.
+
+Missing coordinates are omitted from the spatial view, but the neuron remains
+available in the selector and activity records. Gray background points and hollow
+neighbors do not imply zero activity. Straight links join connected cell bodies;
+they are not traced axon shapes. Coordinates retain source units with a uniform
+display scale, not a claimed conversion to micrometers.
+
+The API serves `/api/v1/connectome/anatomy` from prepared metadata without running
+a simulation. For static replay deployments, publish the same data alongside the
+frontend, using the connectome identity already recorded in the replay:
+
+```sh
+uv run python scripts/bundle_anatomy.py --data data --output web/dist/examples/anatomy
+```
+
+The viewer rejects a different connectome and keeps the existing connection and
+activity inspection usable when spatial data or WebGL is unavailable.
+
 ## Training sandbox
 
 Open **Train / 训练沙箱** to evolve a chosen fly or compare random search. Configure circuits, scene, objective, population, generations and an evaluation budget. Sessions persist across reloads, support pause/resume/stop, and show actual scores, parents and neural/behavior replays. Save an evaluated descendant and send it to the Arena. Training evaluations do not affect the public leaderboard.
@@ -73,7 +99,7 @@ Start small: 2 individuals × 2 generations × 1 second, with a budget of 4 solo
 
 The **historical bounded v4 cohort failed 3 of 15 unchanged gates**: heldout-left long approach and both bifurcation choice-and-food gates. Its recorded motor candidate is an engineering preview, with reliable approach, feeding and retention still unproven. Internal v2 solo/dual arena diagnostics are not admitted competitions or leaderboard evidence. That historical cohort does not establish qualification for subsequently changed sources; current admission requires independently verified evidence bound to the current profile. See [SCIENCE_MOTOR_V4](docs/SCIENCE_MOTOR_V4.md) for the bounded result and [QUALIFICATION_V4](docs/QUALIFICATION_V4.md) for the admission contract.
 
-The chemical fixture is analytic and penetrates walls; it is not odor diffusion or line-of-sight transport. Existing body contact reflexes do not add contact or visual input to the neural interface. Game energy is an accounting proxy, not metabolism. Persistence after a cue does not prove memory. Biological navigation, learning, memory and CUDA execution remain unqualified; calibrated neural output and visible movement alone do not establish those capabilities.
+The chemical fixture is analytic and penetrates walls; it is not odor diffusion or line-of-sight transport. In odor-only mode, body contact reflexes do not add neural contact input. Experimental sensory profiles explicitly add engineered visual/contact currents; they are not calibrated sensory receptor models. Game energy is an accounting proxy, not metabolism. Persistence after a cue does not prove memory. Biological navigation, learning, memory and CUDA execution remain unqualified; calibrated neural output and visible movement alone do not establish those capabilities.
 
 ## Architecture and engineering decisions
 
