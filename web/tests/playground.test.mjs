@@ -934,3 +934,43 @@ test('zero intake, inversion, equal contest advantage and missing behavior stay 
  assert.match(document.body.textContent,/Awaiting complete condition/)
  assert.doesNotMatch(document.body.textContent,/No intake|First inversion|no average advantage/)
 })
+
+test('event response pairs the same neurons and contestant without turning missing samples into zero',async()=>{
+ const {EventNeuralResponse,pairedNeuralChanges}=require('./src/features/arena/EventNeuralResponse.js')
+ const sample=(nodes)=>({sampled_nodes:nodes.map(([id,activity])=>({id,activity}))})
+ const before={time:1,brain:[sample([['a',0],['b',30],['lost',50],['invalid',NaN]]),sample([['a',999]])]}
+ const after={time:1.1,brain:[sample([['a',10],['b',5],['new',100],['invalid',4]]),sample([['a',0]])]}
+ const response=pairedNeuralChanges(before,after,0)
+ assert.equal(response.paired,2);assert.equal(response.unpaired,3)
+ assert.deepEqual(response.changes.map(n=>[n.id,n.delta]),[['b',-25],['a',10]])
+ const seeks=[],nodes=[]
+ await mount(EventNeuralResponse,{before,after,slot:0,time:1,graph:connectedGraph,onSeek:t=>seeks.push(t),onInspect:id=>nodes.push(id)})
+ assert.match(document.body.textContent,/2 neurons recorded at both samples; 3 at only one/)
+ await click('Inspect responding neuron b');assert.deepEqual(seeks,[1.1]);assert.deepEqual(nodes,['b'])
+ await click('View before / at event · 1.00 s');assert.equal(seeks.at(-1),1)
+ await mount(EventNeuralResponse,{before,after:before,slot:0,time:1,graph:connectedGraph,onSeek:noop,onInspect:noop})
+ assert.match(document.body.textContent,/no two distinct samples/);assert.equal(document.querySelector('[data-response-neuron]'),null)
+})
+
+test('an event opens the responding neuron with its actual weights and retains focus when seeking before and after',async()=>{
+ const {BrainTheater}=require('./src/features/arena/MatchObservations.js')
+ const graph={neurons:connectedGraph.neurons.filter(n=>n.id!=='b'),edges:[]}
+ const fly={...own,artifact_id:'event-brain',brain_graph:{schema:'brain-neighborhood/v1',artifact_id:'event-brain',connectome_sha256:spec.connectome_sha256,circuits:{olfactory:graph,projection:connectedGraph}}}
+ const frame=(time,a,b)=>({time,tick:Math.round(time*10000),brain:[{circuits:{olfactory:a,projection:b},sampled_nodes:[{id:'a',activity:a},{id:'b',activity:b}]}]})
+ const frames=[frame(1,0,30),frame(1.01,1,28),frame(1.1,10,5)]
+ const seeks=[];const props={frames,events:[{type:'food_contact',tick:10000,slot:0}],season:{connectome:{circuits:[{id:'olfactory',label:'Olfactory',color:'#090'},{id:'projection',label:'Projection',color:'#909'}]}},fly,slot:0,activityScale:30,nodeScale:30,onSeek:t=>seeks.push(t)}
+ globalThis.fetch=()=>{throw Error('Frozen graph must not need a network lookup')}
+ await mount(BrainTheater,{...props,frame:frames[0]})
+ await click('1.00sFood contact');assert.equal(seeks.at(-1),1.1)
+ await mount(BrainTheater,{...props,frame:frames[2]})
+ await click('Inspect responding neuron b')
+ assert.equal(document.querySelector('select[aria-label="Focus neuron"]').value,'b')
+ assert.equal(document.querySelector('.neuron-activity-trace').dataset.neuronId,'b')
+ assert.match(document.querySelector('.local-brain-node-details').textContent,/5.00 Hz/)
+ assert.match(document.querySelector('.local-brain-edge-details').textContent,/6.6000/)
+ await click('View before / at event · 1.00 s');assert.equal(seeks.at(-1),1)
+ await mount(BrainTheater,{...props,frame:frames[0]})
+ assert.equal(document.querySelector('select[aria-label="Focus neuron"]').value,'b')
+ assert.match(document.querySelector('.local-brain-node-details').textContent,/30.00 Hz/)
+ await click('View response sample · 1.10 s');assert.equal(seeks.at(-1),1.1)
+})
