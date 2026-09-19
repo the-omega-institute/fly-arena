@@ -683,3 +683,60 @@ test('lineage comparison keeps mismatched conditions and missing neural behavior
  assert.match(table.textContent,/No matching replay/);assert.match(table.textContent,/—/)
  assert.doesNotMatch(table.textContent,/0\.000|100\.0%|None recorded in window/)
 })
+
+test('synchronized life comparison seeks actual bodies and brains, shares scales, and rejects stale records',async()=>{
+ const canvasFile=require.resolve('./src/ArenaCanvas.js'),replayFile=require.resolve('./src/features/arena/useReplay.js')
+ const oldCanvas=require.cache[canvasFile],oldReplay=require.cache[replayFile]
+ require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:p=>React.createElement('div',{'data-paired-body':p.selectedId,'data-sample':p.frame?.time,'data-alpha':p.alpha})}}
+ delete require.cache[replayFile];delete require.cache[require.resolve('./src/features/arena/ReplayComparison.js')]
+ const {ReplayComparison,comparisonWindow,comparisonActivityScales}=require('./src/features/arena/ReplayComparison.js')
+ const participant=id=>({...own,id,name:id,artifact_id:id,spec,brain_graph:{schema:'brain-neighborhood/v1',artifact_id:id,connectome_sha256:spec.connectome_sha256,circuits:{olfactory:{neurons:[],edges:[]}}}})
+ const a=participant('left'),b=participant('right'),c=participant('third')
+ const scene=f=>({flies:[f],size:28,food:[],obstacles:[],body:{meshes:{},geoms:[]}})
+ const frames=(times,mult)=>times.map((time,i)=>({time,tick:Math.round(time*10000),poses:[],positions:[[i,0,1]],scores:[i],brain:[{circuits:{olfactory:i*mult},sampled_nodes:[{id:'n',activity:i*mult*2}]}],traces:[{olfactory:i*mult}]}))
+ const left=frames([0,.05,.15,.3],2),right=frames([0,.1,.2],10)
+ const match=(id,fly,seed)=>({id,status:'verified',participants:[fly],request:{fly_ids:[fly.id],map_id:'enclosure',mode:'forage',seed,duration_seconds:1}})
+ const current=match('a',a,42),other=match('b',b,43),slow=match('c',c,44)
+ const data={b:{scene:scene(b),frames:right,events:[]},c:{scene:scene(c),frames:right,events:[]}},pending=[],requests=[]
+ globalThis.fetch=async(url,options={})=>{
+  requests.push([String(url),options.method||'GET']);const parts=String(url).split('/'),kind=parts.at(-1),id=parts.at(-2)
+  assert.ok(data[id]&&kind in data[id],`Unexpected request ${url}`)
+  if(id==='c')await new Promise(resolve=>pending.push(resolve))
+  return {ok:true,json:async()=>data[id][kind]}
+ }
+ try{
+  const season={connectome:{circuits:[{id:'olfactory',label:'Olfactory',color:'#91bca5',neuron_count:1}]}}
+  await mount(ReplayComparison,{match:current,scene:scene(a),frames:left,events:[{type:'intake',tick:500,slot:0,amount:1}],matches:[current,other,slow],season,selectedId:a.id})
+  assert.deepEqual(comparisonWindow(left,right),{start:0,end:.2});assert.equal(comparisonWindow(left,[]),null);assert.equal(comparisonWindow(left,frames([1,2],1)),null)
+  assert.deepEqual(comparisonActivityScales([left,right]),{region:20,node:40})
+  assert.equal(document.querySelectorAll('[data-paired-body]').length,2)
+  assert.ok([...document.querySelectorAll('.brain-overview-legend')].every(e=>e.textContent.includes('0–20.00 Hz')))
+  const priorRAF=globalThis.requestAnimationFrame,priorCancel=globalThis.cancelAnimationFrame
+  let tick,cancelled=0
+  globalThis.requestAnimationFrame=fn=>{tick=fn;return 7};globalThis.cancelAnimationFrame=()=>cancelled++
+  try{
+   await click('Play both replays')
+   await act(async()=>tick(performance.now()+60))
+   const clock=Number(document.querySelector('input[aria-label="Shared replay time"]').value)
+   assert.ok(clock>0&&clock<.2)
+   const samples=[...document.querySelectorAll('[data-paired-body]')]
+   const selections=[left,right].map(frames=>{const i=Math.max(0,frames.findIndex(f=>f.time>clock)-1);return frames[i].time})
+   assert.deepEqual(samples.map(e=>Number(e.dataset.sample)),selections)
+   await click('Pause both replays');assert.ok(cancelled>0)
+  }finally{globalThis.requestAnimationFrame=priorRAF;globalThis.cancelAnimationFrame=priorCancel}
+
+  await act(async()=>document.querySelector('.life-event-rows button').click())
+  const bodies=[...document.querySelectorAll('[data-paired-body]')]
+  assert.equal(bodies[0].dataset.sample,'0.15');assert.equal(bodies[1].dataset.sample,'0.1');assert.ok(Math.abs(Number(bodies[1].dataset.alpha)-.5)<1e-9)
+  assert.equal(document.querySelector('input[aria-label="Shared replay time"]').value,'0.15')
+  assert.deepEqual([...document.querySelectorAll('.brain-overview-heading b')].map(e=>e.textContent),['0.15 s','0.10 s'])
+  const pick=document.querySelector('.replay-comparison-picker select')
+  await act(async()=>{pick.value='c';pick.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+  assert.equal(document.querySelectorAll('[data-paired-body]').length,0);assert.match(document.body.textContent,/Loading the other body/)
+  await act(async()=>{pick.value='b';pick.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+  assert.equal(document.querySelectorAll('[data-paired-body]').length,2)
+  await act(async()=>{for(const resolve of pending)resolve()})
+  assert.equal(document.querySelectorAll('[data-paired-body]')[1].dataset.pairedBody,'right')
+  assert.ok(requests.every(([,method])=>method==='GET'))
+ }finally{await act(async()=>root.render(null));require.cache[canvasFile]=oldCanvas;require.cache[replayFile]=oldReplay}
+})
