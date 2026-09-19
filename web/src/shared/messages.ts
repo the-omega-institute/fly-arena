@@ -124,6 +124,8 @@ export const catalog = {
   "Observed fly": {"en": "Observed fly", "zh-CN": "观察果蝇"},
   "Compare participants": {"en": "Compare participants", "zh-CN": "对比参赛果蝇"},
   "Focus one fly": {"en": "Focus one fly", "zh-CN": "聚焦一只果蝇"},
+  "Compare with parent": {"en": "Compare with parent", "zh-CN": "与亲代对比"},
+  "Compare with WT": {"en": "Compare with WT", "zh-CN": "与 WT 对比"},
   "Food collected": {"en": "Food collected", "zh-CN": "已摄取食物"},
   "Food score over time": {"en": "Food score over time", "zh-CN": "摄食量随时间变化"},
   "Energy reserve": {"en": "Energy reserve", "zh-CN": "能量储备"},
