@@ -28,4 +28,14 @@ export type MatchProfile={id:string;name:string;ready:boolean;reason?:string}
 export function defaultMatchProfile(season:Season){return season.match_profiles?.find(p=>p.id==='sensorimotor-research-v2'&&p.ready)?.id||season.default_bridge_profile||''}
 export function recordedMatchProfile(match:Match){return match.request.bridge_profile||'legacy-v1'}
 
+/** Prefer a complete multimodal life sample for the first Arena view.
+ * The match log remains chronological; this only chooses the initial focus.
+ */
+export function preferredReplay(matches:Match[]){
+ const verified=matches.filter(match=>match.status==='verified')
+ return verified.find(match=>match.request.duration_seconds>=30&&match.request.sensory_profile==='engineered-multimodal-v1'&&match.result?.scores?.some(score=>score>0))
+   ||verified.find(match=>match.result?.scores?.some(score=>score>0))
+   ||verified[0]
+}
+
 export type ArenaLayout = {id:string;size:number;obstacles:ArenaObstacle[];food:{position:number[];initial:number;id:string}[];spawns:number[][];ring_radius?:number;habitat?:string}

@@ -19,7 +19,7 @@ import {Preferences,useI18n} from './shared/i18n'
 import type {InterventionSpec} from './shared/research'
 import {ArenaCanvas} from './ArenaCanvas'
 import type {ArenaMap,AuthSettings,Fly,Frame,Identity,Match,Preview,Report,Scene,Season,Spec} from './types'
-import {defaultMatchProfile,colors,modes,num} from './types'
+import {defaultMatchProfile,colors,modes,num,preferredReplay} from './types'
 
 import {readRoute,routeHash,type Tab} from './shared/navigation'
 type Ranking={fly:Fly;wins:number;draws:number;losses:number;matches:number;food:number;points:number}
@@ -152,7 +152,7 @@ export default function App(){
   },[showToken,authSettings?.mode,identity?.id])
   useEffect(()=>{
     Promise.all([api<Season>('/season'),api<Fly[]>('/flies'),api<ArenaMap[]>('/maps'),api<Match[]>('/matches')]).then(([s,f,m,ms])=>{
-      setSeason(s);setBridgeProfile(defaultMatchProfile(s));setFlies(f);setMaps(m);setMatches(ms);setFocusedState(old=>old||ms.find(x=>x.status==='verified')?.id||'')
+      setSeason(s);setBridgeProfile(defaultMatchProfile(s));setFlies(f);setMaps(m);setMatches(ms);setFocusedState(old=>old||preferredReplay(ms)?.id||'')
       if(f.length){setOpponent(f.length>1?f[1].id:f[0].id)}
     }).catch(e=>setError(e.message))
     api<Preview>('/preview').then(setPreview).catch(e=>setError(t("身体模型加载失败：")+e.message))

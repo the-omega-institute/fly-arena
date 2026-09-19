@@ -383,3 +383,5 @@ judge:               event-conservation-v1
 服务端现在在没有对应 SQLite 发布记录时读取 `var/research/evolution-gallery-v038/*-public.json`，并通过同一公开数据返回三条已完成轨迹。画廊中的比赛 ID 也能解析到对应的只读 `scene`、`frames`、`events` 和 `receipt` 文件，所以用户从某一代候选点击回放时仍然进入真实比赛证据。该路径只读已发布文件，不将其当作私有训练会话，也不允许通过它写入数据库。
 
 本地真实检查返回三个算法示例：`cross_entropy`、`evolution`、`random_search`；其中一个静态回放的 `matches/{id}/events` 返回真实事件记录。新增后端测试覆盖没有源数据库时的公开 gallery 与回放资产读取，并保持账户字段和 worker 字段不公开。
+
+Arena 首屏的初始焦点现在按生命证据选择：优先选择至少 30 秒、使用 `engineered-multimodal-v1`、并且有实际摄取记录的已验证回放；若部署中没有这类样本，则退回到有正摄取结果的已验证回放，再退回任意已验证记录。最近比赛列表仍保留原始时间顺序，精选逻辑只影响首次进入时显示的样本，避免访客第一眼看到空结果或失败样本。
