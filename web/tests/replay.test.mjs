@@ -103,3 +103,41 @@ test('event seeking uses actual post-event samples at 20 Hz, 100 Hz and irregula
   }
   assert.equal(eventSampleWindow([],{tick:0,type:'intake'}),null)
 })
+
+const chaptersModule=ts.transpileModule(fs.readFileSync(new URL('../src/features/arena/behaviorSummary.ts',import.meta.url),'utf8'),
+  {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}})
+const {behaviorChapters}=await import('data:text/javascript;base64,'+Buffer.from(chaptersModule.outputText).toString('base64'))
+const behaviorFrames=(times,positions,scores)=>times.map((time,i)=>({time,tick:Math.round(time*10000),positions:[positions[i]],scores:[scores[i]]}))
+
+test('behavior chapters expose movement without intake and conserve actual path across irregular boundaries',()=>{
+  const frames=behaviorFrames([0,2,5.1,7,10.2,11],[[0,0],[3,4],[0,0],[0,3],[0,0],[4,0]],[0,1,1,1,1,1])
+  const events=[{tick:51000,type:'food_contact',slot:0},{tick:51000,type:'contact',slots:[0,1]},
+    {tick:70000,type:'environment_contact',slot:1},{tick:102000,type:'environment_contact',slot:0}]
+  const chapters=behaviorChapters(frames,events,0)
+  assert.deepEqual(chapters.map(c=>[c.start,c.end]),[[0,5.1],[5.1,10.2],[10.2,11]])
+  assert.deepEqual(chapters.map(c=>c.path),[10,6,4])
+  assert.deepEqual(chapters.map(c=>c.displacement),[0,0,4])
+  assert.deepEqual(chapters.map(c=>c.intake),[1,0,0])
+  assert.deepEqual(chapters.map(c=>c.foodContacts),[1,0,0])
+  assert.deepEqual(chapters.map(c=>c.environmentContacts),[0,1,0])
+  assert.deepEqual(chapters.map(c=>c.flyContacts),[1,0,0])
+  assert.equal(behaviorChapters(frames,[{tick:51000,type:'contact',slots:[1,2]}],0)[0].flyContacts,0)
+})
+
+test('missing body or score records never become zero movement or zero intake',()=>{
+  const frames=behaviorFrames([0,2,5],[[0,0],null,[1,0]],[0,undefined,undefined])
+  const chapter=behaviorChapters(frames,[],0)[0]
+  assert.equal(chapter.path,null)
+  assert.equal(chapter.displacement,1)
+  assert.equal(chapter.intake,null)
+  assert.deepEqual(behaviorChapters([],[],0),[])
+  assert.deepEqual(behaviorChapters(frames.slice(0,1),[],0),[])
+})
+
+test('short contact sample has one chapter; initial and final events are retained',()=>{
+  const frames=behaviorFrames([0,.37,1],[[0,0],[2,0],[6,0]],[0,0,1.0552])
+  const events=[{tick:0,type:'food_contact',slot:0},{tick:10000,type:'exit',slot:0}]
+  const [chapter]=behaviorChapters(frames,events,0)
+  assert.equal(chapter.end,1);assert.equal(chapter.intake,1.0552)
+  assert.equal(chapter.foodContacts,1);assert.equal(chapter.exits,1)
+})

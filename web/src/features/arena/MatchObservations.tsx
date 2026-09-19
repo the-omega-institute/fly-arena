@@ -7,6 +7,7 @@ import {useI18n} from '../../shared/i18n'
 import {BrainActivityOverview} from './BrainActivityOverview'
 import {LifeEventTimeline} from './LifeEventTimeline'
 import {eventSampleWindow} from './lifeEvents'
+import {BehaviorChapters} from './BehaviorChapters'
 
 function tracePath(frames:Frame[],read:(frame:Frame)=>number|undefined,max:number) {
   const start=frames[0]?.time||0,end=frames.at(-1)?.time||start
@@ -126,6 +127,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     const scorePeak=Math.max(1,...frames.map(f=>f.scores?.[index]??0))
     return <div className="observation-participant" key={entry?.id||index}>
       <div className="observation-participant-heading"><span><i style={{background:color}}/>{t('Slot')} {index+1} · {entry?.name}</span><small>{entry?.id.slice(0,8)}</small></div>
+      <BehaviorChapters frames={frames} events={visibleEvents} slot={index} time={frame?.time??0} onSeek={onSeek}/>
       <BrainTheater frame={frame} frames={frames} season={season} fly={subjectFly} slot={index} events={visibleEvents} onSeek={onSeek} activityScale={activityScales.region} nodeScale={activityScales.node}/>
       <div className="observation-metrics"><div><span>{t('Food collected')}</span><strong>{shown(frame?.scores?.[index],2)}</strong><svg viewBox="0 0 240 52" role="img" aria-label={t('Food score over time')}><path d={tracePath(frames,f=>f.scores?.[index],scorePeak)} fill="none" stroke={color} strokeWidth="2"/></svg></div><div><span>{t('Energy reserve')}</span><strong>{shown(frame?.energy?.[index])}</strong><svg viewBox="0 0 240 52" role="img" aria-label={t('Energy over time')}><path d={tracePath(frames,f=>f.energy?.[index],Math.max(100,...frames.map(f=>f.energy?.[index]??0)))} fill="none" stroke={color} strokeWidth="2"/></svg></div><div><span>{t('Left / right motor drive')}</span><strong>{shown(frame?.drives?.[index]?.[0],2)} / {shown(frame?.drives?.[index]?.[1],2)}</strong><small>{t('Recorded at')} {shown(frame?.time,2)} s</small></div></div>
       {scene.habitat==='forest-floor'&&<div className="observation-metrics"><div><span>{locale==='zh-CN'?'胸部高度 · mm':'Thorax height · mm'}</span><strong>{shown(frame?.positions?.[index]?.[2],2)}</strong><svg viewBox="0 0 240 52" role="img" aria-label={locale==='zh-CN'?'记录到的身体高度':'Recorded body height'}><path d={tracePath(frames,f=>f.positions?.[index]?.[2],Math.max(1,...frames.map(f=>f.positions?.[index]?.[2]??0)))} fill="none" stroke={color} strokeWidth="2"/></svg><small>{locale==='zh-CN'?'世界坐标 Z；高度变化也可能来自姿态变化或翻倒。':'World Z; height changes may also reflect posture or a fall.'}</small></div></div>}
