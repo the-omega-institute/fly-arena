@@ -883,6 +883,7 @@ test('anatomical replay starts with all recorded circuits and can focus and rest
  const fly={...own,spec:{...spec,connectome_sha256:sha},artifact_id:'own-artifact',brain_graph:{schema:'brain-neighborhood/v1',artifact_id:'own-artifact',connectome_sha256:sha,circuits:{olfactory:positionedGraph,descending}}}
  const frame={time:1,brain:[{sampled_nodes:[{id:'a',activity:1},{id:'d',activity:15}]}]}
  await mount(BrainTheater,{fly,frame,frames:[frame],season:{connectome:{circuits:[{id:'olfactory',label:'Olfactory receptors'},{id:'descending',label:'Descending neurons'}]}},slot:0,events:[],activityScale:20,nodeScale:20,onSeek:noop})
+ assert.ok(document.querySelector('.anatomical-brain-stage'),'a bound anatomical replay opens directly in spatial view')
  await click('Anatomical space · 3D')
  assert.deepEqual(spatialCanvasProps.nodes.map(n=>n.id),['a','b','c','d'])
  await click('Spatial neuron d')

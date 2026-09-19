@@ -61,7 +61,8 @@ The MVP workspace publishes designs, research reports and verified replays. Defa
 
 ## Inspect your fly’s brain during replay
 
-In the Arena neural theatre, choose **Anatomical space · 3D / 解剖空间 · 3D**.
+Replays with bound anatomical graph snapshots open directly in spatial view.
+You can also choose **Anatomical space · 3D / 解剖空间 · 3D** in the neural theatre.
 Drag to rotate, scroll to zoom, or use the XY/XZ views. The gray cloud uses actual
 MaleCNS soma coordinates. The default foreground shows all recorded circuit neighborhoods; choose a
 circuit to focus it. Unrecorded neighbors appear around the selected neuron. Select a node to inspect connection direction,
