@@ -201,6 +201,7 @@ test('observations follow the selected second fly and show its real parent and z
   assert.match(text,/Energy reserve0.0/)
   assert.match(text,/Left \/ right motor drive0.00 \/ 0.00/)
   assert.doesNotMatch(text,/123.0|99.00|88.0/)
+  assert.match(text,/Compare participants/)
   assert.doesNotMatch(html,/NaN|Infinity/)
   assert.match(html,/aria-pressed="true"[^>]*>.*Slot 2 · Descendant/)
 })
