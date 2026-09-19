@@ -1,4 +1,12 @@
 export const catalog = {
+  "Experimental vision + food touch": {en:"Experimental vision + food touch","zh-CN":"实验性视觉 + 食物触觉"},
+  "Experimental vision + food / obstacle / opponent touch": {en:"Experimental vision + food / obstacle / opponent touch","zh-CN":"实验性视觉 + 食物 / 障碍 / 对手触觉"},
+  "Environment contact": {en:"Environment contact","zh-CN":"环境接触"},
+  "Contacted environment": {en:"Contacted environment","zh-CN":"接触的环境对象"},
+  "No contact": {en:"No contact","zh-CN":"无接触"},
+  "Ground support excluded": {en:"Ground support excluded","zh-CN":"不含地面支撑接触"},
+  "Tactile population activity": {en:"Tactile population activity","zh-CN":"触觉神经群活动"},
+  "Recorded population mean \u00b7 model activity": {en:"Recorded population mean \u00b7 model activity","zh-CN":"实际群体均值 · 模型活动值"},
   "实体围挡保留探索空间；果蝇必须靠自己的神经输出继续觅食，也可能碰壁或停滞。": {"en": "Physical walls keep the exploration space enclosed. Neural output drives continued foraging; flies may also collide or get stuck.", "zh-CN": "实体围挡保留探索空间；果蝇必须靠自己的神经输出继续觅食，也可能碰壁或停滞。"},
   "Sensory input profile": {"en": "Sensory input profile", "zh-CN": "感觉输入模式"},
   "Sensory profile": {"en": "Sensory profile", "zh-CN": "感觉模式"},

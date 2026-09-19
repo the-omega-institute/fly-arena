@@ -255,3 +255,22 @@ test('portable replay shows the recorded design without a library and prefers it
     assert.doesNotMatch(text,/×1.900|No saved FlySpec|NaN/)
   }
 })
+
+test('environment touch shows recorded target and neural activity without inventing food contact', () => {
+  const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+  const subject=fly('touch001')
+  const sense={odor:[0,0],visual:[0,0],touch:1,contact_food:[],contact_environment:['obstacle-0'],
+    tactile_activity:0,sensory_profile:'engineered-multimodal-v2',nearest_food:10,mouth_distance:10}
+  const frame={time:.1,tick:1000,poses:[],positions:[],senses:[sense]}
+  const props={scene:{flies:[subject]},frame,frames:[frame],flies:[subject],selectedId:subject.id,season:{connectome:{circuits:[]}}}
+  const fallback=textOnly(render(MatchObservations,props))
+  assert.match(fallback,/Contacted environmentobstacle-0/)
+  assert.match(fallback,/Tactile population activity0\.000/)
+  assert.doesNotMatch(fallback,/Food contact/)
+  const events=[{type:'environment_contact',tick:1000,slot:0,objects:['obstacle-0']}]
+  assert.match(textOnly(render(MatchObservations,{...props,events})),/Environment contact · obstacle-0/)
+  const oldFrame={...frame,senses:[{odor:[0,0],visual:[0,0],touch:1,nearest_food:0,mouth_distance:0}]}
+  const oldText=textOnly(render(MatchObservations,{...props,frame:oldFrame,frames:[oldFrame]}))
+  assert.match(oldText,/Food contact/)
+  assert.doesNotMatch(oldText,/Contacted environment/)
+})

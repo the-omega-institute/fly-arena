@@ -105,7 +105,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     runtime_sensory = receipt["runtime"].get("sensory_profile", {"id": "odor-only-v1"})
     if runtime_sensory.get("id") != request.sensory_profile:
         raise ValueError("Receipt sensory profile mismatch")
-    if request.sensory_profile == "engineered-multimodal-v1":
+    if request.sensory_profile in ("engineered-multimodal-v1", "engineered-multimodal-v2"):
         encoder = stored_scene.get("sensory_encoder", {})
         if encoder.get("profile") != runtime_sensory or not encoder.get("groups"):
             raise ValueError("Receipt sensory encoder manifest mismatch")
@@ -148,7 +148,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     if type(result["final_tick"]) is not int or result["final_tick"] != end:
         raise ValueError("Replay is missing ticks or final state")
     _validate_frames(frames, stored_scene, end, pose_ticks, len(artifacts))
-    if request.sensory_profile == "engineered-multimodal-v1":
+    if request.sensory_profile in ("engineered-multimodal-v1", "engineered-multimodal-v2"):
         encoder_sha = digest(stored_scene["sensory_encoder"])
         for frame in frames[1:]:
             senses = frame.get("senses", [])
@@ -165,9 +165,19 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                 currents = _finite_array([values.get(k) for k in channels], (5,), "neural input")
                 if np.any(currents < 0) or np.any(currents > 1):
                     raise ValueError("Recorded neural input outside [0,1]")
+                if request.sensory_profile == "engineered-multimodal-v2":
+                    contacts = sense.get("contact_environment")
+                    targets = {f"obstacle-{i}" for i in range(len(scene["obstacles"]))}
+                    targets.update(f"fly-{i}" for i in range(len(artifacts)))
+                    if (not isinstance(contacts, list) or
+                            any(not isinstance(c, str) or c not in targets for c in contacts) or
+                            sense["touch"] != float(bool(sense.get("contact_food") or contacts))):
+                        raise ValueError("Environmental touch differs from contact observations")
                 if not np.array_equal(currents[2:], [*sense["visual"], sense["touch"]]):
                     raise ValueError("Neural input differs from embodied observations")
     n, nf = len(artifacts), len(scene["food"])
+    environment_targets = {f"obstacle-{i}" for i in range(len(scene["obstacles"]))}
+    environment_targets.update(f"fly-{i}" for i in range(n))
     scores, eaten = np.zeros(n), np.zeros(nf)
     exits = [None] * n
     prior_tick = 0
@@ -203,6 +213,14 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                 raise ValueError("Invalid sensory detection event")
             if not all(isinstance(value, (int, float)) and math.isfinite(value) and value >= 0 for value in values):
                 raise ValueError("Invalid sensory detection values")
+        elif event["type"] == "environment_contact":
+            slot, objects = event.get("slot"), event.get("objects")
+            if (request.sensory_profile != "engineered-multimodal-v2" or
+                    not isinstance(slot, int) or not 0 <= slot < n or
+                    not isinstance(objects, list) or not objects or
+                    any(not isinstance(obj, str) or obj not in environment_targets or obj == f"fly-{slot}"
+                        for obj in objects)):
+                raise ValueError("Invalid environment contact event")
         elif event["type"] == "food_contact":
             slot, distance = event.get("slot"), event.get("mouth_distance")
             if (not isinstance(slot, int) or not 0 <= slot < n or

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from flyarena.common import digest, file_sha, write_json
-from flyarena.experiments.embodied_sensor import EmbodiedSensor, PROFILE
+from flyarena.experiments.embodied_sensor import EmbodiedSensor, PROFILE, ENVIRONMENT_PROFILE
 from flyarena.neural import Brain
 from flyarena.rate import RateBrain
 
@@ -76,7 +76,8 @@ def test_full_connectome_uses_official_tactile_and_side_annotations():
         assert np.all(g.side[encoder.groups[name]]==sign)
 
 
-def test_real_physics_records_inputs_and_encoder_manifest(tmp_path):
+@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE])
+def test_real_physics_records_inputs_and_encoder_manifest(tmp_path, monkeypatch, profile):
     from test_replay_parity import tiny_assets
     from flyarena.connectome import Connectome
     from flyarena.compiler import Compiler
@@ -94,7 +95,15 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path):
     graph=Connectome(data);artifact=Compiler(graph).compile(
         FlySpec(name='fixture',connectome_sha256=manifest['sha256']),publish=True,root=var)
     fly=dict(id='a'*32,name='fixture',color='mint',artifact_id=artifact['artifact_id'])
-    request=MatchRequest(fly_ids=[fly['id']],mode='forage',duration_seconds=1,sensory_profile=PROFILE['id'])
+    if profile == ENVIRONMENT_PROFILE:
+        # A declared fixture places an anatomical body against a real wall;
+        # the full integration below must carry that MuJoCo contact to the brain.
+        from flyarena.scenarios import arena_scene
+        scene = arena_scene('enclosure', 42)
+        scene['spawns'] = [[11.8, 0, 0]]
+        monkeypatch.setattr('flyarena.runner.arena_scene', lambda *args: dict(scene))
+        monkeypatch.setattr('flyarena.judge.receipt_scene', lambda *args: dict(scene))
+    request=MatchRequest(fly_ids=[fly['id']],mode='forage',duration_seconds=1,sensory_profile=profile['id'])
     out=tmp_path/'run';receipt=simulate(request,[fly],out,data=data,var=var)
     assert verify(out)['status']=='verified'
     scene=json.loads((out/'scene.json').read_text());frames=json.loads((out/'frames.json').read_text())
@@ -102,27 +111,37 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path):
     events=json.loads((out/'events.json').read_text())
     assert result['food_contact_ticks']==[[e['tick'] for e in events if e['type']=='food_contact' and e['slot']==0]]
     assert result['intake_ticks']==[[e['tick'] for e in events if e['type']=='intake' and e['slot']==0]]
-    assert scene['sensory_encoder']==EmbodiedSensor(graph).manifest
-    assert receipt['runtime']['sensory_profile']==PROFILE
+    assert scene['sensory_encoder']==EmbodiedSensor(graph,profile['id']).manifest
+    assert receipt['runtime']['sensory_profile']==profile
     for frame in frames[1:]:
         sense=frame['senses'][0];encoded=sense['neural_input']
         assert encoded['group_manifest_sha256']==digest(scene['sensory_encoder'])
         assert encoded['values']['visual_left']==sense['visual'][0]
         assert encoded['values']['touch']==sense['touch']
-    assert any(f['senses'][0]['visual'][0]>0 for f in frames)
+    if profile == ENVIRONMENT_PROFILE:
+        contacts = [f['senses'][0] for f in frames[1:] if f['senses'][0]['contact_environment']]
+        assert contacts
+        assert all(c['neural_input']['values']['touch'] == 1 for c in contacts)
+        assert all(c['tactile_activity'] is not None for c in contacts)
+        assert any(e['type'] == 'environment_contact' for e in events)
+        assert not any(e['type'] == 'food_contact' for e in events)
+    else:
+        assert any(f['senses'][0]['visual'][0]>0 for f in frames)
 
 
-def test_experimental_results_do_not_change_public_ranking():
+@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE])
+def test_experimental_results_do_not_change_public_ranking(profile):
     from flyarena.services.ranking import rank,tournament_projection
     ids=['a'*32,'b'*32];flies=[{'id':i} for i in ids]
     match={'status':'verified','runtime_hash':'fixture','created':1,
-           'request':{'fly_ids':ids,'map_id':'orchard','mode':'contest','sensory_profile':PROFILE['id']},
+           'request':{'fly_ids':ids,'map_id':'orchard','mode':'contest','sensory_profile':profile['id']},
            'result':{'scores':[20,0],'winner_slot':0}}
     assert all(r['matches']==0 for r in rank(flies,[match]))
     assert all(r['played']==0 for r in tournament_projection([match],ids)['standings'])
 
 
-def test_research_bridge_cannot_silently_inherit_experimental_input():
+@pytest.mark.parametrize("profile", [PROFILE, ENVIRONMENT_PROFILE])
+def test_research_bridge_cannot_silently_inherit_experimental_input(profile):
     from flyarena.contracts import MatchRequest
     with pytest.raises(ValueError,match='legacy-v1 only'):
-        MatchRequest(fly_ids=['a'*32],mode='forage',bridge_profile='sensorimotor-research-v2',sensory_profile=PROFILE['id'])
+        MatchRequest(fly_ids=['a'*32],mode='forage',bridge_profile='sensorimotor-research-v2',sensory_profile=profile['id'])

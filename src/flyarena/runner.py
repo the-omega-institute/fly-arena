@@ -18,15 +18,16 @@ from .neural import Brain, PROFILE
 from .models import PROFILES, make_brain, require_model_bridge
 from .scenarios import RULES, arena_scene
 from .replay import POLICY, REPLAY_RECEIPT
+from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILE
 
 
 def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                      sensory_profile: str = "odor-only-v1") -> dict:
-    from .experiments.embodied_sensor import PROFILE as MULTIMODAL_PROFILE, validate_profile
+    from .experiments.embodied_sensor import validate_profile
     validate_profile(bridge_profile, sensory_profile)
     sensory = {"id": sensory_profile}
-    if sensory_profile == MULTIMODAL_PROFILE["id"]:
-        sensory = dict(MULTIMODAL_PROFILE)
+    if sensory_profile in SENSORY_PROFILES:
+        sensory = dict(SENSORY_PROFILES[sensory_profile])
     if bridge_profile == "sensorimotor-research-v2":
         from .experiments.probes import profile_manifest, runtime_closure
         profile = profile_manifest(data)
@@ -39,7 +40,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                 "sensory_profile": sensory,
                 "sensors": {"olfaction": "analytic_bilateral_v2",
                              "vision": "raycast_engineered_observation_v1",
-                             "touch": "mujoco_food_contact_observation_v1"}}
+                             "touch": sensory.get("touch", {}).get("source", "mujoco_food_contact_observation_v1")}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
     files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
@@ -50,7 +51,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
             "sensory_profile": sensory,
             "sensors": {"olfaction": "analytic_bilateral_v1",
                         "vision": "raycast_engineered_observation_v1",
-                        "touch": "mujoco_food_contact_observation_v1"},
+                        "touch": sensory.get("touch", {}).get("source", "mujoco_food_contact_observation_v1")},
             "connectome_sha256": json.loads((data / "connectome/manifest.json").read_text())["sha256"],
             "readout_weights_sha256": file_sha(data / "connectome/readout.npz"),
             "mujoco": mujoco.__version__, "python": platform.python_version(),
@@ -69,9 +70,9 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     graph = Connectome(data, verify=True)
     compiler = Compiler(graph)
     sensory_encoder = None
-    if request.sensory_profile == "engineered-multimodal-v1":
+    if request.sensory_profile in SENSORY_PROFILES:
         from .experiments.embodied_sensor import EmbodiedSensor
-        sensory_encoder = EmbodiedSensor(graph)
+        sensory_encoder = EmbodiedSensor(graph, request.sensory_profile)
     readout, ro = None, None
     if not v2:
         readout = json.loads((data / "connectome/readout.json").read_text())
@@ -119,8 +120,12 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     eliminated = np.zeros(len(flies), dtype=bool)
     exit_ticks = [None for _ in flies]
     frames, events = [], []
+    environment_touch = request.sensory_profile == ENVIRONMENT_PROFILE["id"]
+    touch_status = frozen_runtime["sensors"]["touch"]
+    environment_latches = [set() for _ in flies]
     senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "raycast_engineered_observation",
-               "touch": 0.0, "touch_status": "mujoco_food_contact_observation_v1", "contact_food": [],
+               "touch": 0.0, "touch_status": touch_status, "contact_food": [],
+               **({"contact_environment": []} if environment_touch else {}),
                "nearest_food": None, "mouth_distance": None,
                "sensory_profile": request.sensory_profile} for _ in flies]
     sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
@@ -196,10 +201,12 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             mouth = bodies.mouth(slot)
             mouth_distance = float(np.min(np.linalg.norm(food_xy - mouth[:2], axis=1))) if len(food_xy) else None
             contact_food = [] if request.mode == "sumo" else bodies.food_contacts(slot)
-            touch = float(bool(contact_food))
+            contact_environment = bodies.environment_contacts(slot) if environment_touch else []
+            touch = float(bool(contact_food or contact_environment))
             senses[slot] = {"odor": [float(odor[0]), float(odor[1])], "visual": visual,
                             "visual_status": "raycast_engineered_observation",
-                            "touch": touch, "touch_status": "mujoco_food_contact_observation_v1",
+                            "touch": touch, "touch_status": touch_status,
+                            **({"contact_environment": contact_environment} if environment_touch else {}),
                             "contact_food": contact_food, "nearest_food": nearest,
                             "mouth_distance": mouth_distance,
                             "sensory_profile": request.sensory_profile}
@@ -211,13 +218,19 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 events.append({"type": "visual_target_detected", "tick": bodies.tick, "slot": slot,
                                "values": visual, "observation": "raycast_engineered_geometry"})
             sensory_latches[slot]["visual"] = max(visual) > .05
-            if touch and not sensory_latches[slot]["touch"]:
+            if contact_food and not sensory_latches[slot]["touch"]:
                 events.append({"type": "food_contact", "tick": bodies.tick, "slot": slot,
                                "mouth_distance": mouth_distance,
                                "food": contact_food,
                                "observation": "mujoco_food_contact"})
                 food_contact_ticks[slot].append(bodies.tick)
-            sensory_latches[slot]["touch"] = bool(touch)
+            sensory_latches[slot]["touch"] = bool(contact_food)
+            new_contacts = set(contact_environment) - environment_latches[slot]
+            if new_contacts:
+                events.append({"type": "environment_contact", "tick": bodies.tick, "slot": slot,
+                               "objects": sorted(new_contacts),
+                               "observation": "mujoco_anatomical_contact"})
+            environment_latches[slot] = set(contact_environment)
             if v2:
                 backend = backends[slot]
                 encoded = encode_odor(*odor)
@@ -237,6 +250,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 else:
                     brain.stimulate(float(encoded[0]), float(encoded[1]))
                 brain.advance(RULES["sense_ticks"])
+                if sensory_encoder:
+                    tactile_group = sensory_encoder.groups["touch"]
+                    senses[slot]["tactile_activity"] = (
+                        float(np.mean(brain.rates[tactile_group])) if len(tactile_group) else None)
                 command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
                 # Fixed low-pass decoder; no access to food or world coordinates.
                 drives[slot] = .85 * drives[slot] + .15 * np.clip(command, 0, 1.5)
