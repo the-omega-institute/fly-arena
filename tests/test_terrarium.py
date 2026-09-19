@@ -182,14 +182,17 @@ def test_enclosure_wall_collides_with_body():
     walls = set(_obstacle_geoms(bodies)[:16])
     mouth = bodies.mouth_contact_geom_ids[0]
     contacts = 0
+    sensed = set()
     for _ in range(500):
         bodies.step(np.array([[1., 1.]]))
+        sensed.update(bodies.environment_contacts(0))
         assert not any(mouth in (int(c.geom1), int(c.geom2)) and
                        (int(c.geom1) in walls or int(c.geom2) in walls)
                        for c in bodies.data.contact if c.dist <= 0)
         contacts += sum((int(c.geom1) in walls and int(c.geom2) in bodies.geom_slots) or
                         (int(c.geom2) in walls and int(c.geom1) in bodies.geom_slots) for c in bodies.data.contact)
     assert contacts > 0
+    assert sensed and all(name.startswith("obstacle-") for name in sensed)
     assert np.isfinite(bodies.data.qpos).all()
 
 
@@ -202,5 +205,25 @@ def test_feeding_probes_do_not_push_another_fly():
     bodies = Bodies(scene, 2, 42)
     probes = set(bodies.mouth_contact_geom_ids.values())
     assert bodies.contact_between_flies()
+    assert bodies.environment_contacts(0) == ["fly-1"]
+    assert bodies.environment_contacts(1) == ["fly-0"]
     assert not any(probes.intersection((int(c.geom1), int(c.geom2)))
                    for c in bodies.data.contact if c.dist <= 0)
+
+
+def test_ground_support_and_food_probe_do_not_become_environment_touch():
+    scene = scenario('orchard', 42)
+    scene['obstacles'] = []
+    scene['food'] = [scene['food'][0]]
+    x, y, _ = scene['food'][0]['position']
+    scene['spawns'] = [[x - .2, y, 0]]
+    bodies = Bodies(scene, 1, 42)
+    assert bodies.food_contacts(0)
+    assert bodies.environment_contacts(0) == []
+    ground_contacts = 0
+    for _ in range(500):
+        bodies.step(np.zeros((1, 2)))
+        assert bodies.environment_contacts(0) == []
+        ground_contacts += sum(any(bodies.model.geom_type[int(g)] == mj.mjtGeom.mjGEOM_PLANE
+                                   for g in (c.geom1, c.geom2)) for c in bodies.data.contact)
+    assert ground_contacts > 0

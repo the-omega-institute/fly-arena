@@ -28,24 +28,36 @@ PROFILE = {
 }
 
 
+ENVIRONMENT_PROFILE = {
+    **PROFILE, "id": "engineered-multimodal-v2",
+    "touch": {**PROFILE["touch"],
+              "source": "mujoco_food_and_environment_contact_v2",
+              "aggregation": "binary OR of mouth-food, anatomical obstacle and opponent contact; ground support excluded"},
+}
+PROFILES = {p["id"]: p for p in (PROFILE, ENVIRONMENT_PROFILE)}
+
+
 def catalog():
     return [
         {"id": "odor-only-v1", "name": "Bilateral odor only", "ready": True},
-        {"id": PROFILE["id"], "name": "Experimental vision + touch", "ready": True,
-         "ranking_eligible": False, "bridge_profiles": ["legacy-v1"],
-         "reason": "Engineered sensory currents; unranked sandbox runs only."},
+        *[{"id": profile["id"], "name": name, "ready": True,
+           "ranking_eligible": False, "bridge_profiles": ["legacy-v1"],
+           "reason": "Engineered sensory currents; unranked sandbox runs only."}
+          for profile, name in ((PROFILE, "Experimental vision + food touch"),
+                                (ENVIRONMENT_PROFILE, "Experimental vision + food / obstacle / opponent touch"))],
     ]
 
 
 def validate_profile(bridge_profile, sensory_profile):
-    if sensory_profile not in ("odor-only-v1", PROFILE["id"]):
+    if sensory_profile not in ("odor-only-v1", *PROFILES):
         raise ValueError("Unknown sensory profile")
-    if sensory_profile == PROFILE["id"] and bridge_profile != "legacy-v1":
+    if sensory_profile in PROFILES and bridge_profile != "legacy-v1":
         raise ValueError("Experimental sensory input currently supports legacy-v1 only")
 
 
 class EmbodiedSensor:
-    def __init__(self, graph):
+    def __init__(self, graph, profile_id=PROFILE["id"]):
+        self.profile = PROFILES[profile_id]
         self.groups = {"odor_" + side: np.asarray(graph.groups["olfactory_" + side], dtype=np.int32)
                        for side in ("left", "right")}
         visual = np.asarray(graph.groups.get("visual", []), dtype=np.int32)
@@ -68,7 +80,7 @@ class EmbodiedSensor:
             tactile = graph.groups.get("mechanosensory_tactile", [])
         self.groups["touch"] = np.asarray(tactile, dtype=np.int32)
         self.manifest = {
-            "profile": PROFILE,
+            "profile": self.profile,
             "groups": {name: {"count": len(indices),
                                "neuron_ids_sha256": digest(graph.ids[indices].tolist())}
                        for name, indices in self.groups.items()},
@@ -79,18 +91,18 @@ class EmbodiedSensor:
         raw = np.asarray([odor_left, odor_right, visual_left, visual_right, touch], dtype=float)
         if not np.isfinite(raw).all() or np.any(raw < 0) or np.any(raw > 1):
             raise ValueError("Sensory values must be finite in [0,1]")
-        for name, value in zip(PROFILE["channels"], raw):
+        for name, value in zip(self.profile["channels"], raw):
             if value and not len(self.groups[name]):
                 raise ValueError(f"{name} requires an annotated sensory group")
         # Reuse the unchanged odor encoder; zero extra inputs exactly preserve
         # its current, including on fixtures with overlapping circuit labels.
         brain.stimulate(float(odor_left), float(odor_right))
-        gains = {"visual_left": PROFILE["visual"]["gain_mv"],
-                 "visual_right": PROFILE["visual"]["gain_mv"],
-                 "touch": PROFILE["touch"]["gain_mv"]}
+        gains = {"visual_left": self.profile["visual"]["gain_mv"],
+                 "visual_right": self.profile["visual"]["gain_mv"],
+                 "touch": self.profile["touch"]["gain_mv"]}
         for name, value in (("visual_left", visual_left),
                             ("visual_right", visual_right), ("touch", touch)):
             if value:
                 brain.external[self.groups[name]] += gains[name] * value
-        return {"profile": PROFILE["id"], "values": dict(zip(PROFILE["channels"], raw.tolist())),
+        return {"profile": self.profile["id"], "values": dict(zip(self.profile["channels"], raw.tolist())),
                 "group_manifest_sha256": self.sha256}

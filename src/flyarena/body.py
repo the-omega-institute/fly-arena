@@ -191,6 +191,34 @@ class Bodies:
                 touched.append(food_by_geom[other])
         return sorted(set(touched))
 
+    def environment_contacts(self, slot: int) -> list[str]:
+        """Actual anatomical contact with obstacles or opponents, excluding ground.
+
+        Ground support and the invisible feeding probe are not environmental
+        touch. This binary observation does not infer receptors or laterality.
+        """
+        touched = set()
+        probe = self.mouth_contact_geom_ids[slot]
+        for contact in self.data.contact:
+            if contact.dist > 0:
+                continue
+            a, b = int(contact.geom1), int(contact.geom2)
+            if self.geom_slots.get(a) == slot:
+                own, other = a, b
+            elif self.geom_slots.get(b) == slot:
+                own, other = b, a
+            else:
+                continue
+            if own == probe or other in self.mouth_contact_geom_ids.values():
+                continue
+            opponent = self.geom_slots.get(other)
+            name = mj.mj_id2name(self.model, mj.mjtObj.mjOBJ_GEOM, other) or ""
+            if opponent is not None and opponent != slot:
+                touched.add(self.names[opponent])
+            elif name.startswith("obstacle-"):
+                touched.add(name)
+        return sorted(touched)
+
     def step(self, drives: np.ndarray):
         # Observe all flies before writing any controls; advance the shared world once.
         observations = [HybridControllerObservation.from_sim(self.sim, name) for name in self.names]

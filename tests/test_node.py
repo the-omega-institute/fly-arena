@@ -153,7 +153,7 @@ def test_old_node_cannot_silently_downgrade_multimodal_input(monkeypatch):
     assert not node._runtime
 
 
-@pytest.mark.parametrize('sensory', [None, 'engineered-multimodal-v1'])
+@pytest.mark.parametrize('sensory', [None, 'engineered-multimodal-v1', 'engineered-multimodal-v2'])
 def test_node_describe_uses_requested_sensory_profile(monkeypatch, capsys, sensory):
     calls = []
     def manifest(**kwargs):
