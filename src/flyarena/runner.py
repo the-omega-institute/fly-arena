@@ -137,7 +137,11 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
         circuit_id = circuit["id"]
         group = np.asarray(graph.groups.get(circuit_id, []), dtype=np.int64)
         if len(group):
-            sample_nodes.extend(group[np.linspace(0, len(group) - 1, min(6, len(group)), dtype=int)].tolist())
+            # The browser's canonical neuron endpoint exposes the first
+            # ``limit`` members of each group.  Keep the fixed replay sample
+            # inside that same deterministic window so recorded activity can
+            # always be joined to the real metadata and local edge display.
+            sample_nodes.extend(group[:min(6, len(group))].tolist())
     if not sample_nodes:
         sample_nodes = np.linspace(0, graph.n - 1, min(48, graph.n), dtype=int).tolist()
     sample_nodes = list(dict.fromkeys(int(i) for i in sample_nodes))[:48]
