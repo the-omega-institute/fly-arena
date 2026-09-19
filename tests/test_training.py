@@ -26,6 +26,46 @@ def complete_next(store,scores):
     store.finish(ident,lease,{'scores':scores,'winner_slot':None,'outcome':'solo','receipt_sha256':'fixture'})
     return ident
 
+
+def test_training_can_evaluate_ready_research_assets_without_match_qualification(lab, monkeypatch, tmp_path):
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    from flyarena.bridge import training_profiles, match_profiles
+    store, service, user, parent = lab
+    monkeypatch.setattr('flyarena.api.Connectome', lambda: service.compiler().graph)
+    monkeypatch.setattr('flyarena.api.runtime_manifest', lambda **kw: {'fixture': True, **kw})
+    monkeypatch.setattr('flyarena.bridge.profile_manifest', lambda *args: {'ready': True})
+    monkeypatch.setattr('flyarena.bridge.QUALIFICATION', tmp_path / 'missing.json')
+    assert training_profiles()[1]['ready']
+    assert not match_profiles()[1]['ready']
+    with TestClient(create_app(with_worker=False, store=store, auth_config=AuthConfig())) as client:
+        client.headers['Authorization'] = 'Bearer ' + user['token']
+        body = {'founder_id': parent['id'], 'population': 2, 'generations': 1,
+                'circuits': ['olfactory'], 'bridge_profile': 'sensorimotor-research-v2'}
+        response = client.post('/api/v1/training', json=body)
+        assert response.status_code == 202, response.text
+        ident = response.json()['id']
+        for _ in range(3):
+            service.tick()  # Two candidates, then the first queued evaluation.
+        match = store.matches()[0]
+        assert match['request']['bridge_profile'] == body['bridge_profile']
+        # Ordinary matches still follow their independent admission policy.
+        response = client.post('/api/v1/matches', json={
+            'fly_ids': [parent['id']], 'mode': 'forage', 'bridge_profile': body['bridge_profile']})
+        assert response.status_code == 422
+        assert 'Bridge unavailable' in response.json()['detail']
+        assert client.post('/api/v1/training', json=body | {
+            'sensory_profile': 'engineered-contact-support-v1'}).status_code == 422
+        rate_spec = FlySpec.model_validate(parent['spec']).model_copy(update={'model_profile': 'malecns-rate-cpu-v1'})
+        rate = store.add_fly(user['id'], rate_spec.model_dump(), service.compiler().compile(rate_spec, publish=True, root=store.root))
+        assert client.post('/api/v1/training', json=body | {'founder_id': rate['id']}).status_code == 422
+        monkeypatch.setattr('flyarena.bridge.profile_manifest', lambda *args: {
+            'ready': False, 'reason': 'incompatible readout'})
+        response = client.post('/api/v1/training', json=body | {'name': 'Unavailable'})
+        assert response.status_code == 422 and 'Training bridge unavailable' in response.json()['detail']
+        assert service.get(ident)['spec']['bridge_profile'] == body['bridge_profile']
+
 def test_generation_selection_hidden_candidates_publication_and_reload(lab):
     store,service,user,parent=lab;run=create(lab)
     scores=iter([1.,3.,3.,2.])

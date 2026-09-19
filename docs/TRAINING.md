@@ -325,3 +325,24 @@ plugins receive evaluated fitness and per-match components in their history;
 plugin-specific objective settings can also be supplied in the local config.
 Use longer observation windows and evaluate held-out seeds before claiming an
 improvement; changing the objective does not itself produce evolved behavior.
+
+## Choose the sensorimotor setup independently
+
+The training form separates **brain dynamics**, **sensorimotor setup**, and **weight optimizer**. The founder supplies its LIF or continuous-rate brain; the selected setup converts sensation into neural input and descending activity into body commands; the optimizer proposes new FlySpecs between evaluations. Branching from a saved descendant restores the setup as well as the environment.
+
+`GET /api/v1/season` advertises `training_bridge_profiles` with availability, supported brain models and sensory profiles. Training uses compatible installed readout assets and its existing resource budget. Availability allows an experiment; it does not claim that the controller succeeds at its task. Training evaluations remain excluded from the public leaderboard, and ordinary match/tournament qualification is separate.
+
+| Training setup | Brain | Inputs that enter the brain |
+| --- | --- | --- |
+| `legacy-v1`: linear readout and filtered drive | LIF or experimental rate | Odor, or the selected experimental visual/taste/touch profile |
+| `sensorimotor-research-v2`: kernel readout and motor transfer | LIF | Odor only; recorded vision and touch are observations |
+
+The second setup requires its compatible frozen readout bundle; missing or incompatible assets remain unavailable. Switching setups can also change encoding and initial headings, so compare each candidate against its own baseline under the same setup. Do not interpret cross-setup fitness differences as the effect of weight mutations alone.
+
+AI/custom optimizers may select the setup when creating a session:
+
+```sh
+python scripts/custom_strategy.py --bridge-profile sensorimotor-research-v2 --sensory-profile odor-only-v1 --seconds 10 --generations 2 --population 2 --budget 4
+```
+
+When attaching with `--run`, the session's recorded setup is retained. Older deployments without the training setup catalog expose the existing legacy option only.
