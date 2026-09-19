@@ -274,3 +274,16 @@ test('environment touch shows recorded target and neural activity without invent
   assert.match(oldText,/Food contact/)
   assert.doesNotMatch(oldText,/Contacted environment/)
 })
+
+test('life timeline starts with early feeding and exposes navigation for long records',()=>{
+  const {LifeEventTimeline}=require('./src/features/arena/LifeEventTimeline.js')
+  const events=[{type:'food_contact',tick:100,slot:0},
+    ...Array.from({length:25},(_,i)=>({type:'environment_contact',tick:200+i*100,slot:0}))]
+  const html=render(LifeEventTimeline,{events,slot:0,time:.01,onSelect:noop,label:e=>e.type})
+  assert.match(textOnly(html),/food_contact/)
+  assert.match(textOnly(html),/1–12 \/ 26/)
+  assert.match(html,/aria-label="Filter life events"/)
+  assert.match(html,/aria-label="Earlier events" disabled=""/)
+  assert.match(html,/aria-label="Later events"/)
+  assert.match(html,/aria-current="step"/)
+})

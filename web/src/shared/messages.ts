@@ -1,4 +1,12 @@
 export const catalog = {
+  "Filter life events": {en:"Filter life events","zh-CN":"筛选生命事件"},
+  "All events": {en:"All events","zh-CN":"全部事件"},
+  "Food and sensing": {en:"Food and sensing","zh-CN":"食物与感知"},
+  "Body contact": {en:"Body contact","zh-CN":"身体接触"},
+  "Locate playhead": {en:"Locate playhead","zh-CN":"定位播放时刻"},
+  "No events in this category.": {en:"No events in this category.","zh-CN":"这一类别没有事件。"},
+  "Earlier events": {en:"Earlier events","zh-CN":"更早事件"},
+  "Later events": {en:"Later events","zh-CN":"更晚事件"},
   "Experimental vision + food touch": {en:"Experimental vision + food touch","zh-CN":"实验性视觉 + 食物触觉"},
   "Experimental vision + food / obstacle / opponent touch": {en:"Experimental vision + food / obstacle / opponent touch","zh-CN":"实验性视觉 + 食物 / 障碍 / 对手触觉"},
   "Environment contact": {en:"Environment contact","zh-CN":"环境接触"},
