@@ -37,10 +37,13 @@ class LifeLedger:
 
     def visible(self,ident,owner=None):
         with self.store.db() as db:
-            return db.execute('''SELECT 1 FROM flies f WHERE f.id=? AND (
+            present=db.execute('''SELECT 1 FROM flies f WHERE f.id=? AND (
                 f.owner=? OR NOT EXISTS(SELECT 1 FROM training_members m WHERE m.fly_id=f.id AND m.saved=0)
                 OR EXISTS(SELECT 1 FROM training_members m JOIN training_publications p ON p.run_id=m.run_id WHERE m.fly_id=f.id))''',
                 (ident,owner)).fetchone() is not None
+            exists=db.execute('SELECT 1 FROM flies WHERE id=?',(ident,)).fetchone() is not None
+        # A bundle must never make a private database record public by ID collision.
+        return present if exists else self.store.published_fly(ident) is not None
 
     def listing(self,owner=None):
         with self.store.db() as db:
@@ -53,7 +56,7 @@ class LifeLedger:
     def card(self,ident,owner=None):
         fly=self.store.fly(ident)
         return {'id':ident,'name':fly['name'],'color':fly['color'],'parent_id':fly['spec']['parent_id'],
-                'created':fly['created'],'reference_kind':fly['reference_kind'],'can_annotate':fly['owner']==owner}
+                'created':fly['created'],'reference_kind':fly['reference_kind'],'can_annotate':owner is not None and fly['owner']==owner}
 
     def visible_match(self,match,owner):
         with self.store.db() as db:
@@ -64,7 +67,7 @@ class LifeLedger:
 
     def get(self,ident,owner=None):
         if not self.visible(ident,owner):return None
-        fly=self.store.fly(ident);can_annotate=fly['owner']==owner
+        fly=self.store.fly(ident);can_annotate=owner is not None and fly['owner']==owner
         fly.pop('owner',None);fly.pop('designer',None)
         with self.store.db() as db:
             origin=db.execute('''SELECT r.*,m.generation,m.slot,m.fitness,m.saved FROM training_members m
@@ -75,9 +78,13 @@ class LifeLedger:
             children=[r[0] for r in db.execute("SELECT id FROM flies WHERE json_extract(spec,'$.parent_id')=? ORDER BY created LIMIT 100",(ident,))]
             notes=[dict(r) for r in db.execute('SELECT id,action,reason,match_id,supersedes,created FROM life_notes WHERE fly_id=? ORDER BY created,id',(ident,))]
             if origin and origin['owner']!=owner and not db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(origin['id'],)).fetchone():origin=None
+        from .training import TrainingService
+        training=TrainingService(self.store,None)
+        public_matches={m['id']:m for m in training.gallery_matches() if ident in m.get('request',{}).get('fly_ids',[])}
+        match_ids+= [mid for mid in public_matches if mid not in match_ids]
         experiences=[]
         for mid in match_ids:
-            match=self.store.match(mid)
+            match=self.store.match(mid) or public_matches.get(mid)
             if not self.visible_match(match,owner):continue
             match.pop('owner',None);runtime=match.pop('runtime_hash',None)
             slots=[i for i,f in enumerate(match['request']['fly_ids']) if f==ident]
@@ -107,6 +114,11 @@ class LifeLedger:
             origin_info={'run_id':origin['id'],'strategy':plan['strategy'],'optimizer_name':plan.get('optimizer_name',''),
                          'round':origin['generation']+1,'slot':origin['slot'],'fitness':origin['fitness'],'saved':bool(origin['saved']),
                          'evaluation_context':origin['runtime_hash'],'plan':plan}
+        if origin_info is None and fly.get('source',{}).get('kind')=='published-training':
+            source=fly['source'];plan=source['plan']
+            origin_info={'run_id':source['run_id'],'strategy':plan['strategy'],'optimizer_name':plan.get('optimizer_name',''),
+                         'round':source['generation']+1,'slot':source['slot'],'fitness':source['fitness'],'saved':False,
+                         'evaluation_context':source['evaluation_context'],'plan':plan}
         return {'fly':fly,'can_annotate':can_annotate,'origin':origin_info,'ancestors':ancestors,
                 'descendants':[self.card(c,owner) for c in children if self.visible(c,owner)],
                 'experiences':experiences,'notes':notes,
@@ -119,7 +131,7 @@ class LifeLedger:
         note=LifeNote.model_validate(note)
         if not key or len(key)>128:raise ValueError('Provide an Idempotency-Key of at most 128 characters')
         fly=self.store.fly(ident)
-        if fly is None or fly['owner']!=owner:raise ValueError('Only the designer can annotate this fly')
+        if owner is None or fly is None or fly['owner']!=owner:raise ValueError('Only the designer can annotate this fly')
         if note.match_id:
             match=self.store.match(note.match_id)
             if not match or ident not in match['request']['fly_ids'] or not self.visible_match(match,owner):
@@ -144,13 +156,21 @@ class LifeLedger:
 
     def observation(self,ident,mid,owner=None):
         if not self.visible(ident,owner):return None
-        match=self.store.match(mid)
+        from .training import TrainingService
+        training=TrainingService(self.store,None)
+        local=self.store.match(mid)
+        match=local or training.gallery_match(mid)
         if not match or ident not in match['request']['fly_ids'] or not self.visible_match(match,owner):return None
         if match['status']!='verified':return {'status':match['status'],'observations':None}
         folder=self.store.result_folder(match)
         try:
-            frames=json.loads((folder/'frames.json').read_text());events=json.loads((folder/'events.json').read_text())
-            receipt=json.loads((folder/'receipt.json').read_text())
+            def artifact(name):
+                if local:return folder/(name+'.json')
+                path=training.bundled_replay_artifact(mid,name) or training.gallery_artifact(mid,name)
+                if path is None:raise FileNotFoundError(name)
+                return path
+            frames=json.loads(artifact('frames').read_text());events=json.loads(artifact('events').read_text())
+            receipt=json.loads(artifact('receipt').read_text())
         except (OSError,ValueError):return {'status':'evidence_unavailable','observations':None}
         if not frames:return {'status':'evidence_unavailable','observations':None}
         observations=[]

@@ -287,3 +287,42 @@ test('life timeline starts with early feeding and exposes navigation for long re
   assert.match(html,/aria-label="Later events"/)
   assert.match(html,/aria-current="step"/)
 })
+
+test('separate taste and lateral touch show recorded activity, zero and missing distinctly',()=>{
+  const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+  const subject=fly('contact-context')
+  const sense={odor:[0,0],visual:[0,0],touch:1,taste:1,touch_left:0,touch_right:1,
+    contact_activity:{taste:12.345,touch_left:0,touch_right:null},contact_food:['food-0'],
+    contact_environment:['obstacle-0'],nearest_food:0,mouth_distance:0}
+  const frame={time:.5,tick:5000,poses:[],positions:[],senses:[sense]}
+  const html=render(MatchObservations,{scene:{flies:[subject]},frame,frames:[frame],flies:[subject],selectedId:subject.id,season:{connectome:{circuits:[]}}})
+  const text=textOnly(html)
+  assert.match(html,/aria-label="Separate contact responses"/)
+  assert.match(text,/Food taste12\.345/)
+  assert.match(text,/Left environmental touch0\.000/)
+  assert.match(text,/Right environmental touch—/)
+  assert.doesNotMatch(text,/NaN|undefined/)
+})
+
+test('a replay offers separately labeled WT and controller comparisons',()=>{
+  const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+  const subject=fly('comparison-subject')
+  const html=render(MatchObservations,{scene:{flies:[subject]},frames:[],flies:[subject],selectedId:subject.id,season:null,match:{id:'subject-match',source:{description:{en:'Actual comparison samples'},comparison_match:'original-controller',comparison_links:[{match_id:'canonical-wt',label:{en:'WT under this controller','zh-CN':'同控制器下的 WT'}}]}}})
+  assert.match(html,/href="#tab=arena&amp;match=original-controller"/)
+  assert.match(html,/href="#tab=arena&amp;match=canonical-wt"/)
+  assert.match(textOnly(html),/WT under this controller/)
+})
+
+test('support-aware replay distinguishes the same terrain acting as support and lateral contact',()=>{
+ const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+ const subject=fly('support-context')
+ const sense={odor:[0,0],visual:[0,0],touch:1,contact_food:[],contact_environment:['obstacle-19'],contact_support:['obstacle-19'],contact_environment_sides:{left:[],right:['obstacle-19'],center:[]},contact_activity:{taste:0,touch_left:0,touch_right:2},taste:0,touch_left:0,touch_right:1,nearest_food:3,mouth_distance:4}
+ const frame={time:6.4,tick:64000,poses:[],positions:[],senses:[sense]}
+ const props={scene:{flies:[subject]},frame,frames:[frame],flies:[subject],selectedId:subject.id,season:{connectome:{circuits:[]}}}
+ const html=render(MatchObservations,props)
+ assert.match(html,/aria-label="Support and lateral contact"/)
+ assert.match(textOnly(html),/Upward foot supportobstacle-19/)
+ assert.match(textOnly(html),/Contacts sent to lateral touchobstacle-19/)
+ delete sense.contact_support
+ assert.doesNotMatch(render(MatchObservations,props),/aria-label="Support and lateral contact"/)
+})

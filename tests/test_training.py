@@ -476,3 +476,113 @@ def test_bundled_replay_is_listed_without_source_database(lab):
         assert client.get(f'/api/v1/matches/{match_id}').json()['status']=='verified'
         assert client.get(f'/api/v1/matches/{match_id}/scene').json()=={'flies':[]}
         assert client.get(f'/api/v1/matches/{match_id}/receipt').status_code==200
+
+
+@pytest.mark.parametrize('sensory', ['odor-only-v1', 'engineered-multimodal-v2', 'engineered-touch-response-v1'])
+def test_training_keeps_senses_across_generations_conditions_and_mirrored_positions(lab, sensory):
+    store, service, _, parent = lab
+    run = create(lab, mode='contest', opponent_id=parent['id'], sensory_profile=sensory,
+                 evaluation_conditions=[{'map_id':'orchard','seed':42}, {'map_id':'enclosure','seed':43}],
+                 max_evaluations=16)
+    for _ in range(50):
+        service.tick()
+        if any(m['status']=='queued' for m in store.matches()):
+            complete_next(store, [1, 0])  # Explicit lifecycle fixture, not scientific scores.
+        if service.get(run['id'])['status']=='complete':break
+    result=service.get(run['id'])
+    assert result['status']=='complete'
+    matches=[match for member in result['members'] for match in member['matches']]
+    assert len(matches)==16
+    assert all(match['request']['sensory_profile']==sensory for match in matches)
+    assert {m['request']['map_id'] for m in matches}=={'orchard','enclosure'}
+    assert result['spec']['sensory_profile']==sensory
+
+
+def test_training_rejects_incompatible_senses_and_preserves_historical_default(lab):
+    _, _, _, parent = lab
+    legacy=TrainingSpec(founder_id=parent['id'])
+    assert legacy.sensory_profile=='odor-only-v1'
+    with pytest.raises(ValueError,match='legacy-v1'):
+        TrainingSpec(founder_id=parent['id'], bridge_profile='sensorimotor-research-v2',
+                     sensory_profile='engineered-touch-response-v1')
+    with pytest.raises(ValueError):
+        TrainingSpec(founder_id=parent['id'],sensory_profile='invented')
+
+
+def test_training_api_binds_selected_senses_to_node_and_queued_match(lab, monkeypatch):
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    from flyarena.common import digest
+    store, service, user, parent = lab
+    monkeypatch.setattr('flyarena.api.Connectome',lambda:service.compiler().graph)
+    monkeypatch.setattr('flyarena.api.require_bridge',lambda profile:None)
+    calls=[]
+    sensory='engineered-touch-response-v1'
+    runtime={'platform':'fixture-node','sensory_profile':{'id':sensory}}
+    def node_runtime(bridge, senses):
+        calls.append((bridge,senses));return runtime
+    monkeypatch.setattr('flyarena.services.node.configured_node',lambda:SimpleNamespace(runtime=node_runtime))
+    def no_local(**kw):raise AssertionError('Selected node must provide training runtime')
+    monkeypatch.setattr('flyarena.api.runtime_manifest',no_local)
+    with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
+        client.headers['Authorization']='Bearer '+user['token']
+        payload={'founder_id':parent['id'],'population':2,'generations':1,'circuits':['olfactory'], 'sensory_profile':sensory}
+        response=client.post('/api/v1/training',json=payload,headers={'Idempotency-Key':'senses'})
+        assert response.status_code==202,response.text
+        assert calls==[('legacy-v1',sensory)]
+        run=response.json()
+        assert run['evaluation_context']==digest(runtime)
+        for _ in range(3):service.tick()
+        match=next(m for m in store.matches() if m['status']=='queued')
+        assert match['request']['sensory_profile']==sensory
+        assert match['runtime_hash']==digest(runtime)
+        changed={**payload,'sensory_profile':'odor-only-v1'}
+        assert client.post('/api/v1/training',json=changed,headers={'Idempotency-Key':'senses'}).status_code==422
+
+
+def test_behavior_objective_selects_later_feeding_parent_and_retains_components(lab):
+    store,service,_,_=lab
+    run=create(lab,fitness_objective='sustained-foraging-v1')
+    # Explicit fixtures: higher food alone is worse under sustained behavior.
+    cases=iter([(10,0,.2),(6,6,1),(6,6,1),(6,3,1)])
+    for _ in range(30):
+        service.tick()
+        if any(m['status']=='queued' for m in store.matches()):
+            ident,lease,_=store.claim();food,late,upright=next(cases)
+            metric=dict(schema='sustained-foraging-v1',food=food,latter_half_food=late,
+                        upright_fraction=upright,fitness=(food+late)*upright)
+            store.finish(ident,lease,{'scores':[food],'winner_slot':None,'outcome':'solo',
+                                     'receipt_sha256':'fixture','behavior':[metric]})
+        if service.get(run['id'])['status']=='complete':break
+    result=service.get(run['id'])
+    assert result['status']=='complete'
+    assert [m['fitness'] for m in result['members']]==[2,12,12,9]
+    parent=result['members'][1]
+    assert all(m['fly']['spec']['parent_id']==parent['fly_id'] for m in result['members'][2:])
+    assert result['members'][0]['matches'][0]['result']['scores']==[10]
+    assert parent['matches'][0]['result']['behavior'][0]['latter_half_food']==6
+
+
+def test_behavior_objective_missing_worker_observations_fails_without_food_fallback(lab):
+    store,service,_,_=lab;run=create(lab,fitness_objective='sustained-foraging-v1')
+    for _ in range(3):service.tick()
+    complete_next(store,[100]);service.tick()
+    result=service.get(run['id'])
+    assert result['status']=='failed'
+    assert result['members'][0]['fitness'] is None
+    assert 'complete recorded behavior' in result['error']
+
+
+def test_behavior_contest_uses_both_participants_and_swapped_positions():
+    from flyarena.services.training import condition_results
+    plan=TrainingSpec(founder_id='a'*32,opponent_id='b'*32,mode='contest',
+                      population=2,generations=1,max_evaluations=4,
+                      fitness_objective='sustained-foraging-v1')
+    def match(scores):
+        return {'status':'verified','result':{'scores':[99,99],
+                'behavior':[dict(schema='sustained-foraging-v1',fitness=s) for s in scores]}}
+    # Own slot0: 12-3=9; own slot1: 2-4=-2; mean3.5.
+    assert condition_results(plan,[match([12,3]),match([4,2])])[0]['fitness']==3.5
+    assert condition_results(plan,[match([12,3])])[0]['fitness'] is None

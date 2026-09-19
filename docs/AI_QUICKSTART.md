@@ -169,3 +169,26 @@ To branch, use the sample ID as a new training plan's `founder_id`, choose an op
 ## Select brain dynamics
 
 `GET /api/v1/season` now includes `models`. Set `FlySpec.model_profile` to `malecns-lif-cpu-v1` or experimental `malecns-rate-cpu-v1`. Each training session retains its founder model. The latter is a continuous-rate network, not a spiking model, and supports the legacy arena bridge only. Its full-connectome Adam response trainer is documented in [RATE_MODEL.md](RATE_MODEL.md). Teaching loss and embodied fitness must be reported separately.
+
+## Inspect a design before running an embodied match
+
+`POST /api/v1/flies/preview` accepts the same authenticated `FlySpec` as submission.
+The paired preview implementation returns `neural-design-preview/v2`: four fixed
+odor conditions (left, right, bilateral, background only), each starting from
+rest, with 120 ms of model activity sampled every 10 ms. The odor pulse occupies
+20–80 ms. The encoder retains 8 mV tonic input on each side and adds 40 mV on the
+stimulated side; "background only" does not mean zero injected current.
+
+`stimuli[].samples[]` contains `time_ms`, the input over the preceding interval,
+`circuits` for the submitted design, and `reference_circuits` for the unmodified
+WT of the same model. `spec` and `reference.spec` identify both designs. Inspect
+all samples, including response decay; the final sample alone is insufficient.
+The LIF model includes spike totals; the continuous-rate model returns null for
+spike totals. Neural activity differences are not fitness or biological validity.
+Use an embodied match to evaluate behavior.
+
+Check the response schema: an older running backend may still return v1, which
+has no paired WT or time course. Do not invent those missing observations. The
+current local static site also offers a precomputed Nectar example at
+`/examples/neural-preview-nectar-v2.json`; it belongs to that recorded FlySpec,
+not to any new draft. The paired API requires deployment of the updated backend.

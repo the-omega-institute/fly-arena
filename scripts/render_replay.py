@@ -32,7 +32,9 @@ def font(size):
 class Exporter:
     def __init__(self, scene, frame=None):
         self.scene = scene
-        self.bodies = Bodies(scene, 2, 42)
+        self.count = len(scene.get("flies", [])) or (len(frame["positions"]) if frame else 2)
+        self.playback_label = "0.25x playback"
+        self.bodies = Bodies(scene, self.count, 42)
         self.model, self.data = self.bodies.model, self.bodies.data
         self.manifest = scene.get("body") or self.bodies.rendering_manifest()
         # Pose ordering belongs to the recorded mesh manifest, not model iteration.
@@ -59,7 +61,7 @@ class Exporter:
             self.camera.lookat[:] = [0, 0, .6]
         self.initial = frame or {
             **self.bodies.snapshot(), "food": [p["initial"] for p in scene["food"]],
-            "scores": [0, 0], "eliminated": [False, False]}
+            "scores": [0] * self.count, "eliminated": [False] * self.count}
 
     def geom(self, kind, size, pos, color, mat=None):
         sc = self.renderer.scene
@@ -127,7 +129,7 @@ class Exporter:
             if left > 0:
                 r = .8 * np.sqrt(left / food["initial"])
                 self.geom(mj.mjtGeom.mjGEOM_ELLIPSOID, [r, r, .14], [x, y, z - .03], [.97, .72, .25, 1])
-        for slot in range(2):
+        for slot in range(self.count):
             for a, b in zip(history, history[1:]):
                 self.line([*a["positions"][slot][:2], .07],
                           [*b["positions"][slot][:2], .07], .022, COLORS[slot])
@@ -136,10 +138,10 @@ class Exporter:
         result.paste(Image.fromarray(pixels), (0, 90))
         draw = ImageDraw.Draw(result)
         draw.text((36, 20), "FLY ARENA  /  " + self.scene["english"], font=font(30), fill="#e5eadb")
-        title = "RECORDED COMPETITION  |  0.25x playback" if "flies" in self.scene else "MAP PREVIEW  |  initial body poses"
+        title = "RECORDED LIFE  |  " + self.playback_label if "flies" in self.scene else "MAP PREVIEW  |  initial body poses"
         draw.text((38, 61), title, font=font(15), fill="#9bab9e")
         draw.text((38, 746), f"SIM TIME  {frame['time']:.2f} s    /    FOOD LEFT  {sum(frame['food']):.3f}", font=font(21), fill="#eac980")
-        for slot in range(2):
+        for slot in range(self.count):
             name = self.scene.get("flies", [{"name": "Fly A"}, {"name": "Fly B"}])[slot]["name"].split(" / ")[0]
             status = "  [EXITED]" if frame["eliminated"][slot] else ""
             label = f"{slot+1}  {name}   {frame['scores'][slot]:.4f}{status}"
@@ -159,7 +161,10 @@ def main():
     parser.add_argument("--map", choices=list(MAPS), help="Export only one map preview")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--require-renderer", default="", help="Fail unless GL renderer contains this string")
+    parser.add_argument("--frame-time", type=float, help="Export one actual replay sample at or before this simulation time")
     args = parser.parse_args()
+    if args.frame_time is not None and not args.replay:
+        parser.error("--frame-time requires --replay")
     if not args.maps and not args.map and not args.replay:
         parser.error("Provide --map, --maps and/or --replay")
     args.output.mkdir(parents=True, exist_ok=True)
@@ -189,21 +194,30 @@ def main():
             raise ValueError("Replay timestamps must be strictly increasing")
         export = open_export(scene, frames[0])
         try:
-            # Resample by timestamps, including irregular terminal frames. No invented poses.
-            playback = np.arange(times[0], times[-1] + 1e-9, .25 / 25)
-            indices = np.searchsorted(times, playback, side="right") - 1
-            indices = np.append(indices, len(frames) - 1) if indices[-1] != len(frames) - 1 else indices
-            with imageio.get_writer(args.output / "replay.mp4", fps=25, codec="libx264", quality=8) as writer:
-                for i in indices:
-                    pixels = export.render(frames[i], frames[:i+1:4])
-                    writer.append_data(pixels)
-                    if i in {0, len(frames)//2, len(frames)-1}:
-                        imageio.imwrite(args.output / f"frame-{i:04d}.png", pixels)
-            evidence.append({"kind": "recorded-pose-replay", "source": str(args.replay),
-                             "frames": len(frames), "video_frames": len(indices), "fps": 25,
-                             "playback_speed": .25, "simulation_seconds": float(times[-1]-times[0]),
-                             "encoding": "CPU libx264; scene rasterization uses reported GL renderer",
-                             **export.device})
+            if args.frame_time is not None:
+                if not np.isfinite(args.frame_time) or not times[0] <= args.frame_time <= times[-1]:
+                    raise ValueError("Requested frame is outside the recorded replay")
+                i = int(np.searchsorted(times, args.frame_time, side="right") - 1)
+                export.playback_label = "recorded frame"
+                imageio.imwrite(args.output / f"frame-{i:04d}.png", export.render(frames[i], frames[:i+1:4]))
+                evidence.append({"kind":"recorded-pose-still", "source":str(args.replay),
+                                 "simulation_time":float(times[i]), "participants":export.count, **export.device})
+            else:
+                # Resample by timestamps, including irregular terminal frames. No invented poses.
+                playback = np.arange(times[0], times[-1] + 1e-9, .25 / 25)
+                indices = np.searchsorted(times, playback, side="right") - 1
+                indices = np.append(indices, len(frames) - 1) if indices[-1] != len(frames) - 1 else indices
+                with imageio.get_writer(args.output / "replay.mp4", fps=25, codec="libx264", quality=8) as writer:
+                    for i in indices:
+                        pixels = export.render(frames[i], frames[:i+1:4])
+                        writer.append_data(pixels)
+                        if i in {0, len(frames)//2, len(frames)-1}:
+                            imageio.imwrite(args.output / f"frame-{i:04d}.png", pixels)
+                evidence.append({"kind": "recorded-pose-replay", "source": str(args.replay),
+                                 "frames": len(frames), "video_frames": len(indices), "fps": 25,
+                                 "playback_speed": .25, "simulation_seconds": float(times[-1]-times[0]),
+                                 "encoding": "CPU libx264; scene rasterization uses reported GL renderer",
+                                 **export.device})
         finally:
             export.close()
     (args.output / "render-info.json").write_text(json.dumps(evidence, indent=2) + "\n")

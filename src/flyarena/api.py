@@ -6,7 +6,6 @@ import json
 import os
 import subprocess
 import secrets
-import tempfile
 import threading
 import time
 from pathlib import Path
@@ -19,13 +18,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer
 
 from .auth import AuthBoundary, AuthConfig, NyxIDClient
+from .behavior import FITNESS_OBJECTIVES
 
 from .common import DATA, ROOT, VAR, digest, write_json
 from .compiler import BUDGET, Compiler
 from .connectome import Connectome
 from .contracts import CreateIdentity, FlySpec, MatchRequest, TournamentRequest
 from .neural import PROFILE
-from .models import catalog as model_catalog, make_brain, require_model_bridge
+from .models import catalog as model_catalog, require_model_bridge
 from .runner import runtime_manifest
 from .experiments.embodied_sensor import catalog as sensory_catalog
 from .bridge import match_profiles, require_bridge
@@ -134,6 +134,9 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 "model": PROFILE, "models": model_catalog(), "budget": BUDGET, "rules": RULES,
                 "runtime_sha256": digest(runtime_manifest()),
                 "sensory_profiles": sensory_catalog(),
+                "training_sensory_profiles": sensory_catalog(),
+                "training_fitness_objectives": FITNESS_OBJECTIVES,
+                "gallery_copy_available": True,
                 "readout": json.loads((DATA / "connectome/readout.json").read_text()),
                 "invite_required": bool(os.environ.get("ARENA_INVITE_CODE")),
                 "privacy": "Published designs and matches are public. API tokens are private."}
@@ -213,33 +216,10 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
 
     @app.post("/api/v1/flies/preview")
     def neural_preview(spec: FlySpec, owner: dict = Depends(identity)):
-        """Run short fixed stimuli through the submitted full retained connectome.
-
-        This is deliberately separate from matches: it has no body, score, ranking,
-        or claim of biological calibration. The returned circuit values are actual
-        model state after each stimulus, bound to the submitted FlySpec report.
-        Temporary compiled artifacts are discarded after the preview.
-        """
+        """Observe the submitted design and matched WT under fixed odor pulses."""
+        from .neural_preview import preview_design
         with compile_lock:
-            graph = compiler().graph
-            with tempfile.TemporaryDirectory(prefix="arena-neural-preview-") as folder:
-                root = Path(folder)
-                report = compiler().compile(spec, publish=True, root=root)
-                weights, _ = compiler().load_weights(report["artifact_id"], root)
-                brain = make_brain(spec.model_profile, graph, weights,
-                                   spec.neuron_parameters.model_dump())
-                rows = []
-                for left, right in ((1.0, 0.0), (0.0, 1.0), (1.0, 1.0), (0.0, 0.0)):
-                    brain.reset()
-                    brain.stimulate(left, right)
-                    brain.advance(50)
-                    rows.append({"stimulus": {"left": left, "right": right},
-                                 "circuits": brain.trace(),
-                                 "total_spikes": (None if brain.total_spikes is None else int(brain.total_spikes))})
-                return {"schema": "neural-design-preview/v1", "artifact_id": report["artifact_id"],
-                        "model_profile": spec.model_profile, "connectome_sha256": graph.manifest["sha256"],
-                        "steps": 50, "stimuli": rows,
-                        "scope": "Actual retained-connectome dynamics under fixed bilateral odor currents; no body or match score."}
+            return preview_design(compiler(), spec)
 
     @app.post("/api/v1/flies", status_code=201)
     def publish(spec: FlySpec, request: Request, owner: dict = Depends(identity), compare: bool = Query(default=False)):
@@ -289,7 +269,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                     raise ValueError("Starting fly or opponent does not exist")
                 require_model_bridge(fly['spec']['model_profile'],body.bridge_profile)
                 compiler().compile(FlySpec.model_validate(fly['spec']))
-        return training.create(owner['id'], body, digest(match_runtime(body.bridge_profile)), idempotency_key)
+        return training.create(owner['id'], body, digest(match_runtime(body.bridge_profile, body.sensory_profile)), idempotency_key)
 
     @app.get("/api/v1/training")
     def training_list(owner: dict = Depends(identity)):
@@ -310,6 +290,11 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if session is None or session['owner'] != owner['id']:
             raise HTTPException(404, "Training session not found")
         return session
+
+    @app.post('/api/v1/training-showcase/{ident}/flies/{fly_id}/copy', status_code=201)
+    def copy_gallery_fly(ident: str, fly_id: str, request: Request, owner: dict = Depends(identity)):
+        with compile_lock:
+            return training.copy_published(ident,fly_id,owner['id'],agent_channel=registered_agent(request,owner))
 
     @app.get("/api/v1/training/{ident}")
     def training_get(ident: str, owner: dict = Depends(identity)):

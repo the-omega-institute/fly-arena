@@ -25,13 +25,17 @@ export function lifeEventPageAtTime(events:ReplayEvent[],time:number) {
   return Math.floor(Math.max(0,current)/LIFE_EVENT_PAGE_SIZE)
 }
 
-export function eventSampleWindow(frames:Frame[],event:ReplayEvent) {
+export function eventSampleWindow(frames:Frame[],event:ReplayEvent,responseMs=0) {
   if(!frames.length)return null
   let before=frames[0]
   for(const candidate of frames){
     if(candidate.tick<=event.tick)before=candidate
-    else return {before,after:candidate}
+    else break
   }
-  // A final event has no subsequent record: keep the actual final sample.
-  return {before,after:frames[frames.length-1]}
+  // Read an actual recorded sample at the requested response delay. Zero
+  // retains the first post-event sample; no interpolation invents activity.
+  const delayTicks=Math.max(0,Number.isFinite(responseMs)?responseMs:0)*10
+  const target=event.tick+delayTicks
+  const after=frames.find(candidate=>candidate.tick>event.tick&&candidate.tick>=target)||frames[frames.length-1]
+  return {before,after}
 }

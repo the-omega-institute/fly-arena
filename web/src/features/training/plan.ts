@@ -31,3 +31,10 @@ export function trainingFocus(hash:string):string{
 export function trainingHash(id:string):string{
   const p=new URLSearchParams({tab:'train'});if(id)p.set('training',id);return '#'+p.toString()
 }
+
+export function competitionSetup(spec:{map_id:string;seed:number;duration_seconds:number;mode:string;opponent_id?:string|null;bridge_profile?:string;sensory_profile?:string;evaluation_conditions?:{map_id:string;seed:number}[]|null}){
+  const condition=spec.evaluation_conditions?.[0]||spec
+  return {map_id:condition.map_id,seed:condition.seed,duration_seconds:spec.duration_seconds,
+    opponent_id:spec.mode==='contest'?spec.opponent_id:null,
+    bridge_profile:spec.bridge_profile||'legacy-v1',sensory_profile:spec.sensory_profile||'odor-only-v1'}
+}

@@ -1,0 +1,5 @@
+.replay-camera-controls{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+.replay-camera-controls button{border:1px solid var(--border);border-radius:20px;padding:5px 12px;color:var(--text-muted);background:var(--surface);font-size:12px;cursor:pointer}
+.replay-camera-controls button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.replay-camera-controls small{font-size:11px;color:var(--text-muted);margin-left:auto}
+@media(max-width:700px){.replay-camera-controls small{width:100%;margin-left:0}}

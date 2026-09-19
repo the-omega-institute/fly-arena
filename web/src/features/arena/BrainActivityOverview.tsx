@@ -8,9 +8,9 @@ const locations:Record<string,[number,number]>={
   readout:[145,247],visual:[370,247],descending:[180,329],motor:[350,329],
 }
 
-export function BrainActivityOverview({circuits,activity,scale,mutations=[],time,onOpen}:{
+export function BrainActivityOverview({circuits,activity,scale,mutations=[],time,onOpen,mode='replay'}:{
   circuits:Circuit[];activity:Record<string,number>;scale:number;
-  mutations?:Spec['weight_mutations'];time?:number;onOpen:(id:string)=>void;
+  mutations?:Spec['weight_mutations'];time?:number;onOpen:(id:string)=>void;mode?:'replay'|'preview';
 }) {
   const {t,locale}=useI18n()
   const prefix=useId().replace(/:/g,'')
@@ -39,11 +39,11 @@ export function BrainActivityOverview({circuits,activity,scale,mutations=[],time
           <text x={x-54} y={y-3} className="brain-overview-label">{label}</text>
           <text x={x-63} y={y+19} className="brain-overview-value">{value}</text>
           {changes.length>0&&<text x={x+69} y={y+19} textAnchor="end" className="brain-overview-edit">×{scaleFactor.toFixed(2)}</text>}
-          <title>{`${label} · ${c.neuron_count?.toLocaleString()??'—'} ${zh?'神经元；点击展开类别':'neurons; open classes'}`}</title>
+          <title>{`${label} · ${c.neuron_count?.toLocaleString()??'—'} ${mode==='preview'?(zh?'神经元；点击查看响应曲线':'neurons; inspect response curve'):(zh?'神经元；点击展开类别':'neurons; open classes')}`}</title>
         </g>
       })}
     </svg>
     <div className="brain-overview-legend"><span><i/>{zh?'活动亮度':'Activity brightness'} 0–{ceiling.toFixed(2)} Hz</span><span className="brain-overview-edited">○ {zh?'金色边框：权重修改':'Gold outline: weight edit'}</span></div>
-    <p>{zh?'点击功能群，展开神经元类别与局部连接。位置为示意；亮度来自记录的群体平均活动，整段回放与双方共用同一色标。未记录不等于零活动。':'Select a group to open neuron classes and local connections. Positions are schematic; brightness is recorded mean activity, with one scale across this replay and both flies. Missing data is not zero activity.'}</p>
+    <p>{mode==='preview'?(zh?'点击功能群查看响应曲线。位置为示意；亮度来自记录的群体平均活动，设计与 WT 在所有刺激中共用同一色标。未记录不等于零活动。':'Select a group to inspect its response curve. Positions are schematic; brightness is recorded mean activity, with one scale for the design and WT across all stimuli. Missing data is not zero activity.'):(zh?'点击功能群，展开神经元类别与局部连接。位置为示意；亮度来自记录的群体平均活动，整段回放与双方共用同一色标。未记录不等于零活动。':'Select a group to open neuron classes and local connections. Positions are schematic; brightness is recorded mean activity, with one scale across this replay and both flies. Missing data is not zero activity.')}</p>
   </div>
 }

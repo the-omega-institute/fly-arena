@@ -18,7 +18,7 @@ from .neural import Brain, PROFILE
 from .models import PROFILES, make_brain, require_model_bridge
 from .scenarios import RULES, arena_scene
 from .replay import POLICY, REPLAY_RECEIPT
-from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILE
+from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILE
 
 
 def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
@@ -43,7 +43,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                              "touch": sensory.get("touch", {}).get("source", "mujoco_food_contact_observation_v1")}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
-    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
+    files = ["body.py", "behavior.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
@@ -112,7 +112,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     scene["body"] = bodies.rendering_manifest()
     scene["flies"] = [{k: f[k] for k in ["id", "name", "color", "artifact_id"]} for f in flies]
     write_json(output / "scene.json", scene)
-    remaining = np.array([f["initial"] for f in scene["food"]])
+    remaining = np.array([f["initial"] for f in scene["food"]], dtype=float)
     food_xy = np.array([f["position"][:2] for f in scene["food"]])
     scores = np.zeros(len(flies))
     energy = np.full(len(flies), 100.)
@@ -120,7 +120,9 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     eliminated = np.zeros(len(flies), dtype=bool)
     exit_ticks = [None for _ in flies]
     frames, events = [], []
-    environment_touch = request.sensory_profile == ENVIRONMENT_PROFILE["id"]
+    environment_touch = request.sensory_profile in ENVIRONMENT_PROFILES
+    separated_contact = request.sensory_profile in SEPARATED_CONTACT_PROFILES
+    support_contact = request.sensory_profile == SUPPORT_CONTACT_PROFILE["id"]
     touch_status = frozen_runtime["sensors"]["touch"]
     environment_latches = [set() for _ in flies]
     senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": "raycast_engineered_observation",
@@ -203,10 +205,18 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             contact_food = [] if request.mode == "sumo" else bodies.food_contacts(slot)
             contact_environment = bodies.environment_contacts(slot) if environment_touch else []
             touch = float(bool(contact_food or contact_environment))
+            contact_sides = bodies.lateral_environment_contacts(slot, exclude_support=support_contact) if separated_contact else None
+            taste = float(any(food["id"] in contact_food and amount > 0
+                              for food, amount in zip(scene["food"], remaining))) if separated_contact else 0.
+            touch_left = float(bool(contact_sides["left"] or contact_sides["center"])) if contact_sides else 0.
+            touch_right = float(bool(contact_sides["right"] or contact_sides["center"])) if contact_sides else 0.
             senses[slot] = {"odor": [float(odor[0]), float(odor[1])], "visual": visual,
                             "visual_status": "raycast_engineered_observation",
                             "touch": touch, "touch_status": touch_status,
                             **({"contact_environment": contact_environment} if environment_touch else {}),
+                            **({"taste": taste, "touch_left": touch_left, "touch_right": touch_right,
+                                "contact_environment_sides": contact_sides} if separated_contact else {}),
+                            **({"contact_support": bodies.support_contacts(slot)} if support_contact else {}),
                             "contact_food": contact_food, "nearest_food": nearest,
                             "mouth_distance": mouth_distance,
                             "sensory_profile": request.sensory_profile}
@@ -246,7 +256,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 if sensory_encoder:
                     senses[slot]["neural_input"] = sensory_encoder.apply(
                         brain, float(encoded[0]), float(encoded[1]),
-                        float(visual[0]), float(visual[1]), touch)
+                        float(visual[0]), float(visual[1]), 0. if separated_contact else touch,
+                        **({"taste": taste, "touch_left": touch_left, "touch_right": touch_right} if separated_contact else {}))
                 else:
                     brain.stimulate(float(encoded[0]), float(encoded[1]))
                 brain.advance(RULES["sense_ticks"])
@@ -254,6 +265,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                     tactile_group = sensory_encoder.groups["touch"]
                     senses[slot]["tactile_activity"] = (
                         float(np.mean(brain.rates[tactile_group])) if len(tactile_group) else None)
+                    if separated_contact:
+                        senses[slot]["contact_activity"] = {
+                            name: float(np.mean(brain.rates[indices])) if len(indices) else None
+                            for name, indices in sensory_encoder.groups.items() if name in {"taste", "touch_left", "touch_right"}}
                 command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
                 # Fixed low-pass decoder; no access to food or world coordinates.
                 drives[slot] = .85 * drives[slot] + .15 * np.clip(command, 0, 1.5)

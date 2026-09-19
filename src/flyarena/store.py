@@ -60,7 +60,7 @@ class Store:
             row = db.execute("SELECT id,name FROM identities WHERE token_hash=?", (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
         return dict(row) if row else None
 
-    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False, training: tuple | None = None, external_proposal: bool = False) -> dict:
+    def add_fly(self, owner: str, spec: dict, report: dict, *, submission_channel: str = 'web', agent_channel: bool = False, training: tuple | None = None, external_proposal: bool = False, copy_key: str | None = None) -> dict:
         if any(k in spec for k in ('provenance','scientific_version','reference_kind','release_id','submission_channel')):
             raise ValueError('Provenance is server-owned')
         if submission_channel not in {'web','api'}:
@@ -68,6 +68,11 @@ class Store:
         ident = uuid.uuid4().hex
         with self.db() as db:
             db.execute('BEGIN IMMEDIATE')
+            if copy_key:
+                previous=db.execute('SELECT payload,resource FROM idempotency WHERE owner=? AND key=?',(owner,copy_key)).fetchone()
+                if previous:
+                    if previous['payload']!=canonical(spec).decode():raise ValueError('Published source changed since this copy was saved')
+                    return self.fly(previous['resource'])
             if external_proposal:
                 from .services.training import check_proposal
                 prior = check_proposal(db, owner, training, spec)
@@ -75,10 +80,11 @@ class Store:
             elif training:
                 old=db.execute('SELECT fly_id FROM training_members WHERE run_id=? AND generation=? AND slot=?',training).fetchone()
                 if old:return self.fly(old[0])
-            if spec.get("parent_id") and not db.execute("SELECT 1 FROM flies WHERE id=?", (spec["parent_id"],)).fetchone():
-                raise ValueError("Parent fly does not exist")
             if spec.get('parent_id'):
-                parent = json.loads(db.execute('SELECT spec FROM flies WHERE id=?', (spec['parent_id'],)).fetchone()[0])
+                parent_row=db.execute('SELECT spec FROM flies WHERE id=?',(spec['parent_id'],)).fetchone()
+                published=self.published_fly(spec['parent_id']) if parent_row is None else None
+                if parent_row is None and published is None:raise ValueError('Parent fly does not exist')
+                parent=json.loads(parent_row['spec']) if parent_row else published['spec']
                 from .models import PROFILES
                 if parent.get('connectome_sha256')!=spec.get('connectome_sha256') or spec.get('model_profile') not in PROFILES:
                     raise ValueError('Parent must use the same graph and a supported model profile')
@@ -87,6 +93,7 @@ class Store:
             db.execute("INSERT INTO flies VALUES(?,?,?,?,?,?,?,?)", (ident, owner, spec["name"], spec["color"], canonical(spec).decode(),
                         report["artifact_id"], canonical(report).decode(), time.time()))
             db.execute('INSERT INTO fly_provenance VALUES(?,?,?,?,NULL)', (ident,'ai' if agent_channel else 'user',None,submission_channel))
+            if copy_key:db.execute('INSERT INTO idempotency VALUES(?,?,?,?)',(owner,copy_key,canonical(spec).decode(),ident))
             if training:db.execute('INSERT INTO training_members(run_id,generation,slot,fly_id) VALUES(?,?,?,?)',(*training,ident))
             if external_proposal:
                 db.execute("UPDATE training_runs SET status=CASE WHEN status='awaiting_candidates' THEN 'queued' ELSE status END,updated=? WHERE id=?", (time.time(), training[0]))
@@ -96,7 +103,7 @@ class Store:
         with self.db() as db:
             row = db.execute("SELECT f.*,coalesce(i.name,'Arena Lab') AS designer FROM flies f LEFT JOIN identities i ON f.owner=i.id WHERE f.id=?", (ident,)).fetchone()
         if row is None:
-            return None
+            return self.published_fly(ident)
         result = dict(row)
         result["spec"], result["report"] = json.loads(result["spec"]), json.loads(result["report"])
         with self.db() as db:
@@ -112,6 +119,30 @@ class Store:
             if experiment:
                 result.update(experiment_status=experiment['status'],experiment_error=experiment['error'])
         return result
+
+    def published_fly(self, ident: str) -> dict | None:
+        """Resolve a public specimen without importing its account or weights."""
+        from .services.training import TrainingService
+        from .contracts import FlySpec
+        candidates=[]
+        for run in TrainingService(self,None)._bundled_showcase():
+            for member in run.get('members',[]):
+                sample=member.get('fly',{})
+                if member.get('fly_id')!=ident or sample.get('id')!=ident:continue
+                try:spec=FlySpec.model_validate(sample.get('spec')).model_dump(by_alias=True)
+                except ValueError:continue
+                if not isinstance(sample.get('artifact_id'),str) or not isinstance(sample.get('report'),dict):continue
+                candidates.append(dict(id=ident,owner=None,designer='Published sample',name=spec['name'],color=spec['color'],
+                    spec=spec,report=sample['report'],artifact_id=sample['artifact_id'],created=sample.get('created',run.get('created',0)),
+                    reference_kind=None,submission_channel=None,release_id=None,
+                    source={'kind':'published-training','run_id':run['id'],'generation':member['generation'],
+                            'slot':member['slot'],'fitness':member.get('fitness'),'evaluation_context':run.get('evaluation_context'),
+                            'plan':run['spec']}))
+        if not candidates:return None
+        first=candidates[0]
+        if any(c['spec']!=first['spec'] or c['artifact_id']!=first['artifact_id'] for c in candidates[1:]):
+            raise ValueError('Conflicting published snapshots for this fly')
+        return first
 
     def flies(self) -> list[dict]:
         with self.db() as db:

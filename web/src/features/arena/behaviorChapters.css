@@ -1,0 +1,14 @@
+.behavior-chapters{margin:14px 0;padding:16px;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.behavior-chapters-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:12px}
+.behavior-chapters-heading strong{font-size:14px}.behavior-chapters-heading p,.behavior-chapters-note{font-size:11px;color:var(--text-muted);line-height:1.6;margin:5px 0 0}
+.behavior-chapters-heading>span{display:grid;gap:4px;font-size:10px;text-align:right;color:var(--text-muted)}.behavior-chapters-heading b{font-size:14px;color:var(--text);font-variant-numeric:tabular-nums}
+.behavior-chapters-list{display:grid;gap:6px;max-height:300px;overflow:auto}
+.behavior-chapters-list button{display:grid;grid-template-columns:130px 1.2fr .6fr 1.4fr;align-items:center;gap:12px;text-align:left;padding:11px 12px;background:transparent;border:1px solid var(--border);border-radius:9px;color:inherit;cursor:pointer}
+.behavior-chapters-list button:hover,.behavior-chapters-list button.active{background:var(--surface-soft);border-color:var(--accent)}.behavior-chapters-list button:focus-visible{outline:2px solid #357f64;outline-offset:2px}
+.behavior-chapter-time{font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}.behavior-chapter-time small{display:block;margin-top:5px;font-size:10px;font-weight:400;color:var(--text-muted)}
+.behavior-chapter-metric,.behavior-chapter-contacts{font-size:10px;color:var(--text-muted)}.behavior-chapter-metric b,.behavior-chapter-contacts b{display:block;margin-top:5px;font-size:12px;color:var(--text);font-weight:500;font-variant-numeric:tabular-nums}.behavior-chapter-metric.has-intake b{color:var(--accent);font-weight:700}.behavior-chapter-contacts em{font-size:10px;color:var(--danger-ink);font-style:normal}
+.behavior-chapters-note{margin-top:10px}
+@media(max-width:1050px){.behavior-chapters-list button{grid-template-columns:1fr 1fr}.behavior-chapter-time{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){.behavior-chapters-list{scroll-behavior:auto}}
+
+.behavior-chapters-heading{flex-wrap:wrap}.behavior-posture-jump{font-size:11px;padding:7px 10px;margin-bottom:10px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--text);cursor:pointer}

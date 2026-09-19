@@ -14,7 +14,7 @@ test('ownership labels require a known authenticated viewer matching experiment 
 test('physical plot uses equal x/y scale and includes all recorded points outside scene boundaries',()=>{const p=plotTransform([{x:120,y:-53}],{size:80,food:[{position:[7,5],id:'food',initial:10}],obstacles:[]});assert.ok(Math.abs((p.sx(10)-p.sx(0))-(p.sy(0)-p.sy(10)))<1e-10);assert.ok(p.x1>=120&&p.y0<=-53);assert.ok(p.sx(120)<=670&&p.sy(-53)<=395)});
 const {readRoute,routeHash}=await moduleAt('../src/shared/navigation.ts');
 test('deep links round trip experiment/match and preserve scientific IDs',()=>{for(const tab of ['design','arena','lab','code']){const r=readRoute(routeHash(tab,'trial + 1','match&2'));assert.equal(r.tab,tab);if(tab==='lab')assert.equal(r.experiment,'trial + 1');if(tab==='arena')assert.equal(r.match,'match&2')}assert.equal(readRoute('#experiment=historical').tab,'lab');assert.equal(readRoute('#tab=invalid').tab,'design')});
-const {defaultMatchProfile,recordedMatchProfile}=await moduleAt('../src/types.ts');
+const {defaultMatchProfile,recordedMatchProfile,preferredReplay}=await moduleAt('../src/types.ts');
 test('v2 defaults only when ready; historical absence stays legacy regardless of current default',()=>{const profiles=[{id:'legacy-v1',ready:true},{id:'sensorimotor-research-v2',ready:true}];assert.equal(defaultMatchProfile({match_profiles:profiles,default_bridge_profile:'legacy-v1'}),'sensorimotor-research-v2');assert.equal(defaultMatchProfile({match_profiles:profiles.map(p=>({...p,ready:p.id==='legacy-v1'})),default_bridge_profile:'legacy-v1'}),'legacy-v1');assert.equal(defaultMatchProfile({}),'');assert.equal(recordedMatchProfile({request:{}}),'legacy-v1');assert.equal(recordedMatchProfile({request:{bridge_profile:'sensorimotor-research-v2'}}),'sensorimotor-research-v2')});
 test('alignment requires frozen artifact identity and every subject',()=>{assert.equal(alignment(reports,subjects),'matched');assert.equal(alignment(reports.slice(1),subjects),'pending');assert.equal(alignment(reports.map((r,i)=>i? r:{...r,artifact_id:'other'}),subjects),'pending')});
 test('alignment fails closed for absent receipts, partial runs, grids and conditions',()=>{for(const [patch,expected] of [[{receipt_sha256:''},'pending'],[{status:'failed'},'pending'],[{condition_key:'other'},'mismatch'],[{duration_seconds:4},'mismatch'],[{trajectory:[{time:1,x:0,y:0}]},'mismatch']])assert.equal(alignment(reports.map((r,i)=>i?r:{...r,...patch}),subjects),expected)});
@@ -129,3 +129,34 @@ test('random search round best can decline while historical best is retained',()
 test('different brain dynamics are explicit comparison conditions',()=>{
  assert.ok(comparisonDifferences([comparisonRun,{...comparisonRun,id:'rate',model_profile:'malecns-rate-cpu-v1'}]).includes('Brain model'));
 });
+
+test('first arena view opens the selected recorded example without mistaking its score for capability',()=>{
+  const old={id:'old',status:'verified',created:1,request:{duration_seconds:30,sensory_profile:'engineered-multimodal-v1'},result:{scores:[10]}}
+  const sample={id:'sample',status:'verified',created:2,request:{duration_seconds:2,sensory_profile:'engineered-touch-response-v1'},result:{scores:[0]},source:{featured:true}}
+  assert.equal(preferredReplay([old,sample]).id,'sample')
+  assert.equal(preferredReplay([old,{...sample,status:'running'}]).id,'old')
+  assert.equal(preferredReplay([sample,{...sample,id:'new',created:3}]).id,'new')
+})
+
+test('training comparison separates sensory contexts while preserving old odor-only records',()=>{
+ const explicit={...comparisonRun,spec:{...comparisonRun.spec,sensory_profile:'odor-only-v1'}};
+ const touch={...comparisonRun,spec:{...comparisonRun.spec,sensory_profile:'engineered-touch-response-v1'}};
+ assert.deepEqual(comparisonDifferences([comparisonRun,explicit]),[]);
+ assert.ok(comparisonDifferences([comparisonRun,touch]).includes('Sensory profile'));
+});
+test('descendant competition retains the recorded brain bridge and senses',async()=>{
+ const {competitionSetup}=await moduleAt('../src/features/training/plan.ts');
+ const plan={map_id:'enclosure',seed:7,duration_seconds:3,mode:'forage',bridge_profile:'legacy-v1',sensory_profile:'engineered-touch-response-v1'};
+ assert.deepEqual(competitionSetup(plan),{map_id:'enclosure',seed:7,duration_seconds:3,opponent_id:null,bridge_profile:'legacy-v1',sensory_profile:'engineered-touch-response-v1'});
+ assert.equal(competitionSetup({...plan,evaluation_conditions:[{map_id:'scarcity',seed:99}]}).map_id,'scarcity');
+ assert.equal(competitionSetup({...plan,evaluation_conditions:[{map_id:'scarcity',seed:99}]}).seed,99);
+ assert.equal(competitionSetup({...plan,mode:'contest',opponent_id:'opponent'}).opponent_id,'opponent');
+ assert.equal(competitionSetup({...plan,sensory_profile:undefined}).sensory_profile,'odor-only-v1');
+});
+
+
+test('selection objective differences cannot be presented as the same evaluation conditions',()=>{
+ const food={...comparisonRun,spec:{...comparisonRun.spec,fitness_objective:'food'}}
+ assert.deepEqual(comparisonDifferences([comparisonRun,food]),[])
+ assert.ok(comparisonDifferences([food,{...food,spec:{...food.spec,fitness_objective:'sustained-foraging-v1'}}]).includes('Selection objective'))
+})

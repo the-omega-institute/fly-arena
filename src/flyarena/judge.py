@@ -1,6 +1,8 @@
 """Independent admission of a trusted worker's evidence, never its winner field."""
 from __future__ import annotations
 
+from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILE
+
 import json
 import math
 import re
@@ -8,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .behavior import behavior_metrics
 from .common import digest, file_sha
 from .contracts import MatchRequest
 from .scenarios import RULES, receipt_scene
@@ -105,7 +108,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     runtime_sensory = receipt["runtime"].get("sensory_profile", {"id": "odor-only-v1"})
     if runtime_sensory.get("id") != request.sensory_profile:
         raise ValueError("Receipt sensory profile mismatch")
-    if request.sensory_profile in ("engineered-multimodal-v1", "engineered-multimodal-v2"):
+    if request.sensory_profile in SENSORY_PROFILES:
         encoder = stored_scene.get("sensory_encoder", {})
         if encoder.get("profile") != runtime_sensory or not encoder.get("groups"):
             raise ValueError("Receipt sensory encoder manifest mismatch")
@@ -148,7 +151,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     if type(result["final_tick"]) is not int or result["final_tick"] != end:
         raise ValueError("Replay is missing ticks or final state")
     _validate_frames(frames, stored_scene, end, pose_ticks, len(artifacts))
-    if request.sensory_profile in ("engineered-multimodal-v1", "engineered-multimodal-v2"):
+    if request.sensory_profile in SENSORY_PROFILES:
         encoder_sha = digest(stored_scene["sensory_encoder"])
         for frame in frames[1:]:
             senses = frame.get("senses", [])
@@ -161,11 +164,12 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                         encoded.get("group_manifest_sha256") != encoder_sha):
                     raise ValueError("Recorded neural input identity mismatch")
                 values = encoded.get("values", {})
-                channels = ("odor_left", "odor_right", "visual_left", "visual_right", "touch")
-                currents = _finite_array([values.get(k) for k in channels], (5,), "neural input")
+                separated = request.sensory_profile in SEPARATED_CONTACT_PROFILES
+                channels = SENSORY_PROFILES[request.sensory_profile]["channels"] if separated else ("odor_left", "odor_right", "visual_left", "visual_right", "touch")
+                currents = _finite_array([values.get(k) for k in channels], (len(channels),), "neural input")
                 if np.any(currents < 0) or np.any(currents > 1):
                     raise ValueError("Recorded neural input outside [0,1]")
-                if request.sensory_profile == "engineered-multimodal-v2":
+                if request.sensory_profile in ENVIRONMENT_PROFILES:
                     contacts = sense.get("contact_environment")
                     targets = {f"obstacle-{i}" for i in range(len(scene["obstacles"]))}
                     targets.update(f"fly-{i}" for i in range(len(artifacts)))
@@ -173,7 +177,22 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                             any(not isinstance(c, str) or c not in targets for c in contacts) or
                             sense["touch"] != float(bool(sense.get("contact_food") or contacts))):
                         raise ValueError("Environmental touch differs from contact observations")
-                if not np.array_equal(currents[2:], [*sense["visual"], sense["touch"]]):
+                contact_values = [sense["touch"]]
+                if separated:
+                    sides = sense.get("contact_environment_sides", {})
+                    supports = sense.get("contact_support") if request.sensory_profile == SUPPORT_CONTACT_PROFILE["id"] else []
+                    if not isinstance(supports, list) or any(not isinstance(t, str) or t not in targets or not t.startswith("obstacle-") for t in supports):
+                        raise ValueError("Invalid terrain support observations")
+                    if (set(sides) != {"left", "right", "center"} or
+                            any(not isinstance(v, list) or any(not isinstance(t, str) or t not in targets for t in v) for v in sides.values()) or
+                            set(sum(sides.values(), []) + supports) != set(contacts)):
+                        raise ValueError("Lateral touch differs from contact observations")
+                    expected = [float(bool(sides["left"] or sides["center"])), float(bool(sides["right"] or sides["center"]))]
+                    if ([sense.get("touch_left"), sense.get("touch_right")] != expected or
+                            sense.get("taste") not in (0., 1.) or (sense["taste"] and not sense.get("contact_food"))):
+                        raise ValueError("Separate contact input differs from observations")
+                    contact_values = [sense["taste"], *expected]
+                if not np.array_equal(currents[2:], [*sense["visual"], *contact_values]):
                     raise ValueError("Neural input differs from embodied observations")
     n, nf = len(artifacts), len(scene["food"])
     environment_targets = {f"obstacle-{i}" for i in range(len(scene["obstacles"]))}
@@ -215,7 +234,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                 raise ValueError("Invalid sensory detection values")
         elif event["type"] == "environment_contact":
             slot, objects = event.get("slot"), event.get("objects")
-            if (request.sensory_profile != "engineered-multimodal-v2" or
+            if (request.sensory_profile not in ENVIRONMENT_PROFILES or
                     not isinstance(slot, int) or not 0 <= slot < n or
                     not isinstance(objects, list) or not objects or
                     any(not isinstance(obj, str) or obj not in environment_targets or obj == f"fly-{slot}"
@@ -272,4 +291,5 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     return {"status": "verified", "winner_slot": winner, "scores": scores.round(6).tolist(),
             "outcome": "solo" if n == 1 else "draw" if winner is None else "win",
             "receipt_sha256": receipt["sha256"], "final_tick": end,
-            "judge": "event-conservation-v1"}
+            "judge": "event-conservation-v1",
+            "behavior": behavior_metrics(stored_scene, frames, events, n, RULES["physics_dt"])}

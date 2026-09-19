@@ -229,7 +229,7 @@ This example fits a small MLP to observed log circuit multipliers and fitness, r
 
 ## Public evolution gallery
 
-Visitors can open Evolution without logging in and compare explicitly published, completed sessions. Charts retain flat and worsening scores. Each generation exposes candidate weights, parents, budget, actual scores and neural/behavior replays. **Use as starting fly** prepares a new session; it never enqueues work until Start training is pressed.
+Visitors can open Evolution without logging in and compare explicitly published, completed sessions. Charts retain flat and worsening scores. Each generation exposes candidate weights, parents, budget, actual scores and neural/behavior replays. **Save a copy and prepare training** asks you to sign in, saves an owned copy of the full published design, then selects it in a new training plan. The copy preserves its public parent and the source environment, seed, duration and sensory profile. Only **Start training** submits computation. Deployments that do not advertise `gallery_copy_available` show the gallery as read-only.
 
 `POST /api/v1/training/{id}/publish` shares the completed session's designs, scores and replay references; only the owner may publish. `GET /api/v1/training-showcase` and `GET /api/v1/training-showcase/{id}` require no login. Unpublished training remains owner-only. Publication removes account identifiers and operational fields from the response. Local model configuration is never uploaded. Users choose publication explicitly after completion.
 
@@ -245,3 +245,60 @@ matches, tournaments, training conditions and both agent CLI examples. Contact
 with the wall is resolved by MuJoCo; it does not reset the fly or supply an
 automatic turn. Compare sustained movement and feeding as well as scores:
 remaining inside the habitat can also mean that a design got stuck.
+
+
+## Sensory conditions in evolution
+
+Choose **Sensory input profile / 感觉输入模式** when creating a session. Every generation, map/seed condition and mirrored contest position uses the recorded profile. Opening a saved candidate for competition carries the session's bridge, senses and first evaluation condition into the arena. Branching a candidate or public example also restores its sensory/environment settings.
+
+`TrainingSpec.sensory_profile` accepts the same IDs as matches. Its historical default is `odor-only-v1`. Experimental vision/touch profiles currently require `legacy-v1`; incompatible combinations are rejected before evaluation. The API binds the selected profile to the actual compute node runtime. Different sensory profiles are shown as different conditions when comparing algorithms.
+
+Both agent clients accept the same option:
+
+```bash
+python scripts/train.py --founder FLY_ID --map enclosure --seconds 3 --sensory-profile engineered-touch-response-v1
+python scripts/custom_strategy.py --founder FLY_ID --map enclosure --seconds 3 --sensory-profile engineered-touch-response-v1 --plugin my_optimizer.py
+```
+
+For a direct API request, add `"sensory_profile":"engineered-touch-response-v1"` to `POST /api/v1/training`. Reattaching with `--run` uses the recorded plan and does not change conditions. This makes sensory conditions available to optimization; it does not establish that a profile or algorithm improves behavior. The 8 mV profile is an engineering experiment, not biological calibration.
+
+`GET /api/v1/season` advertises `training_sensory_profiles`. Older servers without that field show only odor training in the new UI, and the UI omits the new request field for compatibility. No selected experimental input is silently replaced with an odor-only request.
+
+### Continue from a portable public specimen
+
+`POST /api/v1/training-showcase/{run_id}/flies/{fly_id}/copy` requires an Arena identity. It accepts the published run and specimen IDs, compiles the complete FlySpec, and returns a new owned fly whose `spec.parent_id` is the public specimen. Repeating the same request for the same identity returns the same copy; another identity gets its own copy. No training, match or Lab experiment is scheduled by copying. Use the returned `id` as `founder_id` in a separate training request.
+
+The public specimen remains read-only. Its life record exposes the published training origin, available ancestors and recorded experiences even when the deployment has only portable gallery files and no source database. A specimen page links to the source trajectory for saving a copy before training or competition. The saved copy does not inherit unrecorded within-match state.
+
+## Selecting for sustained behavior
+
+`fitness_objective` is independent of the search strategy and neural model. The
+historical/default value `food` preserves the existing food score or paired food
+margin. `sustained-foraging-v1` selects on:
+
+```
+(total food + food consumed after the temporal midpoint) × fraction of time not inverted
+```
+
+The judge derives intake from actual events and posture from recorded thorax
+quaternions, cancelling the mesh's fixed orientation against the initial pose.
+Tilt over 90° is inverted; each sample's posture is held through the next sample
+interval. Thus a full recording that eats only at the start then remains inverted
+loses fitness, while a motionless nonfeeding fly still gets zero. This objective
+is an explicit engineering choice, not biological fitness or proof of learning.
+It cannot detect every failure: being stuck while upright can still earn credit.
+
+Contest training subtracts the opponent's objective score, averages both spawn
+positions, then averages evaluation conditions. Match winners and public rankings
+retain their existing rules. New match results expose the components in
+`result.behavior`; missing historical posture remains unavailable. A session
+requesting sustained foraging fails clearly if a worker does not supply those
+observations, rather than falling back to food-only fitness.
+
+The web selector is enabled from the server's `training_fitness_objectives`
+catalog. Both `scripts/train.py` and `scripts/custom_strategy.py` accept
+`--fitness-objective sustained-foraging-v1`. API clients can read the selected objective from the session plan. Local AI
+plugins receive evaluated fitness and per-match components in their history;
+plugin-specific objective settings can also be supplied in the local config.
+Use longer observation windows and evaluate held-out seeds before claiming an
+improvement; changing the objective does not itself produce evolved behavior.

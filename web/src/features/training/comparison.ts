@@ -5,7 +5,7 @@ export function evaluationConditions(spec:{map_id:string;seed:number;evaluation_
 export type ComparableRun = {
   id:string; status:string; evaluation_context?:string; model_profile?:string;
   spec:{name:string;strategy:string;founder_id:string;opponent_id:string|null;map_id:string;
-    mode:string;duration_seconds:number;seed:number;bridge_profile:string;population:number;
+    mode:string;duration_seconds:number;seed:number;bridge_profile:string;sensory_profile?:string;fitness_objective?:string;population:number;
     generations:number;max_evaluations:number;circuits:string[];mutation_strength:number;evaluation_conditions?:EvaluationCondition[]|null};
   baseline_fitness:number|null; evaluations_started:number; evaluations_completed:number;
   evaluations_total:number; members:{generation:number;slot:number;fitness:number|null}[];
@@ -33,6 +33,8 @@ export function comparisonDifferences(runs:ComparableRun[]):string[]{
   const fields=[['founder_id','Starting fly'],['mode','Objective'],
     ['duration_seconds','Seconds per evaluation'],['seed','Seed'],['bridge_profile','Match scientific profile']] as const
   const differences:string[]=fields.filter(([field])=>new Set(runs.map(r=>r.spec[field])).size>1).map(([,label])=>label)
+  if(new Set(runs.map(r=>r.spec.fitness_objective||'food')).size>1)differences.push('Selection objective')
+  if(new Set(runs.map(r=>r.spec.sensory_profile||'odor-only-v1')).size>1)differences.push('Sensory profile')
   if(new Set(runs.map(r=>r.model_profile||'malecns-lif-cpu-v1')).size>1)differences.push('Brain model')
   if(new Set(runs.map(r=>JSON.stringify(evaluationConditions(r.spec).map(c=>[c.map_id,c.seed]).sort()))).size>1)differences.push('Evaluation conditions')
   if(runs.some(r=>r.spec.mode==='contest')&&new Set(runs.map(r=>r.spec.opponent_id)).size>1)differences.push('Fixed opponent')
