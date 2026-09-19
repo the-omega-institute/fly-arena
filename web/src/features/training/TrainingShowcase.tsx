@@ -5,6 +5,7 @@ import {api} from '../../api'
 import type {ArenaMap,Fly,Match} from '../../types'
 import {useI18n} from '../../shared/i18n'
 import {TrainingComparison} from './TrainingComparison'
+import {LineageBehavior} from './LineageBehavior'
 import {summarizeRun,type ComparableRun} from './comparison'
 import {ConditionResults} from './ConditionResults'
 import type {ConditionResult} from './ConditionResults'
@@ -30,6 +31,7 @@ export function TrainingShowcase({maps,onReplay,onBranch,copyAvailable=false,bus
    <div className="training-tabs">{runs.map(r=><button key={r.id} className={current?.id===r.id?'active':''} onClick={()=>selectRun(r.id)}>{r.spec.name}<small>{t(algorithmName(r.spec.strategy))}</small></button>)}</div>
    {current&&<>
     <div className="showcase-actions"><strong>{current.spec.name}</strong><button className="secondary" onClick={()=>download(current)}><Download size={14}/>{t('Export results and lineage')}</button></div>
+    <LineageBehavior key={current.id} run={current} onReplay={onReplay}/>
     <div className="generation-list">{Array.from({length:current.spec.generations},(_,g)=><button key={g} className={generation===g?'active':''} onClick={()=>setGeneration(g)}><span>{current.spec.strategy==='random_search'?'R':'G'}{g+1}</span><small>{current.members.filter(m=>m.generation===g).length} {t('evaluated')}</small></button>)}</div>
     <p className="training-hint">{t('Round best')}: {round?.best?.toFixed(4)??'—'} · {t('Historical best')}: {round?.bestSoFar?.toFixed(4)??'—'}</p>
     <div className="showcase-individuals">{current.members.filter(m=>m.generation===generation).map(m=><article key={m.fly_id} className="training-individual">

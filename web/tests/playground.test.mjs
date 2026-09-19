@@ -639,3 +639,47 @@ test('behavior evaluation exposes food, late intake and actual posture without a
  assert.match(document.body.textContent,/Food in second half2\.000/)
  assert.match(document.body.textContent,/does not change the match winner/)
 })
+
+test('lineage behavior uses each participant slot and opens actual baseline, parent and descendant replays',async()=>{
+ const {LineageBehavior}=require('./src/features/training/LineageBehavior.js')
+ const metric=(food)=>({schema:'sustained-foraging-v1',food,latter_half_food:food/2,upright_fraction:1,recorded_seconds:10,first_inversion_s:null,fitness:food*1.5})
+ const member=(id,generation,parent,food)=>({fly_id:id,generation,slot:0,fitness:food*1.5,fly:{...own,id,name:id,spec:{...spec,parent_id:parent}},matches:[{id:'match-'+id,status:'verified',request:{map_id:'enclosure',mode:'contest',seed:42,duration_seconds:10,fly_ids:['opponent',id]},result:{behavior:[metric(900),metric(food)]}}]})
+ const base=member('baseline',0,'original-founder',.5),parent=member('parent',1,base.fly_id,10),child=member('child',2,parent.fly_id,12)
+ const replay=[];const run={best_fly_id:child.fly_id,members:[base,parent,child]}
+ await mount(LineageBehavior,{run,onReplay:m=>replay.push(m.id)})
+ const table=document.querySelector('.lineage-behavior-table')
+ assert.match(table.textContent,/0\.500/);assert.match(table.textContent,/10\.000/);assert.match(table.textContent,/12\.000/)
+ assert.doesNotMatch(table.textContent,/900\.000/)
+ const buttons=[...table.querySelectorAll('button')]
+ for(const b of buttons)await act(async()=>b.click())
+ assert.deepEqual(replay,['match-baseline','match-parent','match-child'])
+ assert.match(document.body.textContent,/not automatically wild type/)
+ assert.match(document.body.textContent,/No circuit multiplier changes/)
+ const select=document.querySelector('.lineage-behavior-heading select')
+ await act(async()=>{select.value='baseline';select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.body.textContent,/Parent evaluation not included/)
+ assert.equal(document.querySelectorAll('.lineage-behavior-table button').length,2)
+ const language=document.querySelector('select[aria-label="Language"]')
+ await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.body.textContent,/观看身体与大脑/)
+})
+
+test('lineage comparison keeps mismatched conditions and missing neural behavior distinct from zero',async()=>{
+ const {LineageBehavior,matchedLifeReplay}=require('./src/features/training/LineageBehavior.js')
+ const request={map_id:'enclosure',mode:'contest',seed:42,duration_seconds:10,bridge_profile:'sensorimotor-research-v2',sensory_profile:'engineered-contact-support-v1',fly_ids:['child','opponent']}
+ const reference={id:'child-match',status:'verified',request,result:null}
+ const child={fly_id:'child',generation:1,slot:0,fly:{...own,id:'child',spec:{...spec,parent_id:'baseline'}},matches:[reference]}
+ const matching={id:'baseline-match',status:'verified',request:{...request,fly_ids:['baseline','opponent']},result:null}
+ const base={fly_id:'baseline',generation:0,slot:0,fly:{...own,id:'baseline',spec},matches:[matching]}
+ assert.equal(matchedLifeReplay(base,child,reference),matching)
+ for(const change of [{seed:43},{duration_seconds:30},{map_id:'orchard'},{sensory_profile:'odor-only-v1'},{bridge_profile:'legacy-v1'},{fly_ids:['opponent','baseline']},{fly_ids:['baseline','other-opponent']}]){
+  assert.equal(matchedLifeReplay({...base,matches:[{...matching,request:{...matching.request,...change}}]},child,reference),undefined)
+ }
+ assert.equal(matchedLifeReplay({...base,fly:{...base.fly,spec:{...spec,model_profile:'other'}}},child,reference),undefined)
+ const mismatched={...base,matches:[{...matching,request:{...matching.request,seed:99}}]}
+ await mount(LineageBehavior,{run:{best_fly_id:'child',members:[mismatched,child]},onReplay:noop})
+ const table=document.querySelector('.lineage-behavior-table')
+ assert.equal(table.querySelectorAll('button').length,1)
+ assert.match(table.textContent,/No matching replay/);assert.match(table.textContent,/—/)
+ assert.doesNotMatch(table.textContent,/0\.000|100\.0%|None recorded in window/)
+})
