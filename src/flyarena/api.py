@@ -70,7 +70,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def match_runtime(profile='legacy-v1', sensory_profile='odor-only-v1'):
         from .services.node import configured_node
         node = configured_node()
-        if node and profile == 'legacy-v1' and sensory_profile == 'odor-only-v1':
+        if node and profile == 'legacy-v1':
             try:
                 return node.runtime(profile, sensory_profile)
             except (ConnectionError, subprocess.TimeoutExpired) as exc:

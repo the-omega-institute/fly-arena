@@ -69,3 +69,23 @@ Admission checks that scientific sources, dependency lock, graph, readout and ru
 Each remote match uses its existing match ID as the node job ID. Repeated submission attaches to the same process/result. A retry never restarts a simulation just because an SSH response was lost. Heavy runs acquire `/tmp/fly-arena-gpu.lock`, shared with operator experiments; queued jobs wait for it. Current execution uses CPU/Numba because the measured ordered CUDA implementation is slower for this workload. The node records progress, errors and retained evidence under `var/node-jobs/JOB_ID/`.
 
 Keep the node source and data in place while jobs are active. Update or disable routing after queues drain; changing execution configuration is an operator action, not a player's setting. Completed jobs retain their evidence for reconnects. As in the existing queue, a process that actually disappears without a result is reported as failed.
+
+### Experimental vision/touch matches
+
+Legacy-v1 matches now route both `odor-only-v1` and
+`engineered-multimodal-v1` to the configured node. The admission query sends the
+selected sensory profile, and the node returns that profile's full gains and
+encoding declaration in its runtime manifest. The old one-argument
+`describe legacy-v1` command remains odor-only. An old node that ignores the
+additional argument is rejected for a profile mismatch; there is no automatic
+sensory downgrade or local fallback on a connection failure.
+
+The existing serial lock, result transfer and independent judge apply to these
+runs. They remain experimental and unranked. Node configuration determines
+placement even when the app and node have identical runtime manifests. As above,
+change routing only after existing queues drain. Research-v2 remains local.
+
+The local node-protocol smoke recorded in
+`docs/evidence/multimodal-node-smoke.json` exercises the actual node CLI,
+detached worker, recompilation, full MaleCNS simulation, archive transfer and
+judge on this Mac. It is not evidence of SSH connectivity or RTX 4060 execution.

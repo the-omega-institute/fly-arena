@@ -117,3 +117,125 @@ def test_archive_cannot_escape_result_directory(tmp_path,monkeypatch):
     with pytest.raises(ValueError,match='archive entry'):
         node.execute({'id':JOB,'request':{},'runtime_hash':'remote'},[],tmp_path,lambda _:None)
     assert not (tmp_path.parent/'outside.json').exists()
+
+
+def test_sensory_profiles_are_forwarded_and_cached_separately(monkeypatch):
+    from flyarena.experiments.embodied_sensor import PROFILE
+    def manifest(bridge_profile='legacy-v1', sensory_profile='odor-only-v1'):
+        return {'sources': {'runner.py': 'science'}, 'sensory_profile':
+                dict(PROFILE) if sensory_profile == PROFILE['id'] else {'id': sensory_profile}}
+    monkeypatch.setattr('flyarena.runner.runtime_manifest', manifest)
+    node = Node(CONFIG); calls = []
+    def call(action, bridge, sensory='odor-only-v1'):
+        calls.append((action, bridge, sensory))
+        return manifest(bridge, sensory) | {'platform': 'linux-node'}
+    monkeypatch.setattr(node, 'call', call)
+    odor = node.runtime('legacy-v1')
+    multimodal = node.runtime('legacy-v1', PROFILE['id'])
+    assert odor['sensory_profile'] == {'id': 'odor-only-v1'}
+    assert multimodal['sensory_profile'] == PROFILE
+    assert multimodal['platform'] == 'linux-node'
+    assert node.runtime('legacy-v1') is odor
+    assert node.runtime('legacy-v1', PROFILE['id']) is multimodal
+    assert calls == [('describe', 'legacy-v1', 'odor-only-v1'), ('describe', 'legacy-v1', PROFILE['id'])]
+    with pytest.raises(ValueError, match='Unknown sensory profile'):
+        node.runtime('legacy-v1', 'unknown')
+    assert len(calls) == 2
+
+
+def test_old_node_cannot_silently_downgrade_multimodal_input(monkeypatch):
+    from flyarena.experiments.embodied_sensor import PROFILE
+    monkeypatch.setattr('flyarena.runner.runtime_manifest', lambda **kw: {'sensory_profile': PROFILE})
+    node = Node(CONFIG)
+    monkeypatch.setattr(node, 'call', lambda *args: {'sensory_profile': {'id': 'odor-only-v1'}})
+    with pytest.raises(ValueError, match='synchronization: sensory_profile'):
+        node.runtime('legacy-v1', PROFILE['id'])
+    assert not node._runtime
+
+
+@pytest.mark.parametrize('sensory', [None, 'engineered-multimodal-v1'])
+def test_node_describe_uses_requested_sensory_profile(monkeypatch, capsys, sensory):
+    calls = []
+    def manifest(**kwargs):
+        calls.append(kwargs)
+        return kwargs
+    monkeypatch.setattr('flyarena.runner.runtime_manifest', manifest)
+    monkeypatch.setattr(node_runner.sys, 'argv', ['node_runner', 'describe', 'legacy-v1'] + ([sensory] if sensory else []))
+    node_runner.main()
+    assert json.loads(capsys.readouterr().out) == {
+        'bridge_profile': 'legacy-v1', 'sensory_profile': sensory or 'odor-only-v1'}
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('endpoint', ['matches', 'tournaments'])
+def test_api_routes_multimodal_to_configured_node_without_local_fallback(tmp_path, monkeypatch, endpoint):
+    from types import SimpleNamespace
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    from flyarena.common import digest
+    from flyarena.contracts import FlySpec
+    from flyarena.experiments.embodied_sensor import PROFILE
+    from flyarena.store import Store
+    store = Store(tmp_path); owner = store.identity('tester')
+    flies = [store.add_fly(owner['id'], FlySpec(name=name, connectome_sha256='a'*64).model_dump(),
+                           {'artifact_id': str(i)*64}) for i, name in enumerate(('WT', 'Nectar'))]
+    calls = []; offline = False
+    runtime = {'platform': 'linux-node', 'sensory_profile': PROFILE}
+    def node_runtime(bridge, sensory):
+        calls.append((bridge, sensory))
+        if offline: raise ConnectionError('offline')
+        return runtime
+    monkeypatch.setattr('flyarena.services.node.configured_node', lambda: SimpleNamespace(runtime=node_runtime))
+    def no_local(**kwargs): raise AssertionError('must not fall back to local runtime')
+    monkeypatch.setattr('flyarena.api.runtime_manifest', no_local)
+    payload = {'fly_ids': [f['id'] for f in flies], 'mode': 'contest', 'duration_seconds': 1,
+               'sensory_profile': PROFILE['id']}
+    if endpoint == 'tournaments': payload['name'] = 'Multimodal series'
+    with TestClient(create_app(with_worker=False, store=store, auth_config=AuthConfig())) as client:
+        client.headers['Authorization'] = 'Bearer ' + owner['token']
+        url = '/api/v1/' + endpoint
+        response = client.post(url, json=payload, headers={'Idempotency-Key': 'first'})
+        assert response.status_code == 202, response.text
+        admitted = response.json()
+        assert calls == [('legacy-v1', PROFILE['id'])]
+        assert all(m['runtime_hash'] == digest(runtime) and m['request']['sensory_profile'] == PROFILE['id']
+                   for m in store.matches())
+        count = len(store.matches()); offline = True
+        # Reading the admitted request after a lost reply does not enqueue a second job.
+        retry = client.post(url, json=payload, headers={'Idempotency-Key': 'first'})
+        assert retry.status_code == 202 and retry.json()['id'] == admitted['id']
+        assert len(calls) == 1
+        assert client.post(url, json=payload, headers={'Idempotency-Key': 'new'}).status_code == 503
+        assert len(store.matches()) == count
+
+
+def test_job_uses_configured_node_even_when_runtime_matches_local(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from flyarena import job
+    from flyarena.common import digest
+    from flyarena.contracts import FlySpec, MatchRequest
+    from flyarena.store import Store
+    store = Store(tmp_path)
+    fly = store.add_fly('owner', FlySpec(name='fixture', connectome_sha256='a'*64).model_dump(),
+                        {'artifact_id': 'b'*64})
+    request = MatchRequest(fly_ids=[fly['id']], mode='forage', duration_seconds=1,
+                           sensory_profile='engineered-multimodal-v1').model_dump()
+    runtime = {'sensory_profile': request['sensory_profile'], 'platform': 'same-host'}
+    match = store.add_match('owner', request, digest(runtime))
+    ident, lease, generation = store.claim()
+    monkeypatch.setattr(job.sys, 'argv', ['job', ident, lease, str(generation), str(tmp_path)])
+    monkeypatch.setattr(job, 'runtime_manifest', lambda **kw: runtime)
+    executed = []
+    def execute(record, flies, destination, heartbeat):
+        executed.append(record['request'])
+        heartbeat(1)
+    monkeypatch.setattr('flyarena.services.node.configured_node', lambda: SimpleNamespace(execute=execute))
+    def no_local(*args, **kwargs): raise AssertionError('Configured node must receive this job')
+    monkeypatch.setattr(job, 'simulate', no_local)
+    # This test covers dispatch only; the real node protocol smoke verifies evidence.
+    verdict = {'status': 'verified', 'scores': [0], 'winner_slot': None}
+    monkeypatch.setattr(job, 'verify', lambda *args, **kwargs: verdict)
+    job.main()
+    assert executed == [request]
+    assert store.match(match['id'])['result'] == verdict

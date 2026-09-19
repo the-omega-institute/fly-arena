@@ -49,17 +49,21 @@ class Node:
         return response
 
     def runtime(self, profile: str, sensory_profile: str = "odor-only-v1") -> dict:
-        if sensory_profile != "odor-only-v1":
-            raise ValueError("Remote execution does not yet support experimental sensory profiles")
+        from ..experiments.embodied_sensor import validate_profile
+        validate_profile(profile, sensory_profile)
+        if profile != 'legacy-v1':
+            raise ValueError('Remote execution currently supports legacy-v1 matches only')
         cached = self._runtime.get((profile, sensory_profile))
         if cached and time.monotonic()-cached[0] < 30:
             return cached[1]
-        remote = self.call('describe', profile)
+        # Keep the old odor-only command compatible with deployed node CLIs.
+        # Additional sensory profiles must be echoed by the node's manifest;
+        # an older node that ignores this argument fails the comparison below.
+        args = (profile,) if sensory_profile == 'odor-only-v1' else (profile, sensory_profile)
+        remote = self.call('describe', *args)
         from ..runner import runtime_manifest
         local = runtime_manifest(bridge_profile=profile, sensory_profile=sensory_profile)
         # Platform/Python may differ. Scientific sources, graph, rules and readout must match.
-        if profile != 'legacy-v1':
-            raise ValueError('Remote execution currently supports legacy-v1 matches only')
         for key in ('sources', 'lock_sha256', 'model', 'models', 'rules', 'replay_policy',
                     'connectome_sha256', 'readout_weights_sha256', 'sensory_profile'):
             if remote.get(key) != local.get(key):

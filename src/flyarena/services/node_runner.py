@@ -106,7 +106,10 @@ def main():
     action, *args = sys.argv[1:]
     if action == 'describe':
         from ..runner import runtime_manifest
-        result = runtime_manifest(bridge_profile=args[0])
+        if len(args) not in (1, 2):
+            raise ValueError('describe requires a bridge profile and optional sensory profile')
+        result = runtime_manifest(bridge_profile=args[0],
+                                  sensory_profile=args[1] if len(args) == 2 else 'odor-only-v1')
     elif action == 'put':
         ident, index, chunk = args
         index = int(index)
