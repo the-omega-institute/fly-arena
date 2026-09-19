@@ -263,9 +263,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             bodies.step(drives)
             energy[:] = np.maximum(0, energy - drives.mean(axis=1) * 2 * RULES["physics_dt"])
             if request.mode != "sumo":
-                mouths = np.array([bodies.mouth(i) for i in range(len(flies))])
-                eligible = np.linalg.norm(mouths[:, None, :2] - food_xy[None, :, :], axis=2) <= RULES["mouth_radius_mm"]
-                eligible &= (mouths[:, 2] < 2.5)[:, None] & (~eliminated)[:, None]
+                eligible = bodies.feeding_eligibility()
+                eligible &= (~eliminated)[:, None]
                 counts = eligible.sum(axis=0)
                 # Split a single source's intake capacity equally; conserve resources.
                 amount = np.minimum(remaining, RULES["food_intake_per_second"] * RULES["physics_dt"])

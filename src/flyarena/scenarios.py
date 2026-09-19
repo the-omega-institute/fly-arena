@@ -85,9 +85,10 @@ MAPS = {
 }
 
 RULES = {
-    "id": "arena-ground-v1", "physics_dt": .0001, "neural_dt_ms": .1,
+    "id": "arena-ground-contact-v2", "physics_dt": .0001, "neural_dt_ms": .1,
     "sense_ticks": 100, "snapshot_ticks": 500, "food_initial_units": 10.0,
     "food_intake_per_second": 8.0, "mouth_radius_mm": 1.1,
+    "feeding_contact": "mujoco-mouth-probe-required-v1",
     "odor_sigma_mm": 5.0, "odor_policy": "analytic Gaussian, penetrates walls",
     "resource_tie": "equal division among eligible mouths each integer physics tick",
     "sumo": "simultaneous thorax boundary exits are draw; no exit at time limit is draw",
