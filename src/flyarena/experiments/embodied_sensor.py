@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import numpy as np
 from ..common import digest, file_sha
+from ..scenarios import VISUAL_OBSERVATION
 
 PROFILE = {
     "id": "engineered-multimodal-v1", "schema": "embodied-sensor/v1",
@@ -20,7 +21,7 @@ PROFILE = {
     # tactile input; a large direct current overwhelms that bridge.  The gains
     # are versioned here so the receipt records the actual experiment, not a
     # hidden runtime knob.  They are not biological calibration constants.
-    "visual": {"gain_mv": 0.1, "source": "raycast_engineered_observation_v1",
+    "visual": {"gain_mv": 0.1, "source": VISUAL_OBSERVATION["id"],
                "selector": "visual_projection, annotated side L/R; unknown side excluded"},
     "touch": {"gain_mv": 0.1, "source": "mujoco_food_contact_observation_v1",
               "selector": "class = mechanosensory_tactile; whole population"},

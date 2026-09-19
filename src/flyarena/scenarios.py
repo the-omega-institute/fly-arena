@@ -6,6 +6,15 @@ import numpy as np
 
 from .common import digest
 
+VISUAL_OBSERVATION = {
+    "id": "raycast_engineered_bilateral_head_v2",
+    "origins": "left and right antenna offsets in the head frame",
+    "directions": "head-local forward-left and forward-right, 45 degrees from forward",
+    "response": "positive cosine of target direction times exp(-distance_mm / 16) times remaining fraction; clipped per channel to [0,1]",
+    "occlusion": "MuJoCo ray must first hit the food geom; own body excluded",
+    "scope": "Engineering binocular observation, not a calibrated retina or compound-eye model",
+}
+
 MAPS = {
     "orchard": {
         "id": "orchard", "name": "琥珀果园", "english": "Amber Orchard",

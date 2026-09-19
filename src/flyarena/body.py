@@ -151,15 +151,15 @@ class Bodies:
 
         Food is a static scene geom and obstacles are the same geoms used by
         physics. A target contributes only when its ray reaches that target
-        before any obstacle or ground geom. This remains an observation until
-        a visual neural encoder is independently qualified.
+        before any obstacle or ground geom. Channels use separate head-local
+        cosine fields; opt-in visual currents remain an engineering hypothesis.
         """
         origins = self.antennae(slot)
-        position, rotation = self.pose(slot)
-        forward = rotation[:, 0][:2]
-        norm = np.linalg.norm(forward)
-        if norm:
-            forward = forward / norm
+        head_rotation = self.data.site_xmat[self.head_ids[slot]].reshape(3, 3)
+        # Each channel keeps its own ray origin and head-local receptive
+        # direction. Local +Y is left, matching antennae() and neural labels.
+        directions = [head_rotation @ np.array([1., side, 0.]) / np.sqrt(2)
+                      for side in (1., -1.)]
         values = [0.0, 0.0]
         for index, (food_id, geom_id) in enumerate(self.food_geom_ids.items()):
             target = self.data.geom_xpos[geom_id].copy()
@@ -176,11 +176,9 @@ class Bodies:
                     int(self.model.body_rootid[self.body_ids[slot]]), hit)
                 if ray_distance < 0 or int(hit[0]) != geom_id:
                     continue
-                unit = delta[:2] / max(distance, 1e-6)
-                front = max(0.0, float(np.dot(forward, unit)))
-                lateral = float(forward[0] * unit[1] - forward[1] * unit[0])
+                front = max(0.0, float(np.dot(directions[side], direction)))
                 signal = float(np.clip(amount / 10.0, 0, 1) * front * np.exp(-distance / 16.0))
-                values[0 if lateral < 0 else 1] += signal
+                values[side] += signal
         return [float(np.clip(value, 0, 1)) for value in values]
 
     def food_contacts(self, slot: int) -> list[str]:

@@ -117,8 +117,12 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path, monkeypatch,
     assert result['intake_ticks']==[[e['tick'] for e in events if e['type']=='intake' and e['slot']==0]]
     assert scene['sensory_encoder']==EmbodiedSensor(graph,profile['id']).manifest
     assert receipt['runtime']['sensory_profile']==profile
+    from flyarena.scenarios import VISUAL_OBSERVATION
+    assert scene['visual_observation'] == VISUAL_OBSERVATION
+    assert receipt['runtime']['sensors']['vision'] == VISUAL_OBSERVATION['id']
     for frame in frames[1:]:
         sense=frame['senses'][0];encoded=sense['neural_input']
+        assert sense['visual_status'] == VISUAL_OBSERVATION['id']
         assert encoded['group_manifest_sha256']==digest(scene['sensory_encoder'])
         assert encoded['values']['visual_left']==sense['visual'][0]
         assert encoded['values']['touch']==sense['touch']
