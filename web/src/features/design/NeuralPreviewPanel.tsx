@@ -4,9 +4,10 @@ import {useEffect,useState} from 'react'
 import {useI18n} from '../../shared/i18n'
 import type {Circuit,Spec} from '../../types'
 import './neuralPreview.css'
+import {MotorPreview,type MotorSample,type MotorReadout} from './MotorPreview'
 
-type Sample={time_ms:number;stimulus:{left:number;right:number};circuits:Record<string,number>;reference_circuits:Record<string,number>;total_spikes:number|null;reference_total_spikes:number|null}
-export type NeuralPreview={schema:string;artifact_id:string;model_profile:string;connectome_sha256:string;steps:number;scope:string;spec?:Spec;reference?:{artifact_id:string;spec:Spec};protocol?:{duration_ms:number;sample_interval_ms:number;onset_ms:number;offset_ms:number};stimuli:{stimulus:{left:number;right:number};circuits:Record<string,number>;total_spikes:number|null;samples?:Sample[]}[];example?:{name:string;related_match_id:string;execution:string}}
+type Sample={time_ms:number;stimulus:{left:number;right:number};circuits:Record<string,number>;reference_circuits:Record<string,number>;total_spikes:number|null;reference_total_spikes:number|null;motor?:MotorSample|null;reference_motor?:MotorSample|null}
+export type NeuralPreview={schema:string;artifact_id:string;model_profile:string;connectome_sha256:string;steps:number;scope:string;motor_readout?:MotorReadout;spec?:Spec;reference?:{artifact_id:string;spec:Spec};protocol?:{duration_ms:number;sample_interval_ms:number;onset_ms:number;offset_ms:number};stimuli:{stimulus:{left:number;right:number};circuits:Record<string,number>;total_spikes:number|null;samples?:Sample[]}[];example?:{name:string;related_match_id:string;execution:string}}
 export type PreviewRecord={data:NeuralPreview;specKey:string|null}
 const finite=(value:number|undefined):value is number=>typeof value==='number'&&Number.isFinite(value)
 const show=(value:number|undefined)=>finite(value)?value.toFixed(2):'—'
@@ -48,12 +49,13 @@ export function NeuralPreviewPanel({record,stale,circuits,onImport,onReplay}:{re
     </svg>
     <label className="stimulus-preview__clock">{zh?'观察时间':'Observation time'} <strong>{sample.time_ms} ms</strong><input type="range" aria-label={zh?'神经预览时间':'Neural preview time'} min={0} max={samples.length-1} step={1} value={Math.min(sampleIndex,samples.length-1)} onInput={e=>setSampleIndex(+e.currentTarget.value)} onChange={e=>setSampleIndex(+e.target.value)}/></label>
    </>}
+   {paired&&<MotorPreview samples={samples} sample={sample} readout={p.motor_readout} duration={duration} onset={p.protocol!.onset_ms} offset={p.protocol!.offset_ms} pulse={trial!==3}/>}
    {paired&&circuits.length>0&&<div className="stimulus-preview__brains"><div><h3>{zh?'设计的大脑':'Design brain'}</h3><BrainActivityOverview circuits={circuits} activity={sample.circuits} scale={brainScale} mutations={changes} time={sample.time_ms/1000} onOpen={setCircuit} mode="preview"/></div><div><h3>WT</h3><BrainActivityOverview circuits={circuits} activity={sample.reference_circuits} scale={brainScale} time={sample.time_ms/1000} onOpen={setCircuit} mode="preview"/></div></div>}
    <div className="stimulus-preview__regions">{keys.map(id=>{const own=sample?sample.circuits[id]:row.circuits[id],wt=sample?.reference_circuits[id],delta=finite(own)&&finite(wt)?own-wt:undefined
     return <button key={id} className={circuit===id?'active':''} onClick={()=>setCircuit(id)} aria-pressed={circuit===id} aria-label={label(id)}><strong>{label(id)}</strong><span>{zh?'设计':'Design'} <b>{show(own)} Hz</b></span><span>WT <b>{show(wt)}{finite(wt)?' Hz':''}</b></span><small>Δ {finite(delta)?`${delta>0?'+':''}${delta.toFixed(2)} Hz`:'—'}</small></button>})}</div>
-   <p className="stimulus-preview__scope">{zh?'这些是模型神经群的活动记录。零气味仍有背景电流；WT 指未修改参数的同模型基线。此实验没有身体、动作读出或比赛分数，响应差异不能直接当作行为优势。':'These are recorded model population activities. Zero odor retains tonic current; WT is the unmodified same-model baseline. There is no body, motor readout or match score. A neural difference is not evidence of better behavior.'}</p>
+   <p className="stimulus-preview__scope">{zh?'这些是模型神经群的活动记录。零气味仍有背景电流；WT 指未修改参数的同模型基线。此实验没有身体或比赛分数，响应差异不能直接当作行为优势。':'These are recorded model population activities. Zero odor retains tonic current; WT is the unmodified same-model baseline. There is no body or match score. A neural difference is not evidence of better behavior.'}</p>
    {example&&p.spec&&<div className="stimulus-preview__actions"><button className="secondary" onClick={()=>onImport(p.spec!)}>{zh?'把样本设计载入编辑器':'Load example design into editor'}</button>{p.example?.related_match_id&&<button className="secondary" onClick={()=>onReplay(p.example!.related_match_id)}>{zh?'观看这份设计的真实对战':'Watch this design in a real contest'}</button>}</div>}
-   <details><summary>{zh?'查看本次设计与实验条件':'Inspect design and experiment conditions'}</summary><pre>{JSON.stringify({artifact_id:p.artifact_id,connectome:p.connectome_sha256,reference:p.reference,protocol:p.protocol,spec:p.spec,scope:p.scope},null,2)}</pre></details>
+   <details><summary>{zh?'查看本次设计与实验条件':'Inspect design and experiment conditions'}</summary><pre>{JSON.stringify({artifact_id:p.artifact_id,connectome:p.connectome_sha256,reference:p.reference,protocol:p.protocol,motor_readout:p.motor_readout,spec:p.spec,scope:p.scope},null,2)}</pre></details>
   </div>
  </section>
 }

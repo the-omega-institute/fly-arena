@@ -1,0 +1,3175 @@
+{
+  "schema": "neural-design-preview/v3",
+  "artifact_id": "caf5cc5eab03a5a550e476ef600a3690e1e503c75aec746365b438e8bde211ab",
+  "motor_readout": {
+    "available": true,
+    "id": "descending-ridge-v1",
+    "bridge_profile": "legacy-v1",
+    "readout_sha256": "500c404ff2624f977167e1cf2b585585b04904dfb47eb41945f7dbd513c6114d",
+    "calibration_model": "malecns-lif-cpu-v1",
+    "neuron_count": 1314,
+    "channels": [
+      "left",
+      "right"
+    ],
+    "units": "dimensionless motor drive",
+    "rate_scale_hz": 100,
+    "clip": [
+      0,
+      1.5
+    ],
+    "previous_fraction": 0.85,
+    "update_interval_ms": 10,
+    "scope": "Shared frozen arena decoder, calibrated on LIF; transfer to other models is unvalidated. No body, world coordinates, reward or stimulus input enters the readout."
+  },
+  "spec": {
+    "schema_version": "flyspec/v1",
+    "name": "Nectar / 花蜜",
+    "description": "加强嗅觉输入与投射连接。行为优势仍需比赛验证。",
+    "color": "amber",
+    "parent_id": null,
+    "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+    "model_profile": "malecns-lif-cpu-v1",
+    "weight_mutations": [
+      {
+        "selector": "olfactory",
+        "scale": 1.18
+      },
+      {
+        "selector": "projection",
+        "scale": 1.1
+      }
+    ],
+    "edge_deltas": [],
+    "neuron_parameters": {
+      "tau_scale": 1.0,
+      "threshold_shift_mv": 0.0
+    },
+    "plasticity": "none",
+    "interventions": []
+  },
+  "report": {
+    "artifact_id": "caf5cc5eab03a5a550e476ef600a3690e1e503c75aec746365b438e8bde211ab",
+    "budget_used": 3.409787,
+    "budget_limit": 100,
+    "weight_points": 3.409787,
+    "intrinsic_points": 0.0,
+    "changed_edges": 443135,
+    "neuron_count": 165122,
+    "edge_count": 25563197,
+    "min_multiplier": 1.0,
+    "max_multiplier": 1.1800000000005033,
+    "weights_sha256": "b1f2b9c47df16d963b15a32cce55d076f5c318ea9df7ad5be427479c8149c76d",
+    "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+    "model_profile": "malecns-lif-cpu-v1",
+    "lineage_semantics": "absolute-canonical-full-spec",
+    "interventions": [],
+    "metadata_sha256": null,
+    "structural_changed_edges": 443135,
+    "effective_changed_edges": 443135,
+    "affected_neurons": 19430,
+    "effective_affected_neurons": 19430,
+    "synaptic_contacts": 3133249,
+    "effective_synaptic_contacts": 3133249
+  },
+  "reference": {
+    "artifact_id": "aaf1fb32e763e7bda8b34bea1519e1041e9b73b07bed6b5dc1c4552840785bd7",
+    "spec": {
+      "schema_version": "flyspec/v1",
+      "name": "WT model reference",
+      "description": "",
+      "color": "mint",
+      "parent_id": null,
+      "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+      "model_profile": "malecns-lif-cpu-v1",
+      "weight_mutations": [],
+      "edge_deltas": [],
+      "neuron_parameters": {
+        "tau_scale": 1.0,
+        "threshold_shift_mv": 0.0
+      },
+      "plasticity": "none",
+      "interventions": []
+    }
+  },
+  "model_profile": "malecns-lif-cpu-v1",
+  "model": {
+    "id": "malecns-lif-cpu-v1",
+    "dt_ms": 0.1,
+    "tau_mem_ms": 20.0,
+    "tau_syn_ms": 5.0,
+    "rest_mv": -52.0,
+    "reset_mv": -52.0,
+    "threshold_mv": -45.0,
+    "refractory_ms": 2.2,
+    "delay_ms": 1.8,
+    "base_weight_mv": 0.275,
+    "integration": "exponential-Euler, delayed current pulses; synaptic current reset on spike",
+    "scope": "Full retained MaleCNS graph; simplified current-based LIF, engineered sensory/motor bridge"
+  },
+  "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+  "steps": 1200,
+  "clock_step_ms": 0.1,
+  "protocol": {
+    "duration_ms": 120,
+    "sample_interval_ms": 10,
+    "onset_ms": 20,
+    "offset_ms": 80,
+    "encoder": "bilateral ORN current: 8 + 40 * concentration mV",
+    "reset": "Both models reset independently before each stimulus",
+    "input_alignment": "Each sample labels the input over the preceding interval"
+  },
+  "stimuli": [
+    {
+      "stimulus": {
+        "left": 1.0,
+        "right": 0.0
+      },
+      "circuits": {
+        "olfactory": 30.95793565486752,
+        "projection": 131.31135449821687,
+        "local": 192.3851558262711,
+        "memory": 112.27249408519418,
+        "readout": 209.44970162619822,
+        "descending": 7.414384389503499,
+        "visual": 0.24798854524578598,
+        "motor": 10.076617509029305
+      },
+      "total_spikes": 129887,
+      "samples": [
+        {
+          "time_ms": 0,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 10,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 20,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 30,
+          "stimulus": {
+            "left": 1.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              -0.06619126475520618,
+              0.1662390465153543
+            ],
+            "clipped": [
+              0.0,
+              0.1662390465153543
+            ],
+            "drive": [
+              0.0,
+              0.024935856977303144
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              -0.0991443664767025,
+              0.19540753092568397
+            ],
+            "clipped": [
+              0.0,
+              0.19540753092568397
+            ],
+            "drive": [
+              0.0,
+              0.029311129638852594
+            ]
+          },
+          "circuits": {
+            "olfactory": 15.404752707458282,
+            "projection": 18.902034580662068,
+            "local": 26.707347145833488,
+            "memory": 0.8388396082221001,
+            "readout": 0.20029208791120642,
+            "descending": 0.177170739047431,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 14.122024336695413,
+            "projection": 16.793127466679696,
+            "local": 24.938931049561265,
+            "memory": 0.2394842321677769,
+            "readout": 0.40788036991877996,
+            "descending": 0.13265196760092418,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 4562,
+          "reference_total_spikes": 3946
+        },
+        {
+          "time_ms": 40,
+          "stimulus": {
+            "left": 1.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0918156631702791,
+              0.37660538979142105
+            ],
+            "clipped": [
+              0.0918156631702791,
+              0.37660538979142105
+            ],
+            "drive": [
+              0.013772349475541864,
+              0.07768628689942082
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.14377642137184887,
+              0.28451437111160566
+            ],
+            "clipped": [
+              0.14377642137184887,
+              0.28451437111160566
+            ],
+            "drive": [
+              0.02156646320577733,
+              0.06759161585976554
+            ]
+          },
+          "circuits": {
+            "olfactory": 28.311084814115553,
+            "projection": 49.03334160431095,
+            "local": 66.50618095761158,
+            "memory": 22.663214814002043,
+            "readout": 32.47684551833765,
+            "descending": 3.247634286630091,
+            "visual": 0.04219362907817444,
+            "motor": 0.9937519229895376
+          },
+          "reference_circuits": {
+            "olfactory": 26.287501859756908,
+            "projection": 44.7066625904179,
+            "local": 62.95413583453129,
+            "memory": 17.297361934489707,
+            "readout": 24.921825730855524,
+            "descending": 2.9701771432293373,
+            "visual": 0.027732087817103585,
+            "motor": 0.8896694857263137
+          },
+          "total_spikes": 19013,
+          "reference_total_spikes": 16165
+        },
+        {
+          "time_ms": 50,
+          "stimulus": {
+            "left": 1.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.10762662272260798,
+              0.5666222687780385
+            ],
+            "clipped": [
+              0.10762662272260798,
+              0.5666222687780385
+            ],
+            "drive": [
+              0.02785049046260178,
+              0.15102668418121346
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.13997360700461525,
+              0.563180084865708
+            ],
+            "clipped": [
+              0.13997360700461525,
+              0.563180084865708
+            ],
+            "drive": [
+              0.03932753477560302,
+              0.1419298862106569
+            ]
+          },
+          "circuits": {
+            "olfactory": 37.71675970266851,
+            "projection": 73.32232883608751,
+            "local": 98.42192597797109,
+            "memory": 44.10188372336967,
+            "readout": 68.27517652716904,
+            "descending": 4.486698735670473,
+            "visual": 0.09121743350530243,
+            "motor": 5.189400366014885
+          },
+          "reference_circuits": {
+            "olfactory": 35.30636594729216,
+            "projection": 67.04727789153824,
+            "local": 93.79709196501258,
+            "memory": 36.05238495416263,
+            "readout": 57.0141680361929,
+            "descending": 4.626868026286779,
+            "visual": 0.07895326909763094,
+            "motor": 4.876955772272589
+          },
+          "total_spikes": 34832,
+          "reference_total_spikes": 30454
+        },
+        {
+          "time_ms": 60,
+          "stimulus": {
+            "left": 1.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.059550037931530866,
+              0.8608304953349851
+            ],
+            "clipped": [
+              0.059550037931530866,
+              0.8608304953349851
+            ],
+            "drive": [
+              0.03260542258294114,
+              0.2574972558542792
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.17460944603076262,
+              0.7105146393210284
+            ],
+            "clipped": [
+              0.17460944603076262,
+              0.7105146393210284
+            ],
+            "drive": [
+              0.059619821463876954,
+              0.22721759917721263
+            ]
+          },
+          "circuits": {
+            "olfactory": 45.036586253025504,
+            "projection": 93.85328207000785,
+            "local": 124.30258327638076,
+            "memory": 62.896625285217304,
+            "readout": 100.6787195454587,
+            "descending": 5.389480358287756,
+            "visual": 0.13579921644393325,
+            "motor": 6.142893606005753
+          },
+          "reference_circuits": {
+            "olfactory": 42.25690410481532,
+            "projection": 85.929318733607,
+            "local": 119.31599436254538,
+            "memory": 52.255948436258166,
+            "readout": 83.73485312227213,
+            "descending": 5.714972861410936,
+            "visual": 0.1377668233245017,
+            "motor": 6.19697995604223
+          },
+          "total_spikes": 50389,
+          "reference_total_spikes": 44533
+        },
+        {
+          "time_ms": 70,
+          "stimulus": {
+            "left": 1.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.13905681992044552,
+              0.9061890619413213
+            ],
+            "clipped": [
+              0.13905681992044552,
+              0.9061890619413213
+            ],
+            "drive": [
+              0.04857313218356679,
+              0.3548010267673355
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.3074274124764733,
+              0.720929438848625
+            ],
+            "clipped": [
+              0.3074274124764733,
+              0.720929438848625
+            ],
+            "drive": [
+              0.0967909601157664,
+              0.3012743751279245
+            ]
+          },
+          "circuits": {
+            "olfactory": 51.21342506035255,
+            "projection": 110.51319016615561,
+            "local": 147.03830931431892,
+            "memory": 78.93359999874522,
+            "readout": 130.71313185746067,
+            "descending": 6.543076281338053,
+            "visual": 0.16025197840141148,
+            "motor": 6.721044590984996
+          },
+          "reference_circuits": {
+            "olfactory": 47.85776373552907,
+            "projection": 101.55417768138824,
+            "local": 140.54329173735354,
+            "memory": 65.5903917529617,
+            "readout": 105.60177332149519,
+            "descending": 6.416997766669292,
+            "visual": 0.1553841667199432,
+            "motor": 6.828577950048401
+          },
+          "total_spikes": 66334,
+          "reference_total_spikes": 58217
+        },
+        {
+          "time_ms": 80,
+          "stimulus": {
+            "left": 1.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.12336587990388281,
+              1.0578681679363449
+            ],
+            "clipped": [
+              0.12336587990388281,
+              1.0578681679363449
+            ],
+            "drive": [
+              0.05979204434161419,
+              0.4602610979426869
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.3616988267571227,
+              0.8157923081125897
+            ],
+            "clipped": [
+              0.3616988267571227,
+              0.8157923081125897
+            ],
+            "drive": [
+              0.13652714011196984,
+              0.37845206507562423
+            ]
+          },
+          "circuits": {
+            "olfactory": 56.1973691553216,
+            "projection": 124.75630008858127,
+            "local": 164.05179308712133,
+            "memory": 92.66471266900194,
+            "readout": 155.61109524936057,
+            "descending": 7.061899150726237,
+            "visual": 0.19821329020272171,
+            "motor": 7.1226422925497195
+          },
+          "reference_circuits": {
+            "olfactory": 52.50654307109983,
+            "projection": 114.8387462974272,
+            "local": 157.55874724813415,
+            "memory": 76.5633568818704,
+            "readout": 121.38865676064451,
+            "descending": 6.973961435505303,
+            "visual": 0.16994602553395904,
+            "motor": 7.211774528276688
+          },
+          "total_spikes": 82198,
+          "reference_total_spikes": 72155
+        },
+        {
+          "time_ms": 90,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.17887402102749095,
+              1.10658912733217
+            ],
+            "clipped": [
+              0.17887402102749095,
+              1.10658912733217
+            ],
+            "drive": [
+              0.0776543408444957,
+              0.5572103023511094
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.30073937563834274,
+              0.9499829325769765
+            ],
+            "clipped": [
+              0.30073937563834274,
+              0.9499829325769765
+            ],
+            "drive": [
+              0.16115897544092578,
+              0.4641816952008271
+            ]
+          },
+          "circuits": {
+            "olfactory": 49.333030769903665,
+            "projection": 131.04631190255563,
+            "local": 176.8667811643969,
+            "memory": 102.86663257337354,
+            "readout": 178.4710981363138,
+            "descending": 7.6846341022056,
+            "visual": 0.1992484300160855,
+            "motor": 7.75966834088159
+          },
+          "reference_circuits": {
+            "olfactory": 45.33285169554533,
+            "projection": 120.06079499619314,
+            "local": 169.25723617479053,
+            "memory": 84.56890484385116,
+            "readout": 137.28089422870815,
+            "descending": 7.024840028380302,
+            "visual": 0.20989602805752003,
+            "motor": 8.169324809158889
+          },
+          "total_spikes": 95784,
+          "reference_total_spikes": 83903
+        },
+        {
+          "time_ms": 100,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.2565139104630773,
+              1.0850018486116224
+            ],
+            "clipped": [
+              0.2565139104630773,
+              1.0850018486116224
+            ],
+            "drive": [
+              0.10448327628728293,
+              0.6363790342901863
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.45741233401661063,
+              0.8916230509734645
+            ],
+            "clipped": [
+              0.45741233401661063,
+              0.8916230509734645
+            ],
+            "drive": [
+              0.2055969792272785,
+              0.5282978985667227
+            ]
+          },
+          "circuits": {
+            "olfactory": 42.53515891825049,
+            "projection": 131.5554667914547,
+            "local": 183.49502899718306,
+            "memory": 108.12312719991873,
+            "readout": 193.69960216632907,
+            "descending": 7.769537192317006,
+            "visual": 0.21948547987197045,
+            "motor": 8.75773761877794
+          },
+          "reference_circuits": {
+            "olfactory": 38.396908902411525,
+            "projection": 121.49102421020842,
+            "local": 175.74483122447708,
+            "memory": 88.08125632511145,
+            "readout": 147.0599130521675,
+            "descending": 7.037909937849582,
+            "visual": 0.20464439099878023,
+            "motor": 8.280915600804809
+          },
+          "total_spikes": 107646,
+          "reference_total_spikes": 93547
+        },
+        {
+          "time_ms": 110,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.3519381625903644,
+              1.0566019318206306
+            ],
+            "clipped": [
+              0.3519381625903644,
+              1.0566019318206306
+            ],
+            "drive": [
+              0.14160150923274514,
+              0.6994124689197528
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.42471456390606305,
+              0.9650971350722644
+            ],
+            "clipped": [
+              0.42471456390606305,
+              0.9650971350722644
+            ],
+            "drive": [
+              0.23846461692909618,
+              0.5938177840425539
+            ]
+          },
+          "circuits": {
+            "olfactory": 36.23012043087184,
+            "projection": 131.1550448971652,
+            "local": 188.25035363761955,
+            "memory": 110.94601698360177,
+            "readout": 203.65504660421638,
+            "descending": 7.582263637269166,
+            "visual": 0.2282732114554611,
+            "motor": 9.752572360287715
+          },
+          "reference_circuits": {
+            "olfactory": 32.422482190863455,
+            "projection": 121.81382254596224,
+            "local": 180.18332633506878,
+            "memory": 89.880714168991,
+            "readout": 154.0888609798915,
+            "descending": 6.874698134806295,
+            "visual": 0.2160874444875333,
+            "motor": 8.397031110850277
+          },
+          "total_spikes": 118769,
+          "reference_total_spikes": 102923
+        },
+        {
+          "time_ms": 120,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.2540027078919927,
+              1.198530967844982
+            ],
+            "clipped": [
+              0.2540027078919927,
+              1.198530967844982
+            ],
+            "drive": [
+              0.15846168903163227,
+              0.7742802437585372
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.3786929895783908,
+              1.0545083795538623
+            ],
+            "clipped": [
+              0.3786929895783908,
+              1.0545083795538623
+            ],
+            "drive": [
+              0.25949887282649037,
+              0.6629213733692502
+            ]
+          },
+          "circuits": {
+            "olfactory": 30.95793565486752,
+            "projection": 131.31135449821687,
+            "local": 192.3851558262711,
+            "memory": 112.27249408519418,
+            "readout": 209.44970162619822,
+            "descending": 7.414384389503499,
+            "visual": 0.24798854524578598,
+            "motor": 10.076617509029305
+          },
+          "reference_circuits": {
+            "olfactory": 27.475698429767018,
+            "projection": 121.9004222708372,
+            "local": 183.5654727971255,
+            "memory": 91.32287731135996,
+            "readout": 158.8814993634824,
+            "descending": 6.8967742660999605,
+            "visual": 0.22274972250983402,
+            "motor": 8.957911770428694
+          },
+          "total_spikes": 129887,
+          "reference_total_spikes": 112265
+        }
+      ]
+    },
+    {
+      "stimulus": {
+        "left": 0.0,
+        "right": 1.0
+      },
+      "circuits": {
+        "olfactory": 43.15885732829767,
+        "projection": 139.97979809008845,
+        "local": 197.64825020062045,
+        "memory": 116.90966060571758,
+        "readout": 215.34812888752097,
+        "descending": 7.434829410387646,
+        "visual": 0.26428568649937356,
+        "motor": 10.277608440803137
+      },
+      "total_spikes": 142826,
+      "samples": [
+        {
+          "time_ms": 0,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 10,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 20,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 30,
+          "stimulus": {
+            "left": 0.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.0009565295181791631,
+              0.12148233879836923
+            ],
+            "clipped": [
+              0.0009565295181791631,
+              0.12148233879836923
+            ],
+            "drive": [
+              0.00014347942772687447,
+              0.018222350819755383
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              -0.006023035329724727,
+              0.11613380888872918
+            ],
+            "clipped": [
+              0.0,
+              0.11613380888872918
+            ],
+            "drive": [
+              0.0,
+              0.017420071333309375
+            ]
+          },
+          "circuits": {
+            "olfactory": 23.782132899305882,
+            "projection": 22.689095114263445,
+            "local": 30.351955360009594,
+            "memory": 1.2122758310332882,
+            "readout": 0.2055679714785136,
+            "descending": 0.2945253251019934,
+            "visual": 0.002149897714636997,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 21.633143182432967,
+            "projection": 20.935949104194176,
+            "local": 28.6924683382686,
+            "memory": 0.4345282730716769,
+            "readout": 0.0,
+            "descending": 0.2806184607383299,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 6257,
+          "reference_total_spikes": 5501
+        },
+        {
+          "time_ms": 40,
+          "stimulus": {
+            "left": 0.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.30228612237443875,
+              0.14104460575952293
+            ],
+            "clipped": [
+              0.30228612237443875,
+              0.14104460575952293
+            ],
+            "drive": [
+              0.04546487586973365,
+              0.036645689060720514
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.4205083649748788,
+              0.01839912761231888
+            ],
+            "clipped": [
+              0.4205083649748788,
+              0.01839912761231888
+            ],
+            "drive": [
+              0.06307625474623182,
+              0.0175669297751608
+            ]
+          },
+          "circuits": {
+            "olfactory": 41.527743255426635,
+            "projection": 55.02662875884756,
+            "local": 71.35268619483352,
+            "memory": 25.661219453195095,
+            "readout": 35.291071583185406,
+            "descending": 3.0592664007289563,
+            "visual": 0.04138494290730427,
+            "motor": 1.5097859635908824
+          },
+          "reference_circuits": {
+            "olfactory": 38.87326890507418,
+            "projection": 51.162283922933405,
+            "local": 67.72383368050802,
+            "memory": 20.242122529399687,
+            "readout": 27.704353482663613,
+            "descending": 2.950264170314757,
+            "visual": 0.03343782667231664,
+            "motor": 1.2321338915899378
+          },
+          "total_spikes": 22644,
+          "reference_total_spikes": 19865
+        },
+        {
+          "time_ms": 50,
+          "stimulus": {
+            "left": 0.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.48381305492673027,
+              0.2662188809715932
+            ],
+            "clipped": [
+              0.48381305492673027,
+              0.2662188809715932
+            ],
+            "drive": [
+              0.11121710272828314,
+              0.07108166784735141
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.6432048846517878,
+              0.07240832564653542
+            ],
+            "clipped": [
+              0.6432048846517878,
+              0.07240832564653542
+            ],
+            "drive": [
+              0.15009554923206522,
+              0.025793139155866993
+            ]
+          },
+          "circuits": {
+            "olfactory": 54.93465061329122,
+            "projection": 83.05814060845928,
+            "local": 104.83046743845074,
+            "memory": 48.56009828057804,
+            "readout": 71.72755406262016,
+            "descending": 4.791029207531579,
+            "visual": 0.12078481802597132,
+            "motor": 5.671374731906819
+          },
+          "reference_circuits": {
+            "olfactory": 51.88771894004564,
+            "projection": 76.44823654710149,
+            "local": 100.34457927954502,
+            "memory": 41.06123302791674,
+            "readout": 63.686442703033435,
+            "descending": 4.462631702064207,
+            "visual": 0.09392562639327667,
+            "motor": 5.018255404388694
+          },
+          "total_spikes": 40765,
+          "reference_total_spikes": 36262
+        },
+        {
+          "time_ms": 60,
+          "stimulus": {
+            "left": 0.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.6081939424920406,
+              0.2959420804460927
+            ],
+            "clipped": [
+              0.6081939424920406,
+              0.2959420804460927
+            ],
+            "drive": [
+              0.18576362869284677,
+              0.1048107297371626
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.6246328535726948,
+              0.2850498305608262
+            ],
+            "clipped": [
+              0.6246328535726948,
+              0.2850498305608262
+            ],
+            "drive": [
+              0.22127614488315966,
+              0.06468164286661088
+            ]
+          },
+          "circuits": {
+            "olfactory": 65.56074355358462,
+            "projection": 105.75262362846004,
+            "local": 132.44064578116857,
+            "memory": 68.19412640667674,
+            "readout": 105.94558124044353,
+            "descending": 5.548682586248738,
+            "visual": 0.15182715391921953,
+            "motor": 6.088324880775836
+          },
+          "reference_circuits": {
+            "olfactory": 62.157978442000854,
+            "projection": 98.12909894297553,
+            "local": 127.2026062075506,
+            "memory": 59.01672398366131,
+            "readout": 94.31378883191647,
+            "descending": 5.077077758138188,
+            "visual": 0.14805208347768792,
+            "motor": 6.7909155783861594
+          },
+          "total_spikes": 58342,
+          "reference_total_spikes": 52225
+        },
+        {
+          "time_ms": 70,
+          "stimulus": {
+            "left": 0.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.6688531231044383,
+              0.41339323260145544
+            ],
+            "clipped": [
+              0.6688531231044383,
+              0.41339323260145544
+            ],
+            "drive": [
+              0.25822705285458547,
+              0.15109810516680652
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.865548525400849,
+              0.2236726903048545
+            ],
+            "clipped": [
+              0.865548525400849,
+              0.2236726903048545
+            ],
+            "drive": [
+              0.3179170019608131,
+              0.08853029998234743
+            ]
+          },
+          "circuits": {
+            "olfactory": 74.42770469830621,
+            "projection": 125.04239038789457,
+            "local": 155.50700210455634,
+            "memory": 84.64191527213804,
+            "readout": 135.86331172936224,
+            "descending": 6.597425510096259,
+            "visual": 0.17770437060271613,
+            "motor": 7.226367941497232
+          },
+          "reference_circuits": {
+            "olfactory": 70.34707354886233,
+            "projection": 115.78563366535842,
+            "local": 148.75548209085935,
+            "memory": 74.13003471752447,
+            "readout": 119.3443254935276,
+            "descending": 6.015194240581716,
+            "visual": 0.15858572661832349,
+            "motor": 7.300288431534808
+          },
+          "total_spikes": 76245,
+          "reference_total_spikes": 68167
+        },
+        {
+          "time_ms": 80,
+          "stimulus": {
+            "left": 0.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.8882708788664653,
+              0.31191831447294416
+            ],
+            "clipped": [
+              0.8882708788664653,
+              0.31191831447294416
+            ],
+            "drive": [
+              0.35273362675636744,
+              0.17522113656272714
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.9360927618780365,
+              0.22970133083909866
+            ],
+            "clipped": [
+              0.9360927618780365,
+              0.22970133083909866
+            ],
+            "drive": [
+              0.41064336594839657,
+              0.1097059546108601
+            ]
+          },
+          "circuits": {
+            "olfactory": 81.69035644881465,
+            "projection": 140.38265454218538,
+            "local": 173.68595050145183,
+            "memory": 98.65705269045145,
+            "readout": 161.51491060710222,
+            "descending": 7.121115959372379,
+            "visual": 0.22881596620044892,
+            "motor": 8.342377913539806
+          },
+          "reference_circuits": {
+            "olfactory": 77.24457280996963,
+            "projection": 130.9195593788329,
+            "local": 166.39407940123297,
+            "memory": 86.56188315924642,
+            "readout": 139.7251280353174,
+            "descending": 6.458508722094853,
+            "visual": 0.19800238226956604,
+            "motor": 7.53934446987395
+          },
+          "total_spikes": 93964,
+          "reference_total_spikes": 84123
+        },
+        {
+          "time_ms": 90,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.8429763417141565,
+              0.4393882635392283
+            ],
+            "clipped": [
+              0.8429763417141565,
+              0.4393882635392283
+            ],
+            "drive": [
+              0.4262700340000358,
+              0.2148462056092023
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              1.0195707341585183,
+              0.24108201659146164
+            ],
+            "clipped": [
+              1.0195707341585183,
+              0.24108201659146164
+            ],
+            "drive": [
+              0.5019824711799148,
+              0.12941236390795033
+            ]
+          },
+          "circuits": {
+            "olfactory": 71.02656344999319,
+            "projection": 145.92723212852337,
+            "local": 185.91019028642242,
+            "memory": 108.66785780843205,
+            "readout": 182.0149735498579,
+            "descending": 7.514624350714527,
+            "visual": 0.23745925300352874,
+            "motor": 8.724940712271808
+          },
+          "reference_circuits": {
+            "olfactory": 66.27228722584321,
+            "projection": 135.62658134877648,
+            "local": 177.34158976270652,
+            "memory": 95.35112151668285,
+            "readout": 156.6368518774878,
+            "descending": 6.755526849091119,
+            "visual": 0.21373606969623904,
+            "motor": 8.222625595838975
+          },
+          "total_spikes": 108322,
+          "reference_total_spikes": 96648
+        },
+        {
+          "time_ms": 100,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.8725260225022866,
+              0.48344997750825136
+            ],
+            "clipped": [
+              0.8725260225022866,
+              0.48344997750825136
+            ],
+            "drive": [
+              0.4932084322753735,
+              0.25513677139405966
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              1.0199487012168866,
+              0.3372526086853691
+            ],
+            "clipped": [
+              1.0199487012168866,
+              0.3372526086853691
+            ],
+            "drive": [
+              0.5796774056854606,
+              0.16058840062456314
+            ]
+          },
+          "circuits": {
+            "olfactory": 60.4594647811039,
+            "projection": 144.24782956157713,
+            "local": 190.93626203107837,
+            "memory": 113.64490621633712,
+            "readout": 198.48049779278023,
+            "descending": 7.802569934795621,
+            "visual": 0.25799466398043847,
+            "motor": 9.228152608194474
+          },
+          "reference_circuits": {
+            "olfactory": 55.57557847558725,
+            "projection": 134.1602473740211,
+            "local": 182.6493596987859,
+            "memory": 98.63226372978235,
+            "readout": 169.47353865949407,
+            "descending": 7.005341661656188,
+            "visual": 0.22649704520356234,
+            "motor": 8.684933353317025
+          },
+          "total_spikes": 120642,
+          "reference_total_spikes": 107027
+        },
+        {
+          "time_ms": 110,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              1.0052082135068094,
+              0.381986070121214
+            ],
+            "clipped": [
+              1.0052082135068094,
+              0.381986070121214
+            ],
+            "drive": [
+              0.5700083994600889,
+              0.27416416620313283
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              1.0351706256917432,
+              0.3765984998142507
+            ],
+            "clipped": [
+              1.0351706256917432,
+              0.3765984998142507
+            ],
+            "drive": [
+              0.6480013886864029,
+              0.19298991550301625
+            ]
+          },
+          "circuits": {
+            "olfactory": 51.100629433574596,
+            "projection": 142.6892362150451,
+            "local": 194.74322242837587,
+            "memory": 115.85459806293778,
+            "readout": 209.24385923096034,
+            "descending": 7.702109939686219,
+            "visual": 0.26817930709993737,
+            "motor": 9.644926190183487
+          },
+          "reference_circuits": {
+            "olfactory": 46.55421731597794,
+            "projection": 132.0970475575134,
+            "local": 185.67259040711832,
+            "memory": 99.8666192427835,
+            "readout": 177.72417555867776,
+            "descending": 6.803362471282025,
+            "visual": 0.22318792718829253,
+            "motor": 8.483339895898903
+          },
+          "total_spikes": 131990,
+          "reference_total_spikes": 116692
+        },
+        {
+          "time_ms": 120,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.93187838915133,
+              0.5496034411999008
+            ],
+            "clipped": [
+              0.93187838915133,
+              0.5496034411999008
+            ],
+            "drive": [
+              0.624288897913775,
+              0.315480057452648
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.8919855489604201,
+              0.5173137403675557
+            ],
+            "clipped": [
+              0.8919855489604201,
+              0.5173137403675557
+            ],
+            "drive": [
+              0.6845990127275055,
+              0.24163848923269715
+            ]
+          },
+          "circuits": {
+            "olfactory": 43.15885732829767,
+            "projection": 139.97979809008845,
+            "local": 197.64825020062045,
+            "memory": 116.90966060571758,
+            "readout": 215.34812888752097,
+            "descending": 7.434829410387646,
+            "visual": 0.26428568649937356,
+            "motor": 10.277608440803137
+          },
+          "reference_circuits": {
+            "olfactory": 39.04101901801845,
+            "projection": 130.70013712861834,
+            "local": 188.90978484216313,
+            "memory": 99.85454842363127,
+            "readout": 180.68704374801956,
+            "descending": 6.457422466028678,
+            "visual": 0.24555042188202392,
+            "motor": 8.109273695585784
+          },
+          "total_spikes": 142826,
+          "reference_total_spikes": 126157
+        }
+      ]
+    },
+    {
+      "stimulus": {
+        "left": 1.0,
+        "right": 1.0
+      },
+      "circuits": {
+        "olfactory": 60.865573845319794,
+        "projection": 146.65566333305958,
+        "local": 201.68596525620347,
+        "memory": 120.00799508969926,
+        "readout": 220.82057340695303,
+        "descending": 7.644200198741326,
+        "visual": 0.28687710333923244,
+        "motor": 11.421354688094453
+      },
+      "total_spikes": 157122,
+      "samples": [
+        {
+          "time_ms": 0,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 10,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 20,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 30,
+          "stimulus": {
+            "left": 1.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              -0.028589440482776306,
+              0.16010803473136498
+            ],
+            "clipped": [
+              0.0,
+              0.16010803473136498
+            ],
+            "drive": [
+              0.0,
+              0.024016205209704745
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              -0.03658678920458096,
+              0.16236894288930265
+            ],
+            "clipped": [
+              0.0,
+              0.16236894288930265
+            ],
+            "drive": [
+              0.0,
+              0.024355341433395395
+            ]
+          },
+          "circuits": {
+            "olfactory": 34.79294672297576,
+            "projection": 25.394862963140866,
+            "local": 33.63420423487334,
+            "memory": 1.6742446440913108,
+            "readout": 0.2055679714785136,
+            "descending": 0.27795599921201125,
+            "visual": 0.004308412242269452,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 32.74191811429468,
+            "projection": 23.781597394518997,
+            "local": 31.818790473503032,
+            "memory": 0.7271361221295941,
+            "readout": 0.0,
+            "descending": 0.2948679054060484,
+            "visual": 0.0021715045458829702,
+            "motor": 0.0
+          },
+          "total_spikes": 8285,
+          "reference_total_spikes": 7520
+        },
+        {
+          "time_ms": 40,
+          "stimulus": {
+            "left": 1.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.16693435127811415,
+              0.2841323160111228
+            ],
+            "clipped": [
+              0.16693435127811415,
+              0.2841323160111228
+            ],
+            "drive": [
+              0.02504015269171712,
+              0.06303362182991745
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.15696333259211748,
+              0.3018722090035519
+            ],
+            "clipped": [
+              0.15696333259211748,
+              0.3018722090035519
+            ],
+            "drive": [
+              0.02354449988881762,
+              0.06598287156891887
+            ]
+          },
+          "circuits": {
+            "olfactory": 60.9506889023833,
+            "projection": 60.65461283657111,
+            "local": 76.93442568733313,
+            "memory": 27.614334552507522,
+            "readout": 36.90334900228603,
+            "descending": 3.0075049419353497,
+            "visual": 0.04333094661358733,
+            "motor": 1.4808504871887747
+          },
+          "reference_circuits": {
+            "olfactory": 58.916345063889686,
+            "projection": 56.76393530740256,
+            "local": 73.16398122476826,
+            "memory": 22.710871161023487,
+            "readout": 30.774887554943795,
+            "descending": 2.929472991083241,
+            "visual": 0.035247438340882405,
+            "motor": 1.2624379512688773
+          },
+          "total_spikes": 27048,
+          "reference_total_spikes": 24454
+        },
+        {
+          "time_ms": 50,
+          "stimulus": {
+            "left": 1.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.4091908844891598,
+              0.3224146719838428
+            ],
+            "clipped": [
+              0.4091908844891598,
+              0.3224146719838428
+            ],
+            "drive": [
+              0.08266276246133353,
+              0.10194077935300626
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.37005350751047855,
+              0.3390200367201375
+            ],
+            "clipped": [
+              0.37005350751047855,
+              0.3390200367201375
+            ],
+            "drive": [
+              0.07552085103206677,
+              0.10693844634160166
+            ]
+          },
+          "circuits": {
+            "olfactory": 80.42700548764829,
+            "projection": 90.6097283993297,
+            "local": 111.1048918559314,
+            "memory": 51.21773404046564,
+            "readout": 75.52191938580656,
+            "descending": 4.878290550282375,
+            "visual": 0.10855326622049465,
+            "motor": 5.54028933470342
+          },
+          "reference_circuits": {
+            "olfactory": 78.53389481298285,
+            "projection": 84.84971034111445,
+            "local": 106.95206148491123,
+            "memory": 44.57350670290051,
+            "readout": 67.93944751613351,
+            "descending": 4.640051774399797,
+            "visual": 0.09589177795095465,
+            "motor": 5.363477649202539
+          },
+          "total_spikes": 47271,
+          "reference_total_spikes": 43229
+        },
+        {
+          "time_ms": 60,
+          "stimulus": {
+            "left": 1.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.4736696483132622,
+              0.4383503805896074
+            ],
+            "clipped": [
+              0.4736696483132622,
+              0.4383503805896074
+            ],
+            "drive": [
+              0.1413137953391228,
+              0.15240221953849642
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.4792703439512706,
+              0.43099856072299697
+            ],
+            "clipped": [
+              0.4792703439512706,
+              0.43099856072299697
+            ],
+            "drive": [
+              0.13608327496994732,
+              0.15554746349881093
+            ]
+          },
+          "circuits": {
+            "olfactory": 96.53697545022669,
+            "projection": 115.85745429851715,
+            "local": 140.16605705196807,
+            "memory": 72.01933131109124,
+            "readout": 111.29981493278075,
+            "descending": 5.569057257098165,
+            "visual": 0.15941103991187827,
+            "motor": 6.1374140348141735
+          },
+          "reference_circuits": {
+            "olfactory": 93.9598403675054,
+            "projection": 108.26218727089766,
+            "local": 135.84182924179686,
+            "memory": 63.241878672386804,
+            "readout": 98.85551484845674,
+            "descending": 5.231544436428185,
+            "visual": 0.1275611321723288,
+            "motor": 6.1357190437810685
+          },
+          "total_spikes": 67252,
+          "reference_total_spikes": 61448
+        },
+        {
+          "time_ms": 70,
+          "stimulus": {
+            "left": 1.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.582561111683252,
+              0.4917482231693343
+            ],
+            "clipped": [
+              0.582561111683252,
+              0.4917482231693343
+            ],
+            "drive": [
+              0.2075008927907422,
+              0.2033041200831221
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.5085165259872622,
+              0.5798606068257238
+            ],
+            "clipped": [
+              0.5085165259872622,
+              0.5798606068257238
+            ],
+            "drive": [
+              0.19194826262254455,
+              0.21919443499784785
+            ]
+          },
+          "circuits": {
+            "olfactory": 109.38687872739186,
+            "projection": 136.13245499603525,
+            "local": 163.4367853706459,
+            "memory": 89.44202661671368,
+            "readout": 143.02104165528957,
+            "descending": 6.474474620386905,
+            "visual": 0.19151069008607352,
+            "motor": 6.9655376497796615
+          },
+          "reference_circuits": {
+            "olfactory": 106.77023841951211,
+            "projection": 128.41151523708413,
+            "local": 157.93775331008004,
+            "memory": 79.19562645521886,
+            "readout": 124.71152464785783,
+            "descending": 6.165784679553767,
+            "visual": 0.1460539316073161,
+            "motor": 6.578830485552386
+          },
+          "total_spikes": 87089,
+          "reference_total_spikes": 79814
+        },
+        {
+          "time_ms": 80,
+          "stimulus": {
+            "left": 1.0,
+            "right": 1.0
+          },
+          "motor": {
+            "raw": [
+              0.6088480033600955,
+              0.606008503443866
+            ],
+            "clipped": [
+              0.6088480033600955,
+              0.606008503443866
+            ],
+            "drive": [
+              0.2677029593761452,
+              0.2637097775872337
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.5515764427275075,
+              0.6114853976742659
+            ],
+            "clipped": [
+              0.5515764427275075,
+              0.6114853976742659
+            ],
+            "drive": [
+              0.24589248963828897,
+              0.2780380793993106
+            ]
+          },
+          "circuits": {
+            "olfactory": 120.81723468370963,
+            "projection": 153.14389520696375,
+            "local": 183.97890741954748,
+            "memory": 103.74272622945414,
+            "readout": 169.45411311973402,
+            "descending": 7.187520403246017,
+            "visual": 0.21216393282754792,
+            "motor": 7.527967939131871
+          },
+          "reference_circuits": {
+            "olfactory": 117.0169099304211,
+            "projection": 144.12523620084104,
+            "local": 176.92130580088934,
+            "memory": 92.27981220176986,
+            "readout": 149.22510608038885,
+            "descending": 6.680223331778429,
+            "visual": 0.189529848263108,
+            "motor": 7.562393831890356
+          },
+          "total_spikes": 107178,
+          "reference_total_spikes": 98388
+        },
+        {
+          "time_ms": 90,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.7950340705516676,
+              0.5284872180985863
+            ],
+            "clipped": [
+              0.7950340705516676,
+              0.5284872180985863
+            ],
+            "drive": [
+              0.34680262605247353,
+              0.30342639366393653
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.7903694973121336,
+              0.471898209385249
+            ],
+            "clipped": [
+              0.7903694973121336,
+              0.471898209385249
+            ],
+            "drive": [
+              0.32756404078936563,
+              0.30711709889720135
+            ]
+          },
+          "circuits": {
+            "olfactory": 103.41465807236285,
+            "projection": 157.75392633850586,
+            "local": 194.39522475394756,
+            "memory": 114.02781267986516,
+            "readout": 190.28792888897527,
+            "descending": 7.677092472957637,
+            "visual": 0.23228017181599922,
+            "motor": 9.31820769103481
+          },
+          "reference_circuits": {
+            "olfactory": 99.30830622540714,
+            "projection": 148.04493211280575,
+            "local": 187.0029072922809,
+            "memory": 101.6040423322996,
+            "readout": 170.4603522656134,
+            "descending": 7.155999310792854,
+            "visual": 0.20956026842316125,
+            "motor": 9.19092274764913
+          },
+          "total_spikes": 122325,
+          "reference_total_spikes": 111876
+        },
+        {
+          "time_ms": 100,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.7514296778945769,
+              0.6245460345043037
+            ],
+            "clipped": [
+              0.7514296778945769,
+              0.6245460345043037
+            ],
+            "drive": [
+              0.407496683828789,
+              0.3515943397899916
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.8997918558988186,
+              0.44684762400497496
+            ],
+            "clipped": [
+              0.8997918558988186,
+              0.44684762400497496
+            ],
+            "drive": [
+              0.41339821305578356,
+              0.3280766776633674
+            ]
+          },
+          "circuits": {
+            "olfactory": 86.99126192629538,
+            "projection": 154.4303297410269,
+            "local": 198.21393727999302,
+            "memory": 118.23535956251823,
+            "readout": 204.27444673228408,
+            "descending": 7.799927885709359,
+            "visual": 0.24295892559254942,
+            "motor": 9.36259303377952
+          },
+          "reference_circuits": {
+            "olfactory": 82.82072800741506,
+            "projection": 144.74954769754905,
+            "local": 191.15508270209511,
+            "memory": 104.55746505504256,
+            "readout": 182.4520510111127,
+            "descending": 7.237620291265195,
+            "visual": 0.21088311291442902,
+            "motor": 9.471242350935592
+          },
+          "total_spikes": 134433,
+          "reference_total_spikes": 122505
+        },
+        {
+          "time_ms": 110,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.8323172737813522,
+              0.5505889701844208
+            ],
+            "clipped": [
+              0.8323172737813522,
+              0.5505889701844208
+            ],
+            "drive": [
+              0.4712197723216735,
+              0.381443534349156
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.8187436330858989,
+              0.5913193429437635
+            ],
+            "clipped": [
+              0.8187436330858989,
+              0.5913193429437635
+            ],
+            "drive": [
+              0.4742000260603008,
+              0.3675630774554268
+            ]
+          },
+          "circuits": {
+            "olfactory": 72.78270166674136,
+            "projection": 149.88751205722795,
+            "local": 200.8725781154419,
+            "memory": 119.84623996935687,
+            "readout": 214.42920996860232,
+            "descending": 7.635638570703712,
+            "visual": 0.28531474959677466,
+            "motor": 10.369000470356026
+          },
+          "reference_circuits": {
+            "olfactory": 68.84458615790884,
+            "projection": 141.0769726265224,
+            "local": 193.00569856346857,
+            "memory": 105.13584335050344,
+            "readout": 187.61430865334404,
+            "descending": 7.177796691334878,
+            "visual": 0.22094402430659493,
+            "motor": 9.455322467482752
+          },
+          "total_spikes": 145909,
+          "reference_total_spikes": 132311
+        },
+        {
+          "time_ms": 120,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.7339095223135172,
+              0.7689446778169777
+            ],
+            "clipped": [
+              0.7339095223135172,
+              0.7689446778169777
+            ],
+            "drive": [
+              0.51062323482045,
+              0.4395687058693292
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.9188123183225968,
+              0.48947431471857145
+            ],
+            "clipped": [
+              0.9188123183225968,
+              0.48947431471857145
+            ],
+            "drive": [
+              0.5408918698996452,
+              0.3858497630448985
+            ]
+          },
+          "circuits": {
+            "olfactory": 60.865573845319794,
+            "projection": 146.65566333305958,
+            "local": 201.68596525620347,
+            "memory": 120.00799508969926,
+            "readout": 220.82057340695303,
+            "descending": 7.644200198741326,
+            "visual": 0.28687710333923244,
+            "motor": 11.421354688094453
+          },
+          "reference_circuits": {
+            "olfactory": 57.24227664346102,
+            "projection": 137.89121551656442,
+            "local": 193.82146859677803,
+            "memory": 104.46280060874165,
+            "readout": 190.87850575219622,
+            "descending": 6.88484635378354,
+            "visual": 0.23289581879650717,
+            "motor": 9.895122830177876
+          },
+          "total_spikes": 157122,
+          "reference_total_spikes": 141753
+        }
+      ]
+    },
+    {
+      "stimulus": {
+        "left": 0.0,
+        "right": 0.0
+      },
+      "circuits": {
+        "olfactory": 9.109749588998838,
+        "projection": 99.14331492664763,
+        "local": 159.8221679878453,
+        "memory": 79.69718223697417,
+        "readout": 138.6350741352316,
+        "descending": 5.658193712856786,
+        "visual": 0.18854765886541947,
+        "motor": 8.456059339723788
+      },
+      "total_spikes": 74931,
+      "samples": [
+        {
+          "time_ms": 0,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 10,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 20,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 30,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 40,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.0,
+              0.0
+            ],
+            "clipped": [
+              0.0,
+              0.0
+            ],
+            "drive": [
+              0.0,
+              0.0
+            ]
+          },
+          "circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 0.0,
+            "projection": 0.0,
+            "local": 0.0,
+            "memory": 0.0,
+            "readout": 0.0,
+            "descending": 0.0,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 0,
+          "reference_total_spikes": 0
+        },
+        {
+          "time_ms": 50,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              -0.04699041635381698,
+              0.16287893839758127
+            ],
+            "clipped": [
+              0.0,
+              0.16287893839758127
+            ],
+            "drive": [
+              0.0,
+              0.02443184075963719
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              -0.02345442664417063,
+              0.13238451259761425
+            ],
+            "clipped": [
+              0.0,
+              0.13238451259761425
+            ],
+            "drive": [
+              0.0,
+              0.019857676889642135
+            ]
+          },
+          "circuits": {
+            "olfactory": 15.656155642811974,
+            "projection": 17.522166447093166,
+            "local": 26.163817987937094,
+            "memory": 0.48810231493473316,
+            "readout": 0.0,
+            "descending": 0.22084212543702872,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "reference_circuits": {
+            "olfactory": 14.858544548955463,
+            "projection": 16.490272496819774,
+            "local": 24.661225862910396,
+            "memory": 0.11712248615463795,
+            "readout": 0.0,
+            "descending": 0.191733015938312,
+            "visual": 0.0,
+            "motor": 0.0
+          },
+          "total_spikes": 4559,
+          "reference_total_spikes": 4179
+        },
+        {
+          "time_ms": 60,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.34352250464090434,
+              0.0776411103049327
+            ],
+            "clipped": [
+              0.34352250464090434,
+              0.0776411103049327
+            ],
+            "drive": [
+              0.05152837569613565,
+              0.03241323119143152
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.35193756259194114,
+              0.0711153688616709
+            ],
+            "clipped": [
+              0.35193756259194114,
+              0.0711153688616709
+            ],
+            "drive": [
+              0.05279063438879117,
+              0.02754633068544645
+            ]
+          },
+          "circuits": {
+            "olfactory": 15.263550083875803,
+            "projection": 38.09506093321143,
+            "local": 59.82537715898331,
+            "memory": 17.217198803779787,
+            "readout": 26.410425609947378,
+            "descending": 2.438538800084379,
+            "visual": 0.03759272179122853,
+            "motor": 0.9945568571529826
+          },
+          "reference_circuits": {
+            "olfactory": 13.61286315315378,
+            "projection": 35.37028475425272,
+            "local": 56.8029017201826,
+            "memory": 12.505694708471166,
+            "readout": 20.591299396151054,
+            "descending": 2.1818905882241535,
+            "visual": 0.03383120210611644,
+            "motor": 0.9409749670512247
+          },
+          "total_spikes": 14062,
+          "reference_total_spikes": 11867
+        },
+        {
+          "time_ms": 70,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.3878648687105963,
+              0.3150891428846323
+            ],
+            "clipped": [
+              0.3878648687105963,
+              0.3150891428846323
+            ],
+            "drive": [
+              0.10197884964830474,
+              0.07481461794541164
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.5393183600041277,
+              0.13226147065396493
+            ],
+            "clipped": [
+              0.5393183600041277,
+              0.13226147065396493
+            ],
+            "drive": [
+              0.12576979323109164,
+              0.043253601680724216
+            ]
+          },
+          "circuits": {
+            "olfactory": 14.218986672091331,
+            "projection": 54.666972761040675,
+            "local": 85.98668142952344,
+            "memory": 33.33704160231531,
+            "readout": 56.38490542384609,
+            "descending": 3.724903884904614,
+            "visual": 0.08853889176756895,
+            "motor": 4.691319578811919
+          },
+          "reference_circuits": {
+            "olfactory": 12.23251040257269,
+            "projection": 51.12848623474981,
+            "local": 82.10346690934625,
+            "memory": 26.39686439565858,
+            "readout": 50.0254807735301,
+            "descending": 3.5040717232036696,
+            "visual": 0.07763625750171409,
+            "motor": 4.67241701780094
+          },
+          "total_spikes": 24949,
+          "reference_total_spikes": 21357
+        },
+        {
+          "time_ms": 80,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.5118263532261409,
+              0.3846169073735997
+            ],
+            "clipped": [
+              0.5118263532261409,
+              0.3846169073735997
+            ],
+            "drive": [
+              0.16345597518498017,
+              0.12128496135963984
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.41115284943852964,
+              0.43875559602315517
+            ],
+            "clipped": [
+              0.41115284943852964,
+              0.43875559602315517
+            ],
+            "drive": [
+              0.16857725166220733,
+              0.10257890083208884
+            ]
+          },
+          "circuits": {
+            "olfactory": 12.886517874448394,
+            "projection": 67.66760335983214,
+            "local": 107.174696679374,
+            "memory": 46.8776288299021,
+            "readout": 79.28990026146941,
+            "descending": 4.243166161953044,
+            "visual": 0.12340818527640068,
+            "motor": 5.735232908488912
+          },
+          "reference_circuits": {
+            "olfactory": 11.059957583778791,
+            "projection": 64.35790680188244,
+            "local": 103.29961670201652,
+            "memory": 38.09024653475433,
+            "readout": 72.01080372803351,
+            "descending": 3.8331697293182545,
+            "visual": 0.10063369278749977,
+            "motor": 5.3240103310880045
+          },
+          "total_spikes": 35018,
+          "reference_total_spikes": 30338
+        },
+        {
+          "time_ms": 90,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.6499131697152878,
+              0.3960212863085749
+            ],
+            "clipped": [
+              0.6499131697152878,
+              0.3960212863085749
+            ],
+            "drive": [
+              0.2364245543645263,
+              0.1624954101019801
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.6726330999440416,
+              0.34021469353183875
+            ],
+            "clipped": [
+              0.6726330999440416,
+              0.34021469353183875
+            ],
+            "drive": [
+              0.24418562890448248,
+              0.13822426973705132
+            ]
+          },
+          "circuits": {
+            "olfactory": 11.747056119994255,
+            "projection": 77.79789826580442,
+            "local": 124.73705370357673,
+            "memory": 57.688907461387124,
+            "readout": 99.33976001244757,
+            "descending": 4.683575340447211,
+            "visual": 0.13622973798886426,
+            "motor": 6.234921979790512
+          },
+          "reference_circuits": {
+            "olfactory": 9.942090344231064,
+            "projection": 74.49476637913898,
+            "local": 120.34324361012477,
+            "memory": 48.23921502435078,
+            "readout": 92.17864061554245,
+            "descending": 4.257345776962786,
+            "visual": 0.12180124113940907,
+            "motor": 5.793465071438521
+          },
+          "total_spikes": 45011,
+          "reference_total_spikes": 39555
+        },
+        {
+          "time_ms": 100,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.5786680966418076,
+              0.606924406720516
+            ],
+            "clipped": [
+              0.5786680966418076,
+              0.606924406720516
+            ],
+            "drive": [
+              0.28776108570611847,
+              0.22915975959476048
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.696377936453703,
+              0.46072644864314777
+            ],
+            "clipped": [
+              0.696377936453703,
+              0.46072644864314777
+            ],
+            "drive": [
+              0.3120144750368656,
+              0.18659959657296576
+            ]
+          },
+          "circuits": {
+            "olfactory": 10.771234632516437,
+            "projection": 86.73552833361428,
+            "local": 138.60593928400561,
+            "memory": 66.74859010564938,
+            "readout": 115.12693755535784,
+            "descending": 5.169140187100614,
+            "visual": 0.14703552534771047,
+            "motor": 7.128342110394414
+          },
+          "reference_circuits": {
+            "olfactory": 9.148392964652075,
+            "projection": 82.84165108013173,
+            "local": 134.35578003076722,
+            "memory": 56.40641485337705,
+            "readout": 107.82194794545492,
+            "descending": 4.562500602880368,
+            "visual": 0.14207773522103317,
+            "motor": 5.994817078576476
+          },
+          "total_spikes": 55051,
+          "reference_total_spikes": 48540
+        },
+        {
+          "time_ms": 110,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.7049439829267191,
+              0.582917802437416
+            ],
+            "clipped": [
+              0.7049439829267191,
+              0.582917802437416
+            ],
+            "drive": [
+              0.35033852028920853,
+              0.2822234660211588
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.690718520139884,
+              0.5560329986292475
+            ],
+            "clipped": [
+              0.690718520139884,
+              0.5560329986292475
+            ],
+            "drive": [
+              0.36882008180231834,
+              0.24201460688140802
+            ]
+          },
+          "circuits": {
+            "olfactory": 9.882979352741422,
+            "projection": 94.33978155129621,
+            "local": 150.55314002621475,
+            "memory": 73.82698887773901,
+            "readout": 127.22445349645434,
+            "descending": 5.452226316836067,
+            "visual": 0.1754706233991192,
+            "motor": 8.178877626947225
+          },
+          "reference_circuits": {
+            "olfactory": 8.444375350121177,
+            "projection": 89.82841818509709,
+            "local": 145.75878760239564,
+            "memory": 63.08491535268072,
+            "readout": 120.83428573570939,
+            "descending": 4.729220123067872,
+            "visual": 0.1574222115619942,
+            "motor": 6.660442048043187
+          },
+          "total_spikes": 65107,
+          "reference_total_spikes": 57411
+        },
+        {
+          "time_ms": 120,
+          "stimulus": {
+            "left": 0.0,
+            "right": 0.0
+          },
+          "motor": {
+            "raw": [
+              0.7376784366921901,
+              0.6508544825532799
+            ],
+            "clipped": [
+              0.7376784366921901,
+              0.6508544825532799
+            ],
+            "drive": [
+              0.40843950774965576,
+              0.3375181185009769
+            ]
+          },
+          "reference_motor": {
+            "raw": [
+              0.7087555395463531,
+              0.6292542143486448
+            ],
+            "clipped": [
+              0.7087555395463531,
+              0.6292542143486448
+            ],
+            "drive": [
+              0.41981040046392354,
+              0.30010054800149355
+            ]
+          },
+          "circuits": {
+            "olfactory": 9.109749588998838,
+            "projection": 99.14331492664763,
+            "local": 159.8221679878453,
+            "memory": 79.69718223697417,
+            "readout": 138.6350741352316,
+            "descending": 5.658193712856786,
+            "visual": 0.18854765886541947,
+            "motor": 8.456059339723788
+          },
+          "reference_circuits": {
+            "olfactory": 7.854898818303024,
+            "projection": 95.61482916660079,
+            "local": 155.34531726321958,
+            "memory": 68.57261011860754,
+            "readout": 130.72703302378955,
+            "descending": 4.979739033746612,
+            "visual": 0.1681255194647713,
+            "motor": 7.007286690036041
+          },
+          "total_spikes": 74931,
+          "reference_total_spikes": 66471
+        }
+      ]
+    }
+  ],
+  "scope": "Actual full retained-connectome dynamics; matched WT model and pulse protocol. Engineered odor currents, including 8 mV tonic input at zero concentration; optional frozen legacy arena motor commands from actual neuron rates; no body, match score or biological equivalence claim.",
+  "example": {
+    "name": "Nectar / 花蜜",
+    "fly_id": "9335b005e65b434d9b1b4e8efaae75d5",
+    "related_match_id": "a102ea95cb74412ca5c9091b5fe2f83a",
+    "execution": "local CPU",
+    "machine": "arm64",
+    "wall_seconds": 5.72200654190965,
+    "scope": "Recorded example of this exact Nectar design, not the current editor draft",
+    "recording": "new v3 observation with frozen motor readout"
+  }
+}

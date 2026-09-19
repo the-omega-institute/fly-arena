@@ -570,6 +570,36 @@ test('legacy neural preview announces missing paired protocol without inventing 
  assert.match(button('projection').textContent,/WT —Δ —/)
 })
 
+test('motor commands follow preview time and stimulus while missing motor samples remain blank',async()=>{
+ const record=neuralRecord();record.data.schema='neural-design-preview/v3'
+ record.data.motor_readout={available:true,id:'descending-ridge-v1'}
+ for(const [trial,row] of record.data.stimuli.entries())for(const [i,sample] of row.samples.entries()){
+  sample.motor={raw:[i/10,-.2],clipped:[i/10,0],drive:[i/100+trial/10,0]}
+  sample.reference_motor={raw:[.5,.4],clipped:[.5,.4],drive:[.03,.02]}
+ }
+ await mount(NeuralPreviewPanel,{record,stale:false,circuits:[],onImport:noop,onReplay:noop})
+ const drive=()=>document.querySelector('[data-motor-stage="drive"]').textContent
+ assert.match(drive(),/0\.0800\.030/)
+ assert.match(document.querySelector('[data-motor-stage="raw"]').textContent,/0\.8000\.500/)
+ const slider=document.querySelector('input[aria-label="Neural preview time"]')
+ await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(slider,'3');slider.dispatchEvent(new dom.window.Event('input',{bubbles:true}))})
+ assert.match(drive(),/0\.0300\.030/)
+ const select=document.querySelector('select[aria-label="Choose stimulus"]')
+ await act(async()=>{select.value='1';select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(drive(),/0\.1300\.030/)
+ record.data.stimuli[0].samples[8].motor=null
+ await mount(NeuralPreviewPanel,{record:{...record},stale:false,circuits:[],onImport:noop,onReplay:noop})
+ assert.match(drive(),/—0\.030/)
+ assert.match(document.body.textContent,/not speeds or observed turns/)
+ assert.equal(document.querySelectorAll('.stimulus-preview__motor svg').length,2)
+})
+
+test('old previews explicitly omit unrecorded motor output',async()=>{
+ await mount(NeuralPreviewPanel,{record:neuralRecord(),stale:false,circuits:[],onImport:noop,onReplay:noop})
+ assert.match(document.body.textContent,/no available motor readout/)
+ assert.equal(document.querySelector('.stimulus-preview__motor svg'),null)
+})
+
 test('paired stimulus brains share an activity scale and selecting a brain region opens its measured curve',async()=>{
  const record=neuralRecord(),circuits=['projection','motor'].map(id=>({id,label:id,name:id,color:'#98dbc0',neuron_count:10,edge_count:20}))
  await mount(NeuralPreviewPanel,{record,stale:false,circuits,onImport:noop,onReplay:noop})
