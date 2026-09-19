@@ -49,12 +49,13 @@ export function TrainingComparison({runs,maps,flies,onOpen,initiallyOpen=false}:
             })}</g>)}
           </svg>
           <p>{t('Solid: round best. Dashed: historical best. A worse candidate does not erase earlier results.')}</p><p>{t('Round best and historical best')} · {t('Hollow points indicate partially evaluated generations. Missing results remain blank.')}</p>
-          <div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>{t('Session name')}</th><th>{t('Starting food score')}</th><th>{t('Best food score')}</th><th>{t('Change from baseline')}</th><th>{t('Evaluations completed')}</th><th>{t('Evaluated time budget')}</th></tr></thead><tbody>{rows.map(({run,baseline,best,gain,budgetedSeconds},i)=><tr key={run.id}>
+          <div className="comparison-table-wrap"><table className="comparison-table"><thead><tr><th>{t('Session name')}</th><th>{t('Starting fitness')}</th><th>{t('Best fitness')}</th><th>{t('Change from baseline')}</th><th>{t('Evaluations completed')}</th><th>{t('Evaluated time budget')}</th></tr></thead><tbody>{rows.map(({run,baseline,best,gain,budgetedSeconds},i)=><tr key={run.id}>
             <td><button className="text-link" style={{color:colors[i]}} onClick={()=>onOpen(run.id)}>{run.spec.name}<ArrowRight size={13}/></button><small>{t(algorithmName(run.spec.strategy))}</small><small>{run.status==='complete'?t('Complete'):t('Incomplete session')}</small></td>
             <td>{score(baseline)}</td><td>{score(best)}</td><td>{gain===null?'—':(gain>0?'+':'')+score(gain)}</td><td>{run.evaluations_completed} / {run.evaluations_total}<small>{t('Started')} {run.evaluations_started} · {t('Limit')} {run.spec.max_evaluations}</small></td><td>{budgetedSeconds} s</td>
           </tr>)}</tbody></table></div>
           <p>{t('Time budget is completed evaluations × configured duration, not wall time or hardware cost. Best score includes the baseline.')}</p>
           <div className="comparison-conditions">{rows.map(({run},i)=><article key={run.id}><strong style={{color:colors[i]}}>{run.spec.name}</strong><dl>
+            <div><dt>{t('Selection objective')}</dt><dd>{t(run.spec.fitness_objective==='sustained-foraging-v1'?'Sustained foraging':'Food collected')}</dd></div>
             <div><dt>{t('Sensory profile')}</dt><dd>{run.spec.sensory_profile||'odor-only-v1'}</dd></div>
             <div><dt>{t('Brain model')}</dt><dd>{run.model_profile||'malecns-lif-cpu-v1'}</dd></div>
             <div><dt>{t('Starting fly')}</dt><dd>{name(run.spec.founder_id)}</dd></div>

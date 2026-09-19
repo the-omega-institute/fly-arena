@@ -11,6 +11,7 @@ from typing import Literal
 import numpy as np
 from pydantic import Field, model_validator
 
+from ..behavior import selection_score
 from ..common import canonical
 from ..contracts import CircuitId, FlySpec, MatchRequest, SensoryProfile, StrictModel
 
@@ -48,6 +49,7 @@ class TrainingSpec(StrictModel):
     founder_id: str = Field(pattern=r'^[0-9a-f]{32}$')
     opponent_id: str | None = Field(default=None, pattern=r'^[0-9a-f]{32}$')
     strategy: Literal['evolution', 'random_search', 'cross_entropy', 'external'] = 'evolution'
+    fitness_objective: Literal['food', 'sustained-foraging-v1'] = 'food'
     optimizer_name: str = Field(default='', max_length=64)
     circuits: list[CircuitId] = Field(default_factory=lambda:['olfactory','projection','descending'],max_length=8)
     mutation_strength: float = Field(default=.08,ge=.01,le=.3)
@@ -102,10 +104,12 @@ def condition_results(spec, matches):
         verified=sum(m is not None and m['status']=='verified' for m in group)
         fitness=None
         if len(group)==spec.positions_per_condition and verified==spec.positions_per_condition:
-            scores=[m['result']['scores'][position] -
-                    (m['result']['scores'][1-position] if spec.mode=='contest' else 0)
-                    for position,m in enumerate(group)]
-            if all(math.isfinite(score) for score in scores):fitness=sum(scores)/len(scores)
+            scores=[]
+            for position, match in enumerate(group):
+                own=selection_score(match['result'],position,spec.fitness_objective)
+                opponent=selection_score(match['result'],1-position,spec.fitness_objective) if spec.mode=='contest' else 0
+                scores.append(None if own is None or opponent is None else own-opponent)
+            if all(score is not None and math.isfinite(score) for score in scores):fitness=sum(scores)/len(scores)
         results.append(dict(condition=condition.model_dump(),fitness=fitness,
                             evaluations_completed=verified,evaluations_total=spec.positions_per_condition,
                             matches=group))
@@ -464,7 +468,7 @@ class TrainingService:
                 # Equal weight per complete condition; contest conditions each
                 # contain the two mirrored positions, never a partial pair.
                 scores=[r['fitness'] for r in member['condition_results']]
-                if any(score is None for score in scores):raise ValueError('Non-finite evaluation score')
+                if any(score is None for score in scores):raise ValueError('Evaluation score unavailable: selected objective needs complete recorded behavior')
                 member['fitness']=sum(scores)/len(scores)
                 with self.store.db() as db:db.execute('UPDATE training_members SET fitness=? WHERE run_id=? AND generation=? AND slot=?',(member['fitness'],run['id'],member['generation'],member['slot']))
         # Read control again: a user may pause while compilation/recording is in flight.

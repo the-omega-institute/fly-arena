@@ -10,6 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .behavior import behavior_metrics
 from .common import digest, file_sha
 from .contracts import MatchRequest
 from .scenarios import RULES, receipt_scene
@@ -290,4 +291,5 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     return {"status": "verified", "winner_slot": winner, "scores": scores.round(6).tolist(),
             "outcome": "solo" if n == 1 else "draw" if winner is None else "win",
             "receipt_sha256": receipt["sha256"], "final_tick": end,
-            "judge": "event-conservation-v1"}
+            "judge": "event-conservation-v1",
+            "behavior": behavior_metrics(stored_scene, frames, events, n, RULES["physics_dt"])}

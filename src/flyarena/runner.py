@@ -43,7 +43,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                              "touch": sensory.get("touch", {}).get("source", "mujoco_food_contact_observation_v1")}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
-    files = ["body.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
+    files = ["body.py", "behavior.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,

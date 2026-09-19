@@ -269,3 +269,36 @@ For a direct API request, add `"sensory_profile":"engineered-touch-response-v1"`
 `POST /api/v1/training-showcase/{run_id}/flies/{fly_id}/copy` requires an Arena identity. It accepts the published run and specimen IDs, compiles the complete FlySpec, and returns a new owned fly whose `spec.parent_id` is the public specimen. Repeating the same request for the same identity returns the same copy; another identity gets its own copy. No training, match or Lab experiment is scheduled by copying. Use the returned `id` as `founder_id` in a separate training request.
 
 The public specimen remains read-only. Its life record exposes the published training origin, available ancestors and recorded experiences even when the deployment has only portable gallery files and no source database. A specimen page links to the source trajectory for saving a copy before training or competition. The saved copy does not inherit unrecorded within-match state.
+
+## Selecting for sustained behavior
+
+`fitness_objective` is independent of the search strategy and neural model. The
+historical/default value `food` preserves the existing food score or paired food
+margin. `sustained-foraging-v1` selects on:
+
+```
+(total food + food consumed after the temporal midpoint) × fraction of time not inverted
+```
+
+The judge derives intake from actual events and posture from recorded thorax
+quaternions, cancelling the mesh's fixed orientation against the initial pose.
+Tilt over 90° is inverted; each sample's posture is held through the next sample
+interval. Thus a full recording that eats only at the start then remains inverted
+loses fitness, while a motionless nonfeeding fly still gets zero. This objective
+is an explicit engineering choice, not biological fitness or proof of learning.
+It cannot detect every failure: being stuck while upright can still earn credit.
+
+Contest training subtracts the opponent's objective score, averages both spawn
+positions, then averages evaluation conditions. Match winners and public rankings
+retain their existing rules. New match results expose the components in
+`result.behavior`; missing historical posture remains unavailable. A session
+requesting sustained foraging fails clearly if a worker does not supply those
+observations, rather than falling back to food-only fitness.
+
+The web selector is enabled from the server's `training_fitness_objectives`
+catalog. Both `scripts/train.py` and `scripts/custom_strategy.py` accept
+`--fitness-objective sustained-foraging-v1`. API clients can read the selected objective from the session plan. Local AI
+plugins receive evaluated fitness and per-match components in their history;
+plugin-specific objective settings can also be supplied in the local config.
+Use longer observation windows and evaluate held-out seeds before claiming an
+improvement; changing the objective does not itself produce evolved behavior.

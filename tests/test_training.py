@@ -540,3 +540,49 @@ def test_training_api_binds_selected_senses_to_node_and_queued_match(lab, monkey
         assert match['runtime_hash']==digest(runtime)
         changed={**payload,'sensory_profile':'odor-only-v1'}
         assert client.post('/api/v1/training',json=changed,headers={'Idempotency-Key':'senses'}).status_code==422
+
+
+def test_behavior_objective_selects_later_feeding_parent_and_retains_components(lab):
+    store,service,_,_=lab
+    run=create(lab,fitness_objective='sustained-foraging-v1')
+    # Explicit fixtures: higher food alone is worse under sustained behavior.
+    cases=iter([(10,0,.2),(6,6,1),(6,6,1),(6,3,1)])
+    for _ in range(30):
+        service.tick()
+        if any(m['status']=='queued' for m in store.matches()):
+            ident,lease,_=store.claim();food,late,upright=next(cases)
+            metric=dict(schema='sustained-foraging-v1',food=food,latter_half_food=late,
+                        upright_fraction=upright,fitness=(food+late)*upright)
+            store.finish(ident,lease,{'scores':[food],'winner_slot':None,'outcome':'solo',
+                                     'receipt_sha256':'fixture','behavior':[metric]})
+        if service.get(run['id'])['status']=='complete':break
+    result=service.get(run['id'])
+    assert result['status']=='complete'
+    assert [m['fitness'] for m in result['members']]==[2,12,12,9]
+    parent=result['members'][1]
+    assert all(m['fly']['spec']['parent_id']==parent['fly_id'] for m in result['members'][2:])
+    assert result['members'][0]['matches'][0]['result']['scores']==[10]
+    assert parent['matches'][0]['result']['behavior'][0]['latter_half_food']==6
+
+
+def test_behavior_objective_missing_worker_observations_fails_without_food_fallback(lab):
+    store,service,_,_=lab;run=create(lab,fitness_objective='sustained-foraging-v1')
+    for _ in range(3):service.tick()
+    complete_next(store,[100]);service.tick()
+    result=service.get(run['id'])
+    assert result['status']=='failed'
+    assert result['members'][0]['fitness'] is None
+    assert 'complete recorded behavior' in result['error']
+
+
+def test_behavior_contest_uses_both_participants_and_swapped_positions():
+    from flyarena.services.training import condition_results
+    plan=TrainingSpec(founder_id='a'*32,opponent_id='b'*32,mode='contest',
+                      population=2,generations=1,max_evaluations=4,
+                      fitness_objective='sustained-foraging-v1')
+    def match(scores):
+        return {'status':'verified','result':{'scores':[99,99],
+                'behavior':[dict(schema='sustained-foraging-v1',fitness=s) for s in scores]}}
+    # Own slot0: 12-3=9; own slot1: 2-4=-2; mean3.5.
+    assert condition_results(plan,[match([12,3]),match([4,2])])[0]['fitness']==3.5
+    assert condition_results(plan,[match([12,3])])[0]['fitness'] is None

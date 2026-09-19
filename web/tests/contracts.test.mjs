@@ -153,3 +153,10 @@ test('descendant competition retains the recorded brain bridge and senses',async
  assert.equal(competitionSetup({...plan,mode:'contest',opponent_id:'opponent'}).opponent_id,'opponent');
  assert.equal(competitionSetup({...plan,sensory_profile:undefined}).sensory_profile,'odor-only-v1');
 });
+
+
+test('selection objective differences cannot be presented as the same evaluation conditions',()=>{
+ const food={...comparisonRun,spec:{...comparisonRun.spec,fitness_objective:'food'}}
+ assert.deepEqual(comparisonDifferences([comparisonRun,food]),[])
+ assert.ok(comparisonDifferences([food,{...food,spec:{...food.spec,fitness_objective:'sustained-foraging-v1'}}]).includes('Selection objective'))
+})

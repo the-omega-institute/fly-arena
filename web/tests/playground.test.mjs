@@ -229,13 +229,16 @@ for(const supportsSenses of [true,false])test(`training controls retain selected
   else throw Error('Unexpected test request '+endpoint);
   return new Response(JSON.stringify(value),{status:200,headers:{'Content-Type':'application/json'}});
  };
- const season={connectome:{circuits:[]},match_profiles:[{id:'legacy-v1',ready:true}],...(supportsSenses?{training_sensory_profiles:[{id:'odor-only-v1',name:'Bilateral odor only',ready:true},{id:sensory,name:'Experimental touch response · 8 mV',ready:true}]}:{})};
+ const season={connectome:{circuits:[]},match_profiles:[{id:'legacy-v1',ready:true}],...(supportsSenses?{training_fitness_objectives:[{id:'food',name:'Food collected',ready:true},{id:'sustained-foraging-v1',name:'Sustained foraging',ready:true}],training_sensory_profiles:[{id:'odor-only-v1',name:'Bilateral odor only',ready:true},{id:sensory,name:'Experimental touch response · 8 mV',ready:true}]}:{})};
  try{
   await mount(TrainingSandbox,{flies:[participant,wt],identity:{id:'owner',token:'fixture-token'},selected:participant.id,season,maps:[],onLogin:noop,onSaved:async()=>{},onCompete:(...args)=>competitions.push(args),onReplay:noop});
   const select=document.getElementById('training-sensory-profile');assert.ok(select);
   assert.equal(select.options.length,supportsSenses?2:1);
   if(supportsSenses)await act(async()=>{select.value=sensory;select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
+  const objective=document.getElementById('training-fitness-objective');assert.equal(objective.options.length,supportsSenses?2:1);
+  if(supportsSenses)await act(async()=>{objective.value='sustained-foraging-v1';objective.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
   await click('Start training');
+  assert.equal(posted.fitness_objective,supportsSenses?'sustained-foraging-v1':undefined);
   assert.equal(posted.sensory_profile,supportsSenses?sensory:undefined);
   await click('Compete');
   assert.equal(competitions.length,1);assert.equal(competitions[0][1].sensory_profile,supportsSenses?sensory:'odor-only-v1');
@@ -624,4 +627,15 @@ test('actual replay camera follows recorded positions, retains orbit/zoom and re
   await mount(ReplayCamera,props);tick({controls})
   assert.deepEqual(camera.position.toArray(),[17,-25,12]);assert.deepEqual(controls.target.toArray(),[0,0,.25])
  }finally{await act(async()=>root.render(null));require.cache[fiberFile]=originalFiber}
+})
+
+
+test('behavior evaluation exposes food, late intake and actual posture without assigning values to missing records',async()=>{
+ const {BehaviorFitness}=require('./src/features/training/BehaviorFitness.js')
+ await mount(BehaviorFitness,{metric:null});assert.equal(document.querySelector('.behavior-fitness'),null)
+ await mount(BehaviorFitness,{metric:{schema:'sustained-foraging-v1',food:10,latter_half_food:2,upright_fraction:.25,recorded_seconds:30,first_inversion_s:3,fitness:3}})
+ assert.match(document.querySelector('.behavior-fitness summary').textContent,/3\.000/)
+ assert.match(document.body.textContent,/Time not inverted25\.0%/)
+ assert.match(document.body.textContent,/Food in second half2\.000/)
+ assert.match(document.body.textContent,/does not change the match winner/)
 })

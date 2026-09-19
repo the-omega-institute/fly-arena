@@ -1,3 +1,4 @@
+import {BehaviorFitness} from '../training/BehaviorFitness'
 import {ReplayDesignActions} from './ReplayDesignActions'
 import type {ReplayDesignOrigin} from './replayDesign'
 import {FeedingHistory} from './FeedingHistory'
@@ -141,6 +142,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
       {match&&<ReplayDesignActions participant={match.participants?.find(f=>f.id===entry.id)} matchId={match.id} onDesign={onDesignReplay}/>}
       <BrainTheater frame={frame} frames={frames} season={season} fly={subjectFly} slot={index} events={visibleEvents} onSeek={onSeek} activityScale={activityScales.region} nodeScale={activityScales.node}/>
       <FeedingHistory events={events} scene={scene} slot={index} endTime={frames.at(-1)?.time??0} time={frame?.time??0} physicsDt={receipt?.runtime?.rules?.physics_dt??null} accountingTicks={receipt?.replay_policy?.event_ticks??null} onSeek={onSeek}/>
+      <BehaviorFitness metric={match?.result?.behavior?.[index]}/>
       <BehaviorChapters scene={scene} frame={frame} frames={frames} events={visibleEvents} slot={index} time={frame?.time??0} onSeek={onSeek}/>
       <ResponseStory frames={frames} events={visibleEvents} slot={index} time={frame?.time??0} onSeek={onSeek}
         physicsDt={receipt?.runtime?.rules?.physics_dt??null}

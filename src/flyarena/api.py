@@ -18,6 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer
 
 from .auth import AuthBoundary, AuthConfig, NyxIDClient
+from .behavior import FITNESS_OBJECTIVES
 
 from .common import DATA, ROOT, VAR, digest, write_json
 from .compiler import BUDGET, Compiler
@@ -134,6 +135,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 "runtime_sha256": digest(runtime_manifest()),
                 "sensory_profiles": sensory_catalog(),
                 "training_sensory_profiles": sensory_catalog(),
+                "training_fitness_objectives": FITNESS_OBJECTIVES,
                 "gallery_copy_available": True,
                 "readout": json.loads((DATA / "connectome/readout.json").read_text()),
                 "invite_required": bool(os.environ.get("ARENA_INVITE_CODE")),
