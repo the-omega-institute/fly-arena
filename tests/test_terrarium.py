@@ -227,3 +227,39 @@ def test_ground_support_and_food_probe_do_not_become_environment_touch():
         ground_contacts += sum(any(bodies.model.geom_type[int(g)] == mj.mjtGeom.mjGEOM_PLANE
                                    for g in (c.geom1, c.geom2)) for c in bodies.data.contact)
     assert ground_contacts > 0
+
+
+def test_feeding_requires_real_contact_even_inside_old_xy_and_height_limits():
+    scene = scenario('orchard', 42)
+    scene['food'] = scene['food'][:1]
+    x, y, _ = scene['food'][0]['position']
+    scene['spawns'] = [[x - .2, y, 0]]
+    bodies = Bodies(scene, 1, 42)
+    assert bodies.feeding_eligibility().tolist() == [[True]]
+    free_joint = np.flatnonzero(bodies.model.jnt_type == mj.mjtJoint.mjJNT_FREE)[0]
+    z = int(bodies.model.jnt_qposadr[free_joint]) + 2
+    bodies.data.qpos[z] += .8
+    mj.mj_forward(bodies.model, bodies.data)
+    mouth = bodies.mouth(0)
+    # This is the precise old-rule false positive: eligible by XY/height,
+    # but physically above the patch with no feeding contact in MuJoCo.
+    assert np.linalg.norm(mouth[:2] - [x, y]) < 1.1 and mouth[2] < 2.5
+    assert bodies.food_contacts(0) == []
+    assert bodies.feeding_eligibility().tolist() == [[False]]
+
+
+def test_food_contact_eligibility_is_per_fly_and_handles_no_food():
+    scene = scenario('orchard', 42)
+    scene['food'] = scene['food'][:1]
+    x, y, _ = scene['food'][0]['position']
+    scene['spawns'] = [[x - .2, y, 0], [x - .2, y, 0]]
+    bodies = Bodies(scene, 2, 42)
+    assert bodies.feeding_eligibility().tolist() == [[True], [True]]
+    free_joint = np.flatnonzero(bodies.model.jnt_type == mj.mjtJoint.mjJNT_FREE)[1]
+    z = int(bodies.model.jnt_qposadr[free_joint]) + 2
+    bodies.data.qpos[z] += .8
+    mj.mj_forward(bodies.model, bodies.data)
+    assert bodies.feeding_eligibility().tolist() == [[True], [False]]
+    scene['food'] = []
+    empty = Bodies(scene, 2, 42)
+    assert empty.feeding_eligibility().shape == (2, 0)

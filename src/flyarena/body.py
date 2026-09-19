@@ -191,6 +191,27 @@ class Bodies:
                 touched.append(food_by_geom[other])
         return sorted(set(touched))
 
+    def feeding_eligibility(self) -> np.ndarray:
+        """Proximity and height limits with actual mouth-food contact required.
+
+        The registered probe is an engineered feeding sensor, not an
+        articulated proboscis. A fly above a patch must not eat merely because
+        its XY projection overlaps that patch.
+        """
+        food_ids = list(self.food_geom_ids)
+        targets = np.array([self.data.geom_xpos[self.food_geom_ids[f]][:2]
+                            for f in food_ids]).reshape(-1, 2)
+        eligible = np.zeros((len(self.names), len(food_ids)), dtype=bool)
+        for slot in range(len(self.names)):
+            mouth = self.mouth(slot)
+            if mouth[2] >= 2.5:
+                continue
+            nearby = np.linalg.norm(targets - mouth[:2], axis=1) <= RULES["mouth_radius_mm"]
+            if nearby.any():
+                touched = set(self.food_contacts(slot))
+                eligible[slot] = nearby & np.array([f in touched for f in food_ids], dtype=bool)
+        return eligible
+
     def environment_contacts(self, slot: int) -> list[str]:
         """Actual anatomical contact with obstacles or opponents, excluding ground.
 

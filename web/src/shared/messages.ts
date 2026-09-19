@@ -1,4 +1,7 @@
 export const catalog = {
+  "Feeding rule": {"en":"Feeding rule","zh-CN":"摄取条件"},
+  "Physical food contact required": {"en":"Physical food contact required","zh-CN":"必须实际接触食物"},
+  "Legacy distance and height": {"en":"Legacy distance and height","zh-CN":"旧版距离与高度条件"},
   "Filter life events": {en:"Filter life events","zh-CN":"筛选生命事件"},
   "All events": {en:"All events","zh-CN":"全部事件"},
   "Food and sensing": {en:"Food and sensing","zh-CN":"食物与感知"},
