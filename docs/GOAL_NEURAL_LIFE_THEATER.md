@@ -399,3 +399,27 @@ Arena 首屏的初始焦点现在按生命证据选择：优先选择至少 30 �
 候选卡片还提供“与亲代对比”。如果谱系中的父代已经随训练记录返回，父代会被加入当前竞技选择列表，并作为第二个真实参赛者提交；没有可访问父代时按钮明确退回“与 WT 对比”。该入口保留候选的父代关系和 FlySpec，不把父代活动状态复制成后代状态。
 
 回放页的神经与行为记录面板现在还展开 `Replay provenance`。它显示比赛的地图、模式、种子、时长、感觉 profile、参赛者 FlySpec 的 connectome/model 摘要、MuJoCo/机器运行时、读出权重摘要和 receipt 哈希；这些值来自比赛请求、已保存设计和不可变 `receipt.json`。receipt 端点不可用或历史字段缺失时显示 `Unavailable`，不会根据当前机器或页面状态猜测实验条件。
+
+## 正式 30 秒双体竞争回放
+
+新增并登记了一条完整双体样本，作为 Arena 首屏精选回放：
+
+```text
+match:               aca9ac97af8a4cfcb863c3b45da5e857
+attempt:             2
+flies:               Wild Type / 原型 vs Nectar / 花蜜
+map/mode/seed:       orchard / contest / 42
+duration:            30.0 s
+status:              verified
+winner:              slot 1 · Nectar / 花蜜
+scores:              [0.0, 1.4328]
+food_contact:        slot 1, tick 5700
+intake:              slot 1, ticks 6000, 6500, 7000, 7500
+fly_contact:         ticks 6943, 7655
+exit:                slot 1 at 18529; slot 0 at 18907
+sensory_profile:     engineered-multimodal-v1
+receipt:              d633961bc9c71798c6703c3609477a87aaa428a8d8ccc37b3dbb09794087002c
+judge:                event-conservation-v1
+```
+
+这条记录从 tick 0 连续运行到 tick 300000，保存两只果蝇的完整脑 checkpoint、身体物理、感觉输入、回路 trace、规范神经元采样、事件账本和 receipt。独立裁判与 API smoke 已验证 `/matches/{id}`、`scene`、`events` 和 `receipt` 均返回 200；前端的首屏精选规则会优先选择这条 30 秒、多模态且有实际摄取的 verified 回放。slot 0 没有摄取不是失败数据，仍保留为 WT 的真实竞争结果。
