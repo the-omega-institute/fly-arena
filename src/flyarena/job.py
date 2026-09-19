@@ -20,7 +20,10 @@ def main():
         local_runtime = digest(runtime_manifest(bridge_profile=request.bridge_profile,
                                                  sensory_profile=request.sensory_profile))
         from .services.node import configured_node
-        node = configured_node() if match['runtime_hash'] != local_runtime else None
+        # Routing is an operator choice, not an accidental consequence of
+        # platform hashes differing. Identical app/node runtimes still use
+        # the configured node; research-v2 retains its local executor.
+        node = configured_node() if request.bridge_profile == 'legacy-v1' else None
         if node is None and match['runtime_hash'] != local_runtime:
             raise ValueError("Runtime changed after admission; create a match under the current season")
         if match["attempt"] != int(generation):

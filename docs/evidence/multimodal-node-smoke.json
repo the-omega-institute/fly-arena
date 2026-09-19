@@ -1,0 +1,41 @@
+{
+  "food_contact_ticks": [
+    3600
+  ],
+  "frames": 101,
+  "intake_ticks": [
+    4000,
+    4500,
+    5000
+  ],
+  "neural_input_frames": 100,
+  "scope": "local node protocol, not SSH or 4060",
+  "sensory_profile": "engineered-multimodal-v1",
+  "verdict": {
+    "final_tick": 10000,
+    "judge": "event-conservation-v1",
+    "outcome": "solo",
+    "receipt_sha256": "851df9603ace59bb9dd61c9f76aadf1a69ebb20c6c87f6edd5b9c837ab25b579",
+    "scores": [
+      1.1232
+    ],
+    "status": "verified",
+    "winner_slot": null
+  },
+  "request": {
+    "bridge_profile": "legacy-v1",
+    "duration_seconds": 1,
+    "fly_ids": [
+      "9335b005e65b434d9b1b4e8efaae75d5"
+    ],
+    "map_id": "scarcity",
+    "mode": "forage",
+    "seed": 42,
+    "sensory_profile": "engineered-multimodal-v1"
+  },
+  "node_job_id": "bdfefb47c1ca484a99ef72256b122f5a",
+  "connectome_sha256": "473ff8f53214a9a6fecf5b866c4bb11bf6302c938e569898d2ce03fbf3917ccc",
+  "neuron_count": 165122,
+  "edge_count": 25563197,
+  "machine": "arm64"
+}
