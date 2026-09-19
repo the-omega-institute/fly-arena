@@ -48,6 +48,7 @@ function deriveEvents(frames:Frame[],slot:number):ReplayEvent[] {
 }
 
 type Graph={neurons:{id:string;type:string;side?:string|null;class?:string;nt?:string|null}[];edges:{pre:string;post:string;count:number;edge:number}[]}
+type ReplayReceipt={schema?:string;sha256?:string;connectome_sha256?:string;neuron_count?:number;edge_count?:number;request?:{bridge_profile?:string;sensory_profile?:string};runtime?:{machine?:string;python?:string;mujoco?:string;bridge_profile?:string;readout_weights_sha256?:string;model?:{id?:string};sensory_profile?:{id?:string}}}
 type BrainView='region'|'class'|'local'
 
 function BrainTheater({frame,frames,season,fly,slot,events,onSeek}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:Fly;slot:number;events:ReplayEvent[];onSeek:(time:number)=>void}) {
@@ -94,6 +95,13 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
   const {t,locale}=useI18n()
   const [slot,setSlot]=useState(()=>Math.max(0,scene.flies.findIndex(f=>f.id===selectedId)))
   const [compare,setCompare]=useState(false)
+  const [receipt,setReceipt]=useState<ReplayReceipt|null>(null)
+  useEffect(()=>{
+    if(!match?.id){setReceipt(null);return}
+    const controller=new AbortController();let active=true
+    api<ReplayReceipt>('/matches/'+encodeURIComponent(match.id)+'/receipt',{signal:controller.signal}).then(value=>{if(active)setReceipt(value)}).catch(()=>{if(active)setReceipt(null)})
+    return()=>{active=false;controller.abort()}
+  },[match?.id])
   const participant=scene.flies[slot],fly=flies.find(f=>f.id===participant?.id)
   const parent=flies.find(f=>f.id===fly?.spec.parent_id)
   const circuits=season?.connectome.circuits||[]
@@ -122,8 +130,13 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
       <BrainTheater frame={frame} frames={frames} season={season} fly={subjectFly} slot={index} events={visibleEvents} onSeek={onSeek}/>
     </div>
   }
+  const connectomeIds=[...new Set(scene.flies.map(entry=>flies.find(f=>f.id===entry.id)?.spec.connectome_sha256).filter(Boolean))]
+  const modelIds=[...new Set(scene.flies.map(entry=>flies.find(f=>f.id===entry.id)?.spec.model_profile).filter(Boolean))]
+  const request=match?.request
+  const runtime=receipt?.runtime
   return <section className="trace-panel panel observations">
     <div className="panel-heading"><span><AudioLines size={16}/>{t('Neural & behavior records')}</span><button className="text-link" onClick={download}><ArrowDownToLine size={14}/>{t('Export records')}</button></div>
+    <details className="replay-provenance" open><summary>{t('Replay provenance')} <small>{receipt?t('Receipt loaded'):t('Receipt unavailable')}</small></summary><div className="provenance-grid"><div><span>{t('Map / mode / seed')}</span><strong>{request?`${request.map_id} · ${request.mode} · ${request.seed}`:t('Unavailable')}</strong></div><div><span>{t('Duration')}</span><strong>{request?`${request.duration_seconds} s`:t('Unavailable')}</strong></div><div><span>{t('Connectome')}</span><strong title={connectomeIds[0]||''}>{connectomeIds.length===1?connectomeIds[0]?.slice(0,16):connectomeIds.length?`${connectomeIds.length} ${t('variants')}`:t('Unavailable')}</strong></div><div><span>{t('Model')}</span><strong>{modelIds.length===1?modelIds[0]:modelIds.length?`${modelIds.length} ${t('variants')}`:runtime?.model?.id||t('Unavailable')}</strong></div><div><span>{t('Sensory profile')}</span><strong>{request?.sensory_profile||runtime?.sensory_profile?.id||t('Unavailable')}</strong></div><div><span>{t('Runtime')}</span><strong>{runtime?.mujoco||t('Unavailable')} · {runtime?.machine||'—'}</strong></div><div><span>{t('Decoder')}</span><strong>{runtime?.readout_weights_sha256?runtime.readout_weights_sha256.slice(0,16):t('Unavailable')}</strong></div><div><span>{t('Receipt')}</span><strong title={receipt?.sha256||match?.result?.receipt_sha256||''}>{(receipt?.sha256||match?.result?.receipt_sha256||'').slice(0,16)||t('Unavailable')}</strong></div></div><small className="provenance-note">{t('Values come from the match request, saved FlySpec and immutable receipt. Missing runtime fields stay unavailable.')}</small></details>
     <div className="observation-subjects" role="group" aria-label={t('Observed fly')}>{scene.flies.map((entry,i)=><button key={i} className={!compare&&slot===i?'active':''} aria-pressed={!compare&&slot===i} onClick={()=>{setCompare(false);setSlot(i)}}><i style={{background:colors[entry.color]}}/>{t('Slot')} {i+1} · {entry.name}<small>{entry.id.slice(0,8)}</small></button>)}{scene.flies.length>1&&<button className={'comparison-toggle '+(compare?'active':'')} aria-pressed={compare} onClick={()=>setCompare(value=>!value)}>{compare?t('Focus one fly'):t('Compare participants')}</button>}</div>
     {compare?<div className="observation-comparison">{scene.flies.map((_,index)=>participantCard(index))}</div>:participantCard(slot)}
     <div className="observation-lineage"><GitBranch size={16}/><span>{t('Parent design')}: <strong>{fly?.spec.parent_id?`${parent?.name||t('Unavailable')} · ${fly.spec.parent_id.slice(0,8)}`:fly?t('Founder / no parent'):t('Not recorded')}</strong></span><span>{t('Mutation budget')}: {shown(fly?.report.budget_used)} / {fly?.report.budget_limit??'—'}</span></div>
