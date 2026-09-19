@@ -463,6 +463,12 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def annotations(field: str, q: str = "", limit: int = 50):
         return compiler().annotations(field, q, limit)
 
+    @app.get('/api/v1/connectome/anatomy')
+    @lru_cache(maxsize=1)
+    def anatomy():
+        from .anatomy import build_anatomy
+        return build_anatomy(DATA / 'connectome')
+
     @app.get("/api/v1/connectome/neurons")
     def neurons(circuit: str = "descending", limit: int = 80, ids: str = ""):
         g = compiler().graph

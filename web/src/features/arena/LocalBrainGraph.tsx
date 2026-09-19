@@ -5,7 +5,7 @@ import {useI18n} from '../../shared/i18n'
 
 /** Show actual incoming/outgoing edges around a selected canonical neuron.
  * The placement is schematic. Unsampled neighbors never acquire activity. */
-export function LocalBrainGraph({graph,activity,scale,selectedClass,renderActivity}:{graph:NeuralGraph;activity:Map<string,number>;scale:number;selectedClass:string|null;renderActivity?:(neuronId:string)=>ReactNode}){
+export function LocalBrainGraph({graph,activity,scale,selectedClass,renderActivity,focusId,onFocus}:{graph:NeuralGraph;activity:Map<string,number>;scale:number;selectedClass:string|null;renderActivity?:(neuronId:string)=>ReactNode;focusId?:string|null;onFocus?:(id:string)=>void}){
   const {locale}=useI18n(),zh=locale==='zh-CN',prefix=useId().replace(/:/g,'')
   const [focus,setFocus]=useState<string|null>(null),[selectedEdge,setSelectedEdge]=useState<number|null>(null)
   useEffect(()=>{setFocus(null);setSelectedEdge(null)},[selectedClass])
@@ -14,7 +14,7 @@ export function LocalBrainGraph({graph,activity,scale,selectedClass,renderActivi
     if(selectedEdge!==null&&!graph.edges.some(e=>e.edge===selectedEdge))setSelectedEdge(null)
   },[graph,focus,selectedEdge])
   const candidates=graph.neurons.filter(n=>!selectedClass||(n.class||n.type||'unannotated')===selectedClass)
-  const node=graph.neurons.find(n=>n.id===focus)||candidates.find(n=>activity.has(n.id))||candidates[0]
+  const node=graph.neurons.find(n=>n.id===(focusId===undefined?focus:focusId))||candidates.find(n=>activity.has(n.id))||candidates[0]
   if(!node)return <p className="empty">{zh?'此类别没有展示神经元。':'No displayed neurons in this class.'}</p>
   const edges=graph.edges.filter(e=>e.pre===node.id||e.post===node.id)
   const upstream=new Set(edges.filter(e=>e.post===node.id&&e.pre!==node.id).map(e=>e.pre))
@@ -26,7 +26,7 @@ export function LocalBrainGraph({graph,activity,scale,selectedClass,renderActivi
   const show=(n:number|undefined)=>n===undefined||!Number.isFinite(n)?'—':n.toFixed(4)
   const sign=(weight:number|undefined)=>weight===undefined?'unknown':weight>0?'positive':weight<0?'negative':'silent'
   const colors={positive:'#418c78',negative:'#bb7388',silent:'#86918a',unknown:'#86918a'}
-  const selectNode=(id:string)=>{setFocus(id);setSelectedEdge(null)}
+  const selectNode=(id:string)=>{setFocus(id);setSelectedEdge(null);onFocus?.(id)}
   return <div className="local-brain-neighborhood">
     <div className="local-brain-toolbar"><label>{zh?'中心神经元':'Focus neuron'} <select aria-label={zh?'中心神经元':'Focus neuron'} value={node.id} onChange={e=>selectNode(e.target.value)}>{graph.neurons.map(n=><option key={n.id} value={n.id}>{n.id} · {n.type||n.class||'—'}{activity.has(n.id)?' ●':''}</option>)}</select></label><span>{zh?'实线节点有活动记录；空心邻居未记录。':'Filled nodes have activity records; hollow neighbors were not sampled.'}</span></div>
     <svg className="local-brain-canvas" viewBox="0 0 640 390" role="group" aria-label={zh?'真实神经连接邻域':'Actual neuron connection neighborhood'}>
