@@ -11,4 +11,5 @@ import './features/arena/sharedResources.css'
 import './features/arena/feedingHistory.css'
 import './features/arena/replayDesign.css'
 import './features/arena/replayCamera.css'
+import './features/arena/replayComparison.css'
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><I18nProvider><App/></I18nProvider></React.StrictMode>)

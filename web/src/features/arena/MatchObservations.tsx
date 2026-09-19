@@ -48,7 +48,7 @@ type Graph=NeuralGraph
 type ReplayReceipt={replay_policy?:{event_ticks?:number};schema?:string;sha256?:string;connectome_sha256?:string;neuron_count?:number;edge_count?:number;request?:{bridge_profile?:string;sensory_profile?:string};runtime?:{rules?:{id?:string;feeding_contact?:string;physics_dt?:number;sense_ticks?:number};machine?:string;python?:string;mujoco?:string;bridge_profile?:string;readout_weights_sha256?:string;model?:{id?:string};sensory_profile?:{id?:string}}}
 type BrainView='region'|'class'|'local'
 
-function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,nodeScale}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:ReplayParticipant;slot:number;events:ReplayEvent[];activityScale:number;nodeScale:number;onSeek:(time:number)=>void}) {
+export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,nodeScale}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:ReplayParticipant;slot:number;events:ReplayEvent[];activityScale:number;nodeScale:number;onSeek:(time:number)=>void}) {
   const {t,locale}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null); const [selectedEvent,setSelectedEvent]=useState<ReplayEvent|null>(null); const [responseMs,setResponseMs]=useState(100)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
   const sampleIds=useMemo(()=>{
