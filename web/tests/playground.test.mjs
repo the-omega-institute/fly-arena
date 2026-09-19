@@ -923,6 +923,29 @@ test('local neuron selection opens its own history and peak seeks the surroundin
  assert.match(document.querySelector('.neuron-activity-trace').textContent,/did not record this neuron/)
 })
 
+test('recorded tactile group opens actual cell class, weights and history without coloring unsampled neighbors',async()=>{
+ const {BrainTheater}=require('./src/features/arena/MatchObservations.js'),seeks=[]
+ const tactile={neurons:[{id:'touch-r',class:'mechanosensory_tactile'},{id:'neighbor',class:'other'}],edges:[{pre:'touch-r',post:'neighbor',edge:2,count:4,baseline_weight:1.1,weight:1.32,multiplier:1.2}],anchors:['touch-r']}
+ const empty={neurons:[],edges:[]}
+ const display={id:'touch_right',label:'Right environmental touch',name:'Right touch',color:'#76a8df',neuron_count:1294,edge_count:20}
+ const subject={...own,artifact_id:'sensory-design',brain_graph:{schema:'brain-neighborhood/v1',artifact_id:'sensory-design',connectome_sha256:spec.connectome_sha256,circuits:{olfactory:empty,touch_right:tactile},display_groups:[display]}}
+ const frames=[0,1].map((time,i)=>({time,brain:[{circuits:{touch_right:i*9},sampled_nodes:[{id:'touch-r',activity:i*12}]}]}))
+ const props={matchId:'sensory-match',frame:frames[1],frames,fly:subject,slot:0,season:{connectome:{circuits:[]}},events:[],activityScale:20,nodeScale:20,onSeek:t=>seeks.push(t)}
+ await mount(BrainTheater,props)
+ await click('Right environmental touch')
+ const region=document.querySelector('[data-circuit="touch_right"]');assert.equal(region.dataset.recorded,'true')
+ assert.ok(document.querySelector('.brain-overview-map').getAttribute('viewBox').endsWith('585'))
+ await act(async()=>region.dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true})))
+ assert.match(document.querySelector('.brain-class-list').textContent,/mechanosensory_tactile/)
+ await act(async()=>document.querySelector('.brain-class-list button').click())
+ assert.equal(document.querySelector('.neuron-activity-trace').dataset.neuronId,'touch-r')
+ await click('Go to recorded peak · 12.00 Hz / 1.00 s');assert.equal(seeks.at(-1),1)
+ await act(async()=>{const select=document.querySelector('select[aria-label="Focus neuron"]');select.value='neighbor';select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.querySelector('.neuron-activity-trace').textContent,/did not record this neuron/)
+ await mount(BrainTheater,{...props,matchId:'historical-match',fly:{...subject,brain_graph:{...subject.brain_graph,circuits:{olfactory:empty},display_groups:undefined}}})
+ assert.ok(![...document.querySelectorAll('.brain-circuit-tabs button')].some(b=>b.textContent.includes('Right environmental touch')))
+})
+
 const {anatomySpace,spatialNodes,validateAnatomy}=require('./src/features/arena/anatomy.js')
 const {AnatomicalBrain}=require('./src/features/arena/AnatomicalBrain.js')
 const anatomyFixture=sha=>({schema:'connectome-anatomy/v1',connectome_sha256:sha,neuron_count:3,position_count:2,missing_position_count:1,positions:[0,0,0,10,20,30]})

@@ -159,15 +159,30 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     if not sample_nodes:
         sample_nodes = np.linspace(0, graph.n - 1, min(48, graph.n), dtype=int).tolist()
     sample_nodes = list(dict.fromkeys(int(i) for i in sample_nodes))[:48]
+    sensory_samples = {}
+    if sensory_encoder and separated_contact:
+        for name in ("taste", "touch_left", "touch_right"):
+            indices = sensory_encoder.groups[name][:6]
+            sensory_samples[name] = [str(int(graph.ids[i])) for i in indices]
+            sample_nodes.extend(int(i) for i in indices)
+        sample_nodes = list(dict.fromkeys(sample_nodes))
 
     def neural_sample(brain):
         rates = np.asarray(brain.rates)
         sampled = [{"id": str(int(graph.ids[i])), "activity": float(rates[i])}
                    for i in sample_nodes]
-        return {"circuits": brain.trace(), "sampled_nodes": sampled,
+        activity = brain.trace()
+        if sensory_samples:
+            for name in sensory_samples:
+                indices = sensory_encoder.groups[name]
+                if len(indices):
+                    activity[name] = float(np.mean(rates[indices]))
+        return {"circuits": activity, "sampled_nodes": sampled,
                 # Keep the old field for clients that still read v0.4.2 data.
                 "top_nodes": sampled,
-                "sampling": {"kind": "fixed-circuit-sample", "count": len(sampled)}}
+                "sampling": {"kind": "fixed-circuit-and-sensory-sample" if sensory_samples else "fixed-circuit-sample",
+                             "count": len(sampled),
+                             **({"sensory_groups": sensory_samples} if sensory_samples else {})}}
 
     def snapshot():
         frame = bodies.snapshot()

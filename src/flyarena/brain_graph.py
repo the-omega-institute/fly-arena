@@ -35,9 +35,24 @@ def build(graph,compiler,participant,sampled_ids,var):
         return extra if resolved else float(node_delta[graph.pre[edge]])+extra
     def strongest(indices):
         return indices[np.lexsort((indices,-graph.counts[indices].astype(np.int64)))[:3]]
-    circuits={}
-    for key,*_ in CIRCUITS:
-        group=set(int(i) for i in graph.groups[key]);seeds=[int(i) for i in anchors if int(i) in group]
+    circuits={};display_groups=[]
+    anatomical_side=getattr(graph,'side',np.zeros(graph.n))
+    groups={key:set(int(i) for i in graph.groups[key]) for key,*_ in CIRCUITS}
+    # Additional recorded sensory anchors are display groups, not mutations to
+    # the canonical connectome or additions to the genome's circuit selectors.
+    for key,kind,side,label,color in [("taste","gustatory",None,"Food taste","#c6a052"),
+            ("touch_left","mechanosensory_tactile",1,"Left environmental touch","#66b695"),
+            ("touch_right","mechanosensory_tactile",-1,"Right environmental touch","#76a8df")]:
+        group={i for i,row in enumerate(metadata) if row.get('class')==kind and
+               (side is None or anatomical_side[i]==side)}
+        if not group.intersection(anchors):
+            continue
+        groups[key]=group
+        display_groups.append({'id':key,'label':label,'name':label,'color':color,
+                               'neuron_count':len(group),
+                               'edge_count':sum(int(graph.indptr[i+1]-graph.indptr[i]) for i in group)})
+    for key,group in groups.items():
+        seeds=[int(i) for i in anchors if int(i) in group]
         edge_ids=set()
         for index in seeds:
             edge_ids.update(int(e) for e in strongest(np.arange(graph.indptr[index],graph.indptr[index+1])))
@@ -49,6 +64,4 @@ def build(graph,compiler,participant,sampled_ids,var):
             if not np.isclose(baseline*scale,weight,rtol=2e-6,atol=1e-6):raise ValueError('Model weight does not match resolved design')
             edges.append({'pre':str(graph.ids[pre]),'post':str(graph.ids[post]),'edge':edge,'count':int(graph.counts[edge]),'baseline_weight':baseline,'weight':weight,'multiplier':scale})
         circuits[key]={'neurons':[metadata[i] for i in sorted(chosen)],'edges':edges,'anchors':[str(graph.ids[i]) for i in seeds]}
-    return {'schema':'brain-neighborhood/v1','artifact_id':participant['artifact_id'],'connectome_sha256':spec.connectome_sha256,'weights_sha256':manifest['phenotype']['weights_sha256'],'weight_units':'model synaptic strength','selection':'For each recorded sample neuron: three strongest incoming and three strongest outgoing edges by anatomical synapse count, ties by canonical edge index. Neighbor activity remains absent unless recorded.','circuits':circuits}
-
-
+    return {'schema':'brain-neighborhood/v1','artifact_id':participant['artifact_id'],'connectome_sha256':spec.connectome_sha256,'weights_sha256':manifest['phenotype']['weights_sha256'],'weight_units':'model synaptic strength','selection':'For each recorded sample neuron: three strongest incoming and three strongest outgoing edges by anatomical synapse count, ties by canonical edge index. Neighbor activity remains absent unless recorded.','circuits':circuits,'display_groups':display_groups}

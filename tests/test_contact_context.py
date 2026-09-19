@@ -84,7 +84,21 @@ def test_physics_neural_input_and_recording_keep_food_and_walls_distinct(tmp_pat
     out=tmp_path/'run';request=MatchRequest(fly_ids=[fly['id']],mode='forage',duration_seconds=1,sensory_profile=profile_id)
     simulate(request,[fly],out,data=data,var=var)
     assert verify(out)['status']=='verified'
-    senses=[f['senses'][0] for f in json.loads((out/'frames.json').read_text())[1:]]
+    frames=json.loads((out/'frames.json').read_text())
+    senses=[f['senses'][0] for f in frames[1:]]
+    from flyarena.experiments.embodied_sensor import EmbodiedSensor
+    encoder=EmbodiedSensor(graph,profile_id)
+    expected={name:[str(int(graph.ids[i])) for i in encoder.groups[name][:6]]
+              for name in ['taste','touch_left','touch_right']}
+    for frame in frames:
+        sample=frame['brain'][0]
+        assert sample['sampling']['sensory_groups']==expected
+        assert sample['sampling']['count']==len(sample['sampled_nodes'])
+        assert set(sum(expected.values(),[]))<={n['id'] for n in sample['sampled_nodes']}
+    for frame in frames[1:]:
+        for name in expected:
+            if len(encoder.groups[name]):
+                assert frame['brain'][0]['circuits'][name]==frame['senses'][0]['contact_activity'][name]
     if profile_id == SUPPORT_CONTACT_PROFILE['id']:
         assert all(isinstance(s['contact_support'],list) for s in senses)
     assert all(set(s['contact_activity'])=={'taste','touch_left','touch_right'} for s in senses)
