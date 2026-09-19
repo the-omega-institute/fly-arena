@@ -20,12 +20,15 @@ export function requestReplay(matchId:string,fetchReplay:FetchReplay,commit:(sta
   const done = Promise.all([
     fetchReplay<Scene>(path+'/scene',{signal:controller.signal}),
     fetchReplay<Frame[]>(path+'/frames',{signal:controller.signal}),
-  ]).then(([scene,frames])=>{
+    fetchReplay<ReplayEvent[]>(path+'/events',{signal:controller.signal}),
+  ]).then(([scene,frames,events])=>{
     if (!active) return
     if (!scene || !frames.length) throw new Error('Replay data is empty.')
-    // Events are derived from the same recorded frames in the first viewer
-    // pass. The immutable events.json remains available as a research artifact.
-    commit({matchId,status:'ready',scene,frames,events:[],error:''})
+    // Use the immutable event ledger produced by the judge. The viewer may
+    // derive threshold hints for legacy data, but verified records must expose
+    // the exact contact/intake/exit ticks that were independently checked.
+    if (!Array.isArray(events)) throw new Error('Replay events are empty.')
+    commit({matchId,status:'ready',scene,frames,events,error:''})
   }).catch(error=>{
     if (!active) return
     commit({matchId,status:'error',scene:null,frames:[],events:[],error:error instanceof Error?error.message:String(error)})

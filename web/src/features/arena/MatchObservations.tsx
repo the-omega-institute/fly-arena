@@ -62,7 +62,14 @@ function BrainTheater({frame,season,fly,slot,events,onSeek}:{frame?:Frame;season
       {visibleEdges.slice(0,260).map((e,i)=>{const a=visibleNodes.findIndex(n=>n.id===e.pre),b=visibleNodes.findIndex(n=>n.id===e.post);if(a<0||b<0)return null;const pa=point(a),pb=point(b);return <line key={i} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#8b9b8a" strokeOpacity=".16" strokeWidth={Math.min(2,Math.max(.35,e.count/30))}/>})}
       {visibleNodes.map((n,i)=>{const p=point(i),value=activity.get(n.id)||0;return <g key={n.id}><circle cx={p.x} cy={p.y} r={value?4.5:2.7} fill={value?`hsl(${145-(value/max)*115} 75% 57%)`:'#7e8e80'} opacity={value?.9:.52}/><title>{n.id} · {n.class||n.type} · {value.toFixed(2)} Hz</title></g>})}
     </svg>:<p className="empty">{t('Loading canonical neuron sample…')}</p>}<div className="brain-legend"><span><i className="legend-dot quiet"/>{t('Recorded sample node')}</span><span><i className="legend-dot hot"/>{t('Active in this frame')}</span><span>{t('Edges are a display sample; simulation uses the full graph.')}</span></div></div>
-    <div className="event-timeline"><strong>{t('Life events')}</strong>{eventRows.length?eventRows.map((e,i)=><button key={i} onClick={()=>onSeek(e.tick*.0001)}><span>{(e.tick*.0001).toFixed(2)}s</span>{eventName(e)}</button>):<small>{t('No threshold event was recorded in this replay window.')}</small>}</div>
+    <div className="event-timeline"><strong>{t('Life events')}</strong>{eventRows.length?eventRows.map((e,i)=><button key={i} onClick={()=>{
+      // Events are observed at the beginning of a physics block while the
+      // nearest pose sample may still contain the preceding block's state.
+      // Pose records are 100 physics ticks apart, so seek one pose interval
+      // forward to open contact/intake markers on the first sample that
+      // contains the observed change.
+      onSeek(e.tick*.0001+.01)
+    }}><span>{(e.tick*.0001).toFixed(2)}s</span>{eventName(e)}</button>):<small>{t('No threshold event was recorded in this replay window.')}</small>}</div>
   </section>
 }
 

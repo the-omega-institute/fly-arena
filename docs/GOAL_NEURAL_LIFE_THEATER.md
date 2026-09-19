@@ -364,4 +364,6 @@ judge:               event-conservation-v1
 
 该记录含 3001 个身体/感觉/脑活动采样帧、完整的 `brain-0.npz`、`physics.npz`、`scene.json`、`frames.json`、`events.json` 和 receipt，并已经写入本地 match 索引，可以通过 `/api/v1/matches/0aefa99328034f458d89aa68242364fe` 及其 `scene`、`frames`、`events`、`receipt` 端点打开。它证明了当前工程模型下“感觉输入 → 完整连接组状态 → 身体移动 → 物理接触 → 摄取 → 能量/分数”在 30 秒连续回放里闭合；视觉和触碰仍然是带 provenance 的工程观测，不能解释为已完成生理校准。
 
+回放请求现在同时读取不可变的 `events.json`，事件时间轴不再只从帧阈值推导。事件按钮会跳到事件之后的第一个身体采样点，因此点击 `food_contact` 会同时看到真实的 `Touch ON` 和相邻的摄取过程。使用这个正式回放的离线浏览器 smoke 已验证：生产构建加载 1 个三维 Canvas 和 30 秒时间轴，无 JavaScript/网络错误；点击 contact 后显示 `0.37s`、`Touch ON`、`Food contact` 和 `Food intake`。
+
 同一批次还保存了一条 WT 在 `orchard / forage / 42` 中没有摄取的失败记录（match `f049421c0abf4c0a8f222ba3ed132d26`）。它同样是 30 秒、3001 帧并通过 receipt 校验，但结果为 0 contact、0 intake、一次出界。失败样本保留在生命档案中，用来显示设计差异和真实实验选择，不能被隐藏或改写成成功。
