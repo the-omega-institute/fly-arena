@@ -1,4 +1,5 @@
 export const catalog = {
+  "实体围挡保留探索空间；果蝇必须靠自己的神经输出继续觅食，也可能碰壁或停滞。": {"en": "Physical walls keep the exploration space enclosed. Neural output drives continued foraging; flies may also collide or get stuck.", "zh-CN": "实体围挡保留探索空间；果蝇必须靠自己的神经输出继续觅食，也可能碰壁或停滞。"},
   "Sensory input profile": {"en": "Sensory input profile", "zh-CN": "感觉输入模式"},
   "Sensory profile": {"en": "Sensory profile", "zh-CN": "感觉模式"},
   "Versioned neural input": {"en": "Versioned neural input", "zh-CN": "已记录版本的神经输入"},

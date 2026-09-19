@@ -238,3 +238,10 @@ For useful comparisons, keep the founder, runtime, objective, maps/seeds, durati
 ## Brain model and neural gradient training
 
 Choose LIF or experimental continuous-rate dynamics in Studio before saving the founder. All built-in optimizers work with either model. Each session retains that model; different models are explicitly flagged in comparisons. The custom [rate Adam trainer](RATE_MODEL.md) fits neural responses using backpropagation through the full connectome, then submits candidates for actual embodied scoring. It does not backpropagate through MuJoCo or learn within a match.
+
+The `enclosure` map (Enclosed Orchard / 封闭果园) adds a physical perimeter,
+leaves and fruit husks around five shared food patches. It is selectable in
+matches, tournaments, training conditions and both agent CLI examples. Contact
+with the wall is resolved by MuJoCo; it does not reset the fly or supply an
+automatic turn. Compare sustained movement and feeding as well as scores:
+remaining inside the habitat can also mean that a design got stuck.
