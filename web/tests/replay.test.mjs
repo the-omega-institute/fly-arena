@@ -54,3 +54,52 @@ test('uneven recorded timestamps determine selection, independently of index or 
   assert.equal(selection.frame,frames[1]);assert.equal(selection.next,frames[2])
   assert.ok(Math.abs(selection.alpha-.5)<1e-12)
 })
+
+const eventsModule=ts.transpileModule(fs.readFileSync(new URL('../src/features/arena/lifeEvents.ts',import.meta.url),'utf8'),
+  {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}})
+const {lifeEvents,lifeEventPage,lifeEventPageAtTime,eventSampleWindow}=await import('data:text/javascript;base64,'+Buffer.from(eventsModule.outputText).toString('base64'))
+
+test('long life records retain early feeding and every subsequent contact across pages',()=>{
+  const early={tick:50,type:'intake',slot:0}
+  const late=Array.from({length:40},(_,i)=>({tick:100+i*100,type:'environment_contact',slot:0}))
+  const shared={tick:75,type:'contact',slots:[0,1]}
+  const other={tick:20,type:'intake',slot:1}
+  const source=[...late,other,early,shared],original=[...source]
+  const all=lifeEvents(source,0)
+  assert.equal(all[0],early);assert.equal(all[1],shared)
+  assert.equal(all.length,42)
+  const collected=[]
+  for(let page=0;page<lifeEventPage(all,0).pages;page++)collected.push(...lifeEventPage(all,page).rows)
+  assert.deepEqual(collected,all)
+  assert.deepEqual(source,original)
+  assert.deepEqual(lifeEvents(source,0,'food'),[early])
+  assert.equal(lifeEvents(source,0,'contact').length,41)
+  assert.deepEqual(lifeEvents(source,1),[other,shared])
+  assert.deepEqual(lifeEvents(source,0,'outcome'),[])
+  assert.equal(lifeEventPage(all,999).page,3)
+  assert.deepEqual(lifeEventPage([],0).rows,[])
+})
+
+test('playhead location finds the containing event page at start, middle and end',()=>{
+  const events=Array.from({length:37},(_,i)=>({tick:(i+1)*10000,type:'intake',slot:0}))
+  assert.equal(lifeEventPageAtTime(events,0),0)
+  assert.equal(lifeEventPageAtTime(events,13),1)
+  assert.equal(lifeEventPageAtTime(events,100),3)
+  assert.equal(lifeEventPageAtTime([],4),0)
+  const boundary=[...Array.from({length:12},(_,i)=>({tick:i,type:'intake'})),{tick:300,type:'intake'}]
+  assert.equal(lifeEventPageAtTime(boundary,.03),1) // Exact recorded decimal time, without multiplication drift.
+})
+
+test('event seeking uses actual post-event samples at 20 Hz, 100 Hz and irregular cadence',()=>{
+  for(const times of [[0,.05,.1],[0,.01,.02],[0,.003,.037,.1]]){
+    const frames=recorded(times)
+    const event={tick:Math.round(times[1]*10000),type:'food_contact'}
+    const window=eventSampleWindow(frames,event)
+    assert.equal(window.before,frames[1]);assert.equal(window.after,frames[2])
+    const initial=eventSampleWindow(frames,{...event,tick:0})
+    assert.equal(initial.after,frames[1])
+    const final=eventSampleWindow(frames,{...event,tick:Math.round(times.at(-1)*10000)})
+    assert.equal(final.before,frames.at(-1));assert.equal(final.after,frames.at(-1))
+  }
+  assert.equal(eventSampleWindow([],{tick:0,type:'intake'}),null)
+})

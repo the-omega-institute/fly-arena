@@ -5,6 +5,8 @@ import type {Fly,Frame,Match,ReplayEvent,ReplayParticipant,Scene,Season} from '.
 import {colors} from '../../types'
 import {useI18n} from '../../shared/i18n'
 import {BrainActivityOverview} from './BrainActivityOverview'
+import {LifeEventTimeline} from './LifeEventTimeline'
+import {eventSampleWindow} from './lifeEvents'
 
 function tracePath(frames:Frame[],read:(frame:Frame)=>number|undefined,max:number) {
   const start=frames[0]?.time||0,end=frames.at(-1)?.time||start
@@ -17,20 +19,6 @@ function tracePath(frames:Frame[],read:(frame:Frame)=>number|undefined,max:numbe
   }).join(' ')
 }
 function shown(value:number|undefined,digits=1){return value===undefined?'—':value.toFixed(digits)}
-
-function responseFrames(frames:Frame[],event:ReplayEvent){
-  if(!frames.length)return null
-  const eventTime=event.tick*.0001
-  let before=frames[0]
-  for(const candidate of frames){
-    if(candidate.time<=eventTime)before=candidate
-    else break
-  }
-  // Events are captured at the beginning of a physics block. Use the first
-  // later pose when available so the delta describes the observed change.
-  const after=frames.find(candidate=>candidate.time>=eventTime+.01)||frames.find(candidate=>candidate.time>eventTime)||frames.at(-1)
-  return after?{before,after}:null
-}
 
 function deriveEvents(frames:Frame[],slot:number):ReplayEvent[] {
   const result:ReplayEvent[]=[]; let prior={odor:false,visual:false,touch:false,score:0}
@@ -64,7 +52,6 @@ function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,
   const max=nodeScale; const mutations=fly?.spec?.weight_mutations; const edited=Array.isArray(mutations)&&mutations.some(m=>m.selector===circuit)
   const nodes=graph?.neurons||[]; const classes=useMemo(()=>{const groups=new Map<string,{count:number;recorded:number;active:number;peak:number|null}>();for(const node of nodes){const key=node.class||node.type||'unannotated';const prior=groups.get(key)||{count:0,recorded:0,active:0,peak:null};const value=activity.get(node.id);prior.count+=1;if(value!==undefined&&Number.isFinite(value)){prior.recorded+=1;prior.active+=value>0?1:0;prior.peak=Math.max(prior.peak??0,value)}groups.set(key,prior)}return [...groups.entries()].sort((a,b)=>(b[1].peak??-1)-(a[1].peak??-1))},[nodes,activity]);
   const visibleNodes=selectedClass?nodes.filter(n=>(n.class||n.type||'unannotated')===selectedClass):nodes; const visibleIds=new Set(visibleNodes.map(n=>n.id)); const visibleEdges=(graph?.edges||[]).filter(e=>visibleIds.has(e.pre)&&visibleIds.has(e.post)); const point=(i:number)=>({x:20+(i%12)*42,y:30+Math.floor(i/12)*30})
-  const eventRows=events.filter(e=>e.slot===undefined||e.slot===slot).slice(-12)
   const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),environment_contact:t('Environment contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact')}[e.type]||e.type)
   useEffect(()=>setSelectedEvent(null),[slot,frames])
   return <section className="brain-theater panel">
@@ -81,16 +68,13 @@ function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,
       {visibleEdges.slice(0,260).map((e,i)=>{const a=visibleNodes.findIndex(n=>n.id===e.pre),b=visibleNodes.findIndex(n=>n.id===e.post);if(a<0||b<0)return null;const pa=point(a),pb=point(b);return <line key={i} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#8b9b8a" strokeOpacity=".16" strokeWidth={Math.min(2,Math.max(.35,e.count/30))}/>})}
       {visibleNodes.map((n,i)=>{const p=point(i),value=activity.get(n.id),recorded=value!==undefined&&Number.isFinite(value);return <g key={n.id}><circle cx={p.x} cy={p.y} r={recorded&&value>0?4.5:2.7} fill={!recorded?'none':value>0?`hsl(${145-Math.min(1,value/max)*115} 75% 57%)`:'#7e8e80'} stroke={recorded?undefined:'#7e8e80'} strokeDasharray={recorded?undefined:'2 2'} opacity={recorded?.9:.52}/><title>{`${n.id} · ${n.class||n.type} · ${recorded?value.toFixed(2)+' Hz':locale==='zh-CN'?'未记录':'Not recorded'}`}</title></g>})}
     </svg>:<p className="empty">{t('Loading canonical neuron sample…')}</p>}<div className="brain-legend"><span><i className="legend-dot quiet"/>{t('Recorded sample node')}</span><span><i className="legend-dot hot"/>{t('Active in this frame')}</span><span>{t('Edges are a display sample; simulation uses the full graph.')}</span><span>{locale==='zh-CN'?'空心：未记录；不是零活动':'Hollow: not recorded, not zero activity'}</span></div></div>}
-    {selectedEvent&&(()=>{const window=responseFrames(frames,selectedEvent);if(!window)return null;const before=window.before,after=window.after;const changes=circuits.map(c=>({id:c.id,label:c.label,color:c.color,before:before.traces?.[slot]?.[c.id],after:after.traces?.[slot]?.[c.id]})).filter(c=>c.before!==undefined||c.after!==undefined);const beforeSense=before.senses?.[slot],afterSense=after.senses?.[slot];const delta=(a:number|undefined,b:number|undefined)=>a===undefined||b===undefined?'—':`${b-a>=0?'+':''}${(b-a).toFixed(2)}`;const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),environment_contact:t('Environment contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact')}[e.type]||e.type);return <div className="event-response"><div className="event-response-heading"><span><strong>{eventName(selectedEvent)}</strong><small>{locale==='zh-CN'?'记录响应窗口':'Recorded response window'} · {(selectedEvent.tick*.0001).toFixed(2)}s</small></span><button onClick={()=>setSelectedEvent(null)}>×</button></div><div className="event-response-times"><span>{locale==='zh-CN'?'事件前':'Before'} <b>{before.time.toFixed(2)}s</b></span><span>{locale==='zh-CN'?'事件后':'After'} <b>{after.time.toFixed(2)}s</b></span></div><div className="event-response-grid">{changes.slice(0,8).map(c=><div key={c.id}><span style={{color:c.color}}>{t(c.label)}</span><b>{shown(c.before,2)} → {shown(c.after,2)}</b><small>Δ {delta(c.before,c.after)} Hz</small></div>)}</div>{(beforeSense||afterSense)&&<div className="event-sensor-delta"><span>{t('Odor L / R')} <b>{beforeSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Visual L / R')} <b>{beforeSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Touch')} <b>{beforeSense?.touch?'ON':'—'} → {afterSense?.touch?'ON':'—'}</b></span></div>}<small className="event-response-note">{locale==='zh-CN'?'这些数值来自回放中事件前后的实际采样；它们描述时间上的观测变化，不自动宣称因果。':'Values are the actual samples immediately around this event; they describe an observed temporal change and do not by themselves claim causality.'}</small></div>})()}
-    <div className="event-timeline"><strong>{t('Life events')}</strong>{eventRows.length?eventRows.map((e,i)=><button key={i} onClick={()=>{
-      setSelectedEvent(e)
-      // Events are observed at the beginning of a physics block while the
-      // nearest pose sample may still contain the preceding block's state.
-      // Pose records are 100 physics ticks apart, so seek one pose interval
-      // forward to open contact/intake markers on the first sample that
-      // contains the observed change.
-      onSeek(e.tick*.0001+.01)
-    }}><span>{(e.tick*.0001).toFixed(2)}s</span>{eventName(e)}{e.objects?.length?' · '+e.objects.join(', '):''}</button>):<small>{t('No threshold event was recorded in this replay window.')}</small>}</div>
+    {selectedEvent&&(()=>{const window=eventSampleWindow(frames,selectedEvent);if(!window)return null;const before=window.before,after=window.after;const changes=circuits.map(c=>({id:c.id,label:c.label,color:c.color,before:before.traces?.[slot]?.[c.id],after:after.traces?.[slot]?.[c.id]})).filter(c=>c.before!==undefined||c.after!==undefined);const beforeSense=before.senses?.[slot],afterSense=after.senses?.[slot];const delta=(a:number|undefined,b:number|undefined)=>a===undefined||b===undefined?'—':`${b-a>=0?'+':''}${(b-a).toFixed(2)}`;const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),environment_contact:t('Environment contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact')}[e.type]||e.type);return <div className="event-response"><div className="event-response-heading"><span><strong>{eventName(selectedEvent)}</strong><small>{locale==='zh-CN'?'记录响应窗口':'Recorded response window'} · {(selectedEvent.tick*.0001).toFixed(2)}s</small></span><button onClick={()=>setSelectedEvent(null)}>×</button></div><div className="event-response-times"><span>{locale==='zh-CN'?'事件前':'Before'} <b>{before.time.toFixed(2)}s</b></span><span>{locale==='zh-CN'?'事件后':'After'} <b>{after.time.toFixed(2)}s</b></span></div><div className="event-response-grid">{changes.slice(0,8).map(c=><div key={c.id}><span style={{color:c.color}}>{t(c.label)}</span><b>{shown(c.before,2)} → {shown(c.after,2)}</b><small>Δ {delta(c.before,c.after)} Hz</small></div>)}</div>{(beforeSense||afterSense)&&<div className="event-sensor-delta"><span>{t('Odor L / R')} <b>{beforeSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Visual L / R')} <b>{beforeSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Touch')} <b>{beforeSense?.touch?'ON':'—'} → {afterSense?.touch?'ON':'—'}</b></span></div>}<small className="event-response-note">{locale==='zh-CN'?'这些数值来自回放中事件前后的实际采样；它们描述时间上的观测变化，不自动宣称因果。':'Values are the actual samples immediately around this event; they describe an observed temporal change and do not by themselves claim causality.'}</small></div>})()}
+    <LifeEventTimeline events={events} slot={slot} time={frame?.time??0} label={eventName} onSelect={event=>{
+      setSelectedEvent(event)
+      const window=eventSampleWindow(frames,event)
+      if(window)onSeek(window.after.time)
+    }}/>
+
   </section>
 }
 
