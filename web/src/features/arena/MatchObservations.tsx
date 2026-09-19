@@ -39,7 +39,11 @@ type BrainView='region'|'class'|'local'
 function BrainTheater({frame,season,fly,slot,events,onSeek}:{frame?:Frame;season:Season|null;fly?:Fly;slot:number;events:ReplayEvent[];onSeek:(time:number)=>void}) {
   const {t}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
-  useEffect(()=>{let active=true;setSelectedClass(null);api<Graph>('/connectome/neurons?circuit='+encodeURIComponent(circuit)+'&limit=80').then(v=>{if(active)setGraph(v)}).catch(()=>{if(active)setGraph(null)});return()=>{active=false}},[circuit])
+  const sampleIds=useMemo(()=>{
+    const ids=(sample?.sampled_nodes||sample?.top_nodes||[]).map(node=>node.id).filter(Boolean)
+    return [...new Set(ids)].join(',')
+  },[sample?.sampled_nodes,sample?.top_nodes])
+  useEffect(()=>{let active=true;setSelectedClass(null);const query='/connectome/neurons?circuit='+encodeURIComponent(circuit)+(sampleIds?'&ids='+encodeURIComponent(sampleIds)+'&limit=80':'&limit=80');api<Graph>(query).then(v=>{if(active)setGraph(v)}).catch(()=>{if(active)setGraph(null)});return()=>{active=false}},[circuit,sampleIds])
   const activity=useMemo(()=>new Map((sample?.sampled_nodes||sample?.top_nodes||[]).map(n=>[n.id,n.activity])),[sample])
   const max=Math.max(1,...activity.values()); const mutations=fly?.spec?.weight_mutations; const edited=Array.isArray(mutations)&&mutations.some(m=>m.selector===circuit)
   const nodes=graph?.neurons||[]; const classes=useMemo(()=>{const groups=new Map<string,{count:number;active:number;peak:number}>();for(const node of nodes){const key=node.class||node.type||'unannotated';const prior=groups.get(key)||{count:0,active:0,peak:0};const value=activity.get(node.id)||0;prior.count+=1;prior.active+=value>0?1:0;prior.peak=Math.max(prior.peak,value);groups.set(key,prior)}return [...groups.entries()].sort((a,b)=>b[1].peak-a[1].peak)},[nodes,activity]);

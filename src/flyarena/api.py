@@ -422,12 +422,26 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         return compiler().annotations(field, q, limit)
 
     @app.get("/api/v1/connectome/neurons")
-    def neurons(circuit: str = "descending", limit: int = 80):
+    def neurons(circuit: str = "descending", limit: int = 80, ids: str = ""):
         g = compiler().graph
         if circuit not in g.groups or limit < 1 or limit > 200:
             raise ValueError("Invalid circuit or limit")
         meta = json.loads((g.path / "neurons.json").read_text())
-        indices = g.groups[circuit][:limit]
+        if ids:
+            requested = [value for value in ids.split(",") if value]
+            if len(requested) > 200 or len(set(requested)) != len(requested):
+                raise ValueError("Invalid neuron ID sample")
+            by_id = {str(ident): index for index, ident in enumerate(g.ids)}
+            group = set(int(index) for index in g.groups[circuit])
+            # A replay sample contains nodes from every circuit.  Select the
+            # intersection for this circuit; the remaining IDs belong to the
+            # other tabs and must not make an otherwise valid replay fail.
+            indices = np.asarray([by_id[value] for value in requested
+                                  if value in by_id and by_id[value] in group], dtype=np.int32)
+            if not len(indices):
+                indices = g.groups[circuit][:limit]
+        else:
+            indices = g.groups[circuit][:limit]
         chosen = {int(i) for i in indices}
         edges = []
         for i in indices:
