@@ -358,7 +358,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
 
     @app.get("/api/v1/matches/{ident}")
     def match_get(ident: str):
-        result = store.match(ident)
+        result = store.match(ident) or training.gallery_match(ident)
         if result is None:
             raise HTTPException(404, "Match not found")
         return result
@@ -367,12 +367,15 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def evidence(ident: str, artifact: str):
         if artifact not in {"scene", "frames", "events", "receipt"}:
             raise HTTPException(404, "Unknown replay artifact")
-        match = store.match(ident)
+        match = store.match(ident) or training.gallery_match(ident)
         if match is None:
             raise HTTPException(404, "Match not found")
         if match["status"] != "verified":
             raise HTTPException(409, "Verified replay is not ready")
-        return FileResponse(store.result_folder(match) / f"{artifact}.json", media_type="application/json")
+        path=store.result_folder(match) / f"{artifact}.json" if store.match(ident) else training.gallery_artifact(ident,artifact)
+        if path is None or not path.is_file():
+            raise HTTPException(404, "Replay artifact not found")
+        return FileResponse(path, media_type="application/json")
 
     @app.post("/api/v1/tournaments", status_code=202)
     def tournament_create(body: TournamentRequest, owner: dict = Depends(identity),

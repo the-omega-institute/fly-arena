@@ -230,20 +230,64 @@ class TrainingService:
         return self.showcase(ident)
 
     def showcase(self,ident=None):
+        bundled = self._bundled_showcase()
         with self.store.db() as db:
             ids=[r[0] for r in db.execute('SELECT run_id FROM training_publications ORDER BY published DESC LIMIT 40')]
-        if ident is None:return [self.showcase(i) for i in ids]
+        if ident is None:
+            result=[self.showcase(i) for i in ids]
+            seen={item['id'] for item in result if item}
+            result.extend(self._public(item) for item in bundled if item.get('id') not in seen)
+            return result
         with self.store.db() as db:
-            if not db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(ident,)).fetchone():return None
+            published=db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(ident,)).fetchone()
+        if not published:
+            item=next((item for item in bundled if item.get('id')==ident),None)
+            return self._public(item) if item else None
         # Publishing explicitly shares designs, lineage, scores and replay links.
         # Strip account identifiers and operational fields at every nested level.
-        def public(value):
-            if isinstance(value,dict):
-                return {k:public(v) for k,v in value.items() if k not in
-                        {'owner','designer','control','error','experiment_error','lease','expires','runtime_hash'}}
-            if isinstance(value,list):return [public(v) for v in value]
-            return value
-        return public(self.get(ident))
+        return self._public(self.get(ident))
+
+    def _public(self,value):
+        """Remove account and worker fields from a published or bundled run."""
+        if isinstance(value,dict):
+            return {k:self._public(v) for k,v in value.items() if k not in
+                    {'owner','designer','control','error','experiment_error','lease','expires','runtime_hash'}}
+        if isinstance(value,list):return [self._public(v) for v in value]
+        return value
+
+    def _bundled_showcase(self):
+        """Read explicitly published gallery files when the DB was not bundled.
+
+        Deployments may ship the public gallery as immutable files instead of
+        copying the source workspace database. These files contain only
+        completed, published runs and are never used for private training.
+        """
+        folder=self.store.root/'research'/'evolution-gallery-v038'
+        if not folder.is_dir():return []
+        result=[]
+        for path in sorted(folder.glob('*-public.json')):
+            try:
+                value=json.loads(path.read_text())
+            except (OSError,ValueError):
+                continue
+            if value.get('status')=='complete' and value.get('id'):
+                result.append(value)
+        return result
+
+    def gallery_match(self,ident):
+        for run in self._bundled_showcase():
+            for member in run.get('members',[]):
+                for match in member.get('matches',[]):
+                    if match.get('id')==ident:return self._public(match)
+        return None
+
+    def gallery_artifact(self,ident,artifact):
+        if artifact not in {'scene','frames','events','receipt'}:return None
+        for run in self._bundled_showcase():
+            if any(match.get('id')==ident for member in run.get('members',[]) for match in member.get('matches',[])):
+                path=self.store.root/'research'/'evolution-gallery-v038'/f'{ident}-{artifact}.json'
+                return path if path.is_file() else None
+        return None
 
     def control(self,ident,owner,action):
         if action not in {'pause','resume','stop'}:raise ValueError('Unknown training action')

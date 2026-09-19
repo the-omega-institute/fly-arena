@@ -428,3 +428,28 @@ def test_completed_showcase_is_opt_in_owner_controlled_and_sanitized(lab,monkeyp
             assert '"'+private+'"' not in public.text
         assert client.get('/api/v1/training/'+run['id']).status_code==401
         assert len(client.get('/api/v1/training-showcase').json())==1
+
+
+def test_bundled_public_gallery_and_replay_artifacts_are_read_only(lab):
+    """A deployment bundle can serve published examples without its source DB."""
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    import json
+    store,service,_,_=lab
+    folder=store.root/'research'/'evolution-gallery-v038';folder.mkdir(parents=True)
+    match_id='a'*32
+    match={'id':match_id,'status':'verified','progress':1,'attempt':1,
+           'request':{'fly_ids':[],'map_id':'orchard','mode':'forage','seed':42,'duration_seconds':1},
+           'result':{'scores':[1.0],'winner_slot':None,'outcome':'solo','receipt_sha256':'b'*64}}
+    run={'id':'bundled-run','status':'complete','spec':{'strategy':'evolution','generations':1,'population':1},
+         'members':[{'generation':0,'slot':0,'fitness':1.0,'fly_id':'c'*32,'fly':{},'matches':[match]}]}
+    (folder/'evolution-public.json').write_text(json.dumps(run))
+    for artifact,payload in {'scene':{},'frames':[],'events':[],'receipt':{'sha256':'b'*64}}.items():
+        (folder/f'{match_id}-{artifact}.json').write_text(json.dumps(payload))
+    assert [r['id'] for r in service.showcase()]==['bundled-run']
+    assert service.gallery_match(match_id)['status']=='verified'
+    with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
+        assert client.get('/api/v1/training-showcase').json()[0]['id']=='bundled-run'
+        assert client.get(f'/api/v1/matches/{match_id}').status_code==200
+        assert client.get(f'/api/v1/matches/{match_id}/events').status_code==200

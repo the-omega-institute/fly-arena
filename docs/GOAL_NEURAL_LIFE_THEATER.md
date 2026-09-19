@@ -375,3 +375,11 @@ judge:               event-conservation-v1
 该窗口只描述时间上的观测变化，不自动宣称因果。视觉仍标记为 `raycast_engineered_observation_v1`，触碰仍标记为 `mujoco_food_contact_observation_v1`；活动亮度和响应数值全部来自回放中的 `traces`、`brain` 与 `senses`，没有用动画或得分补造。切换参赛个体或回放时会清空旧事件选择，避免把一只果蝇的响应显示到另一只身上。
 
 前端验证：`npm test --prefix web` 通过 51 项，`npm run build --prefix web` 通过。Playwright UI 测试在当前 Mac 沙箱启动 Chromium 时被系统 Mach port 权限拒绝，因此没有把浏览器验收冒充为通过；已有离线 mock origin 验收继续作为此前版本的证据。
+
+## 演化展示增量：公开 gallery 不依赖源数据库
+
+训练页的演化画廊现在支持读取部署时随应用提供的只读公开 gallery 文件。此前 `training-showcase` 只查询 SQLite 的 `training_publications`；当发布记录与应用数据库分开打包时，访客会错误地看到“没有示例”，尽管已经存在真实的 evolution、random search 和 CEM 运行。
+
+服务端现在在没有对应 SQLite 发布记录时读取 `var/research/evolution-gallery-v038/*-public.json`，并通过同一公开数据返回三条已完成轨迹。画廊中的比赛 ID 也能解析到对应的只读 `scene`、`frames`、`events` 和 `receipt` 文件，所以用户从某一代候选点击回放时仍然进入真实比赛证据。该路径只读已发布文件，不将其当作私有训练会话，也不允许通过它写入数据库。
+
+本地真实检查返回三个算法示例：`cross_entropy`、`evolution`、`random_search`；其中一个静态回放的 `matches/{id}/events` 返回真实事件记录。新增后端测试覆盖没有源数据库时的公开 gallery 与回放资产读取，并保持账户字段和 worker 字段不公开。
