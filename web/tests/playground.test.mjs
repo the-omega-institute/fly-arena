@@ -740,3 +740,23 @@ test('synchronized life comparison seeks actual bodies and brains, shares scales
   assert.ok(requests.every(([,method])=>method==='GET'))
  }finally{await act(async()=>root.render(null));require.cache[canvasFile]=oldCanvas;require.cache[replayFile]=oldReplay}
 })
+
+test('ordinary replay loads its compiled brain and labels canonical fallback when binding fails',async()=>{
+ const {BrainTheater}=require('./src/features/arena/MatchObservations.js')
+ const fly={...own,artifact_id:'own-artifact',spec},requests=[]
+ const canonical={neurons:connectedGraph.neurons,edges:connectedGraph.edges.map(({edge,pre,post,count})=>({edge,pre,post,count}))}
+ globalThis.fetch=async(url)=>{
+  requests.push(String(url));return {ok:true,json:async()=>String(url).includes('/brain/')?{schema:'brain-neighborhood/v1',artifact_id:fly.artifact_id,connectome_sha256:spec.connectome_sha256,circuits:{olfactory:connectedGraph}}:canonical}
+ }
+ const frame={time:0,tick:0,brain:[{circuits:{olfactory:2},sampled_nodes:[{id:'a',activity:0},{id:'b',activity:9}]}]}
+ const props={matchId:'new-match',fly,frame,frames:[frame],season:{connectome:{circuits:[{id:'olfactory',label:'Olfactory',color:'#91bca5'}]}},slot:0,events:[],onSeek:noop,activityScale:20,nodeScale:20}
+ await mount(BrainTheater,props);await click('Local graph')
+ assert.match(document.querySelector('.local-brain-edge-details').textContent,/×1.2000.*6.6000/)
+ assert.ok(requests.some(url=>url.includes('/matches/new-match/brain/0?ids=')))
+ assert.ok(!requests.some(url=>url.includes('/connectome/neurons')))
+ await mount(BrainTheater,{...props,fly:{...fly,artifact_id:'different-artifact'}})
+ assert.match(document.body.textContent,/design weights are unavailable/)
+ assert.doesNotMatch(document.querySelector('.local-brain-edge-details').textContent,/6.6000/)
+ assert.ok(requests.some(url=>url.includes('/connectome/neurons')))
+ globalThis.fetch=()=>{throw Error('Unexpected request')}
+})
