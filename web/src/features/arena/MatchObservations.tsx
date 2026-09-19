@@ -17,6 +17,20 @@ function tracePath(frames:Frame[],read:(frame:Frame)=>number|undefined,max:numbe
 }
 function shown(value:number|undefined,digits=1){return value===undefined?'—':value.toFixed(digits)}
 
+function responseFrames(frames:Frame[],event:ReplayEvent){
+  if(!frames.length)return null
+  const eventTime=event.tick*.0001
+  let before=frames[0]
+  for(const candidate of frames){
+    if(candidate.time<=eventTime)before=candidate
+    else break
+  }
+  // Events are captured at the beginning of a physics block. Use the first
+  // later pose when available so the delta describes the observed change.
+  const after=frames.find(candidate=>candidate.time>=eventTime+.01)||frames.find(candidate=>candidate.time>eventTime)||frames.at(-1)
+  return after?{before,after}:null
+}
+
 function deriveEvents(frames:Frame[],slot:number):ReplayEvent[] {
   const result:ReplayEvent[]=[]; let prior={odor:false,visual:false,touch:false,score:0}
   for(const frame of frames){
@@ -36,8 +50,8 @@ function deriveEvents(frames:Frame[],slot:number):ReplayEvent[] {
 type Graph={neurons:{id:string;type:string;side?:string|null;class?:string;nt?:string|null}[];edges:{pre:string;post:string;count:number;edge:number}[]}
 type BrainView='region'|'class'|'local'
 
-function BrainTheater({frame,season,fly,slot,events,onSeek}:{frame?:Frame;season:Season|null;fly?:Fly;slot:number;events:ReplayEvent[];onSeek:(time:number)=>void}) {
-  const {t}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null)
+function BrainTheater({frame,frames,season,fly,slot,events,onSeek}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:Fly;slot:number;events:ReplayEvent[];onSeek:(time:number)=>void}) {
+  const {t,locale}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null); const [selectedEvent,setSelectedEvent]=useState<ReplayEvent|null>(null)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
   const sampleIds=useMemo(()=>{
     const ids=(sample?.sampled_nodes||sample?.top_nodes||[]).map(node=>node.id).filter(Boolean)
@@ -50,6 +64,7 @@ function BrainTheater({frame,season,fly,slot,events,onSeek}:{frame?:Frame;season
   const visibleNodes=selectedClass?nodes.filter(n=>(n.class||n.type||'unannotated')===selectedClass):nodes; const visibleIds=new Set(visibleNodes.map(n=>n.id)); const visibleEdges=(graph?.edges||[]).filter(e=>visibleIds.has(e.pre)&&visibleIds.has(e.post)); const point=(i:number)=>({x:20+(i%12)*42,y:30+Math.floor(i/12)*30})
   const eventRows=events.filter(e=>e.slot===undefined||e.slot===slot).slice(-12)
   const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact')}[e.type]||e.type)
+  useEffect(()=>setSelectedEvent(null),[slot,frames])
   return <section className="brain-theater panel">
     <div className="panel-heading"><span><AudioLines size={16}/>{t('Neural theatre')}</span><small>{t('Recorded activity · selectable circuit')}</small></div>
     <div className="sensory-strip"><div><span>{t('Sensory profile')}</span><strong>{frame?.senses?.[slot]?.sensory_profile||'odor-only-v1'}</strong><small>{t('Versioned neural input')}</small></div><div><span>{t('Odor L / R')}</span><strong>{frame?.senses?.[slot]?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong></div><div><span>{t('Visual L / R')}</span><strong>{frame?.senses?.[slot]?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong><small>{frame?.senses?.[slot]?.visual_status?.includes('engineered')?t('geometric observation'):''}</small></div><div><span>{t('Touch')}</span><strong>{frame?.senses?.[slot]?.touch?'ON':'—'}</strong><small>{frame?.senses?.[slot]?.touch_status?.includes('mujoco')?t('MuJoCo contact observation'):''}</small></div><div><span>{t('Nearest food')}</span><strong>{frame?.senses?.[slot]?.nearest_food==null?'—':frame.senses[slot].nearest_food.toFixed(1)+' mm'}</strong></div></div>
@@ -62,7 +77,9 @@ function BrainTheater({frame,season,fly,slot,events,onSeek}:{frame?:Frame;season
       {visibleEdges.slice(0,260).map((e,i)=>{const a=visibleNodes.findIndex(n=>n.id===e.pre),b=visibleNodes.findIndex(n=>n.id===e.post);if(a<0||b<0)return null;const pa=point(a),pb=point(b);return <line key={i} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y} stroke="#8b9b8a" strokeOpacity=".16" strokeWidth={Math.min(2,Math.max(.35,e.count/30))}/>})}
       {visibleNodes.map((n,i)=>{const p=point(i),value=activity.get(n.id)||0;return <g key={n.id}><circle cx={p.x} cy={p.y} r={value?4.5:2.7} fill={value?`hsl(${145-(value/max)*115} 75% 57%)`:'#7e8e80'} opacity={value?.9:.52}/><title>{n.id} · {n.class||n.type} · {value.toFixed(2)} Hz</title></g>})}
     </svg>:<p className="empty">{t('Loading canonical neuron sample…')}</p>}<div className="brain-legend"><span><i className="legend-dot quiet"/>{t('Recorded sample node')}</span><span><i className="legend-dot hot"/>{t('Active in this frame')}</span><span>{t('Edges are a display sample; simulation uses the full graph.')}</span></div></div>
+    {selectedEvent&&(()=>{const window=responseFrames(frames,selectedEvent);if(!window)return null;const before=window.before,after=window.after;const changes=circuits.map(c=>({id:c.id,label:c.label,color:c.color,before:before.traces?.[slot]?.[c.id],after:after.traces?.[slot]?.[c.id]})).filter(c=>c.before!==undefined||c.after!==undefined);const beforeSense=before.senses?.[slot],afterSense=after.senses?.[slot];const delta=(a:number|undefined,b:number|undefined)=>a===undefined||b===undefined?'—':`${b-a>=0?'+':''}${(b-a).toFixed(2)}`;const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact')}[e.type]||e.type);return <div className="event-response"><div className="event-response-heading"><span><strong>{eventName(selectedEvent)}</strong><small>{locale==='zh-CN'?'记录响应窗口':'Recorded response window'} · {(selectedEvent.tick*.0001).toFixed(2)}s</small></span><button onClick={()=>setSelectedEvent(null)}>×</button></div><div className="event-response-times"><span>{locale==='zh-CN'?'事件前':'Before'} <b>{before.time.toFixed(2)}s</b></span><span>{locale==='zh-CN'?'事件后':'After'} <b>{after.time.toFixed(2)}s</b></span></div><div className="event-response-grid">{changes.slice(0,8).map(c=><div key={c.id}><span style={{color:c.color}}>{t(c.label)}</span><b>{shown(c.before,2)} → {shown(c.after,2)}</b><small>Δ {delta(c.before,c.after)} Hz</small></div>)}</div>{(beforeSense||afterSense)&&<div className="event-sensor-delta"><span>{t('Odor L / R')} <b>{beforeSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Visual L / R')} <b>{beforeSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Touch')} <b>{beforeSense?.touch?'ON':'—'} → {afterSense?.touch?'ON':'—'}</b></span></div>}<small className="event-response-note">{locale==='zh-CN'?'这些数值来自回放中事件前后的实际采样；它们描述时间上的观测变化，不自动宣称因果。':'Values are the actual samples immediately around this event; they describe an observed temporal change and do not by themselves claim causality.'}</small></div>})()}
     <div className="event-timeline"><strong>{t('Life events')}</strong>{eventRows.length?eventRows.map((e,i)=><button key={i} onClick={()=>{
+      setSelectedEvent(e)
       // Events are observed at the beginning of a physics block while the
       // nearest pose sample may still contain the preceding block's state.
       // Pose records are 100 physics ticks apart, so seek one pose interval
@@ -79,7 +96,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
   const participant=scene.flies[slot],fly=flies.find(f=>f.id===participant?.id)
   const parent=flies.find(f=>f.id===fly?.spec.parent_id)
   const circuits=season?.connectome.circuits||[]
-  const visibleEvents=events.length?events:deriveEvents(frames,slot)
+  const visibleEvents=useMemo(()=>events.length?events:deriveEvents(frames,slot),[events,frames,slot])
   const circuitPeak=(id:string)=>Math.max(1,...frames.map(f=>f.traces?.[slot]?.[id]??0))
   const scorePeak=Math.max(1,...frames.map(f=>f.scores?.[slot]??0))
   const color=colors[participant?.color]||colors.mint
@@ -99,7 +116,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     <div className="observation-metrics"><div><span>{t('Food collected')}</span><strong>{shown(frame?.scores?.[slot],2)}</strong><svg viewBox="0 0 240 52" role="img" aria-label={t('Food score over time')}><path d={tracePath(frames,f=>f.scores?.[slot],scorePeak)} fill="none" stroke={color} strokeWidth="2"/></svg></div><div><span>{t('Energy reserve')}</span><strong>{shown(frame?.energy?.[slot])}</strong><svg viewBox="0 0 240 52" role="img" aria-label={t('Energy over time')}><path d={tracePath(frames,f=>f.energy?.[slot],Math.max(100,...frames.map(f=>f.energy?.[slot]??0)))} fill="none" stroke={color} strokeWidth="2"/></svg></div><div><span>{t('Left / right motor drive')}</span><strong>{shown(frame?.drives?.[slot]?.[0],2)} / {shown(frame?.drives?.[slot]?.[1],2)}</strong><small>{t('Recorded at')} {shown(frame?.time,2)} s</small></div></div>
     {scene.habitat==='forest-floor'&&<div className="observation-metrics"><div><span>{locale==='zh-CN'?'胸部高度 · mm':'Thorax height · mm'}</span><strong>{shown(frame?.positions?.[slot]?.[2],2)}</strong><svg viewBox="0 0 240 52" role="img" aria-label={locale==='zh-CN'?'记录到的身体高度':'Recorded body height'}><path d={tracePath(frames,f=>f.positions?.[slot]?.[2],Math.max(1,...frames.map(f=>f.positions?.[slot]?.[2]??0)))} fill="none" stroke={color} strokeWidth="2"/></svg><small>{locale==='zh-CN'?'世界坐标 Z；高度变化也可能来自姿态变化或翻倒。':'World Z; height changes may also reflect posture or a fall.'}</small></div></div>}
     <div className="trace-circuits">{circuits.map(c=><div key={c.id}><span style={{color:c.color}}>{t(c.label)}</span><strong>{shown(frame?.traces?.[slot]?.[c.id])}<small> Hz</small></strong><svg viewBox="0 0 240 52" role="img" aria-label={`${t(c.label)} · Hz`}><path fill="none" stroke={c.color} strokeWidth="1.8" d={tracePath(frames,f=>f.traces?.[slot]?.[c.id],circuitPeak(c.id))}/></svg><small>0–{circuitPeak(c.id).toFixed(1)} Hz</small></div>)}</div>
-    <BrainTheater frame={frame} season={season} fly={fly} slot={slot} events={visibleEvents} onSeek={onSeek}/>
+    <BrainTheater frame={frame} frames={frames} season={season} fly={fly} slot={slot} events={visibleEvents} onSeek={onSeek}/>
     <div className="observation-lineage"><GitBranch size={16}/><span>{t('Parent design')}: <strong>{fly?.spec.parent_id?`${parent?.name||t('Unavailable')} · ${fly.spec.parent_id.slice(0,8)}`:fly?t('Founder / no parent'):t('Not recorded')}</strong></span><span>{t('Mutation budget')}: {shown(fly?.report.budget_used)} / {fly?.report.budget_limit??'—'}</span></div>
     <p className="observation-note">{frames.length} {t('recorded samples')} · {frames[0]?.time.toFixed(2)}–{frames.at(-1)?.time.toFixed(2)} s · {t('Circuit averages; each chart uses its own scale. Energy is a game reserve, not metabolic measurement.')}</p>
   </section>

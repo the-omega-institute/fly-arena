@@ -367,3 +367,11 @@ judge:               event-conservation-v1
 回放请求现在同时读取不可变的 `events.json`，事件时间轴不再只从帧阈值推导。事件按钮会跳到事件之后的第一个身体采样点，因此点击 `food_contact` 会同时看到真实的 `Touch ON` 和相邻的摄取过程。使用这个正式回放的离线浏览器 smoke 已验证：生产构建加载 1 个三维 Canvas 和 30 秒时间轴，无 JavaScript/网络错误；点击 contact 后显示 `0.37s`、`Touch ON`、`Food contact` 和 `Food intake`。
 
 同一批次还保存了一条 WT 在 `orchard / forage / 42` 中没有摄取的失败记录（match `f049421c0abf4c0a8f222ba3ed132d26`）。它同样是 30 秒、3001 帧并通过 receipt 校验，但结果为 0 contact、0 intake、一次出界。失败样本保留在生命档案中，用来显示设计差异和真实实验选择，不能被隐藏或改写成成功。
+
+## 神经剧场增量：事件响应窗口
+
+回放的生命事件现在不仅改变时间轴。用户点击气味检测、视觉目标、物理接触、摄取、出界或个体接触后，神经剧场会保存该事件，并显示事件时间点前后的实际记录采样：每个功能回路的活动值与差值、左右气味、左右视觉、触碰状态以及两个采样时刻。事件发生在 physics block 开头，响应窗口选择事件之后的第一个 pose sample，避免把同一个 block 当成前后变化。
+
+该窗口只描述时间上的观测变化，不自动宣称因果。视觉仍标记为 `raycast_engineered_observation_v1`，触碰仍标记为 `mujoco_food_contact_observation_v1`；活动亮度和响应数值全部来自回放中的 `traces`、`brain` 与 `senses`，没有用动画或得分补造。切换参赛个体或回放时会清空旧事件选择，避免把一只果蝇的响应显示到另一只身上。
+
+前端验证：`npm test --prefix web` 通过 51 项，`npm run build --prefix web` 通过。Playwright UI 测试在当前 Mac 沙箱启动 Chromium 时被系统 Mach port 权限拒绝，因此没有把浏览器验收冒充为通过；已有离线 mock origin 验收继续作为此前版本的证据。
