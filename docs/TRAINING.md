@@ -4,6 +4,29 @@ Open **Train / 训练沙箱**, choose a starting fly and a small budget, then st
 
 Each generation shows individuals, parents, circuit multipliers, mutation budget, scores and links to behavior/neural replays. Save publishes an evaluated individual to the fly library; Compete saves it and selects it in the Arena. Hidden candidates stay out of the library until saved. Training matches never enter public standings, even after an individual is saved. Hidden library entries are not private storage: the MVP's fly-by-ID and match/replay endpoints remain public.
 
+## Observation window and planned work
+
+The setup shows match count, seconds per match, total planned simulation seconds,
+and simulation seconds summed across all participating brains. For example,
+2 individuals × 2 generations × 2 conditions × 2 swapped positions × 10 seconds
+is 16 matches and 160 simulated seconds; with two flies in each match, the brains
+sum to 320 simulated seconds. These figures exclude retries and early termination;
+they are neither wall-clock estimates nor GPU billing. Editing the duration or
+conditions does not start work; only **Start training** submits the plan.
+
+The default 1-second window is labeled as a workflow trial. A fly may not reach
+food within 1–2 seconds. Select a longer window (up to 10 seconds) to inspect
+post-contact behavior, then compare against WT and conditions outside training.
+All admitted integer durations from 1 to 10 seconds remain selectable, including
+when branching from a published specimen.
+
+Where behavior metrics are recorded, each replay shows actual observed duration,
+intake and first inversion without opening the formula details. No recorded
+intake does not identify its cause; use the replay to inspect approach, contact,
+sensory input and neural response. A zero contest fitness instead means zero
+average advantage across swapped positions; it can occur even when both flies
+fed. Missing metrics remain absent rather than being described as zero intake.
+
 ## Strategies and scores
 
 - **Evolution**: retain the previous generation's best individual and generate legal circuit mutations around it. Ties retain the earlier individual. Generation one starts from the chosen founder.

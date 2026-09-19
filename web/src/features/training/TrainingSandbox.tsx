@@ -10,6 +10,7 @@ import {TrainingShowcase} from './TrainingShowcase'
 import {algorithmName} from './algorithms'
 import type {Strategy} from './algorithms'
 import {TrainingComparison} from './TrainingComparison'
+import {TrainingWorkload} from './TrainingWorkload'
 import {ConditionResults} from './ConditionResults'
 import type {ConditionResult} from './ConditionResults'
 import {evaluationConditions,type ComparableRun} from './comparison'
@@ -147,7 +148,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <p className="training-hint">{locale==='en'?'Brain model':'大脑模型'} · {selectedFly?.spec.model_profile||'—'}</p>
       {strategy==='external'&&selectedFly?.spec.model_profile==='malecns-rate-cpu-v1'&&<p className="training-hint">{locale==='en'?'Train neural responses with Adam on your device, then evaluate proposals here.':'可在自己的设备上用 Adam 训练神经响应，再把候选提交到这里评测。'} <a href="https://github.com/the-omega-institute/fly-arena/blob/main/docs/RATE_MODEL.md" target="_blank" rel="noreferrer">{locale==='en'?'Adam trainer setup':'Adam 训练器配置'}</a></p>}
       <div className="training-pair"><label>{t('Population')}<input type="number" min="2" max="6" value={population} onChange={e=>setPopulation(+e.target.value)}/></label><label>{t(strategy==='random_search'?'Search rounds':'Generations')}<input type="number" min="1" max="8" value={generations} onChange={e=>setGenerations(+e.target.value)}/></label></div>
-      <div className="training-pair"><label>{t('Seconds per evaluation')}<select value={duration} onChange={e=>setDuration(+e.target.value)}>{[1,2,3,5,10].map(n=><option key={n}>{n}</option>)}</select></label><label>{t('Seed')}<input type="number" min="0" max="2147483647" value={seed} onChange={e=>setSeed(+e.target.value)}/></label></div>
+      <div className="training-pair"><label>{t('Seconds per evaluation')}<select value={duration} onChange={e=>setDuration(+e.target.value)}>{Array.from({length:10},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} s{n<=2?(locale==='zh-CN'?' · 流程试跑':' · Workflow trial'):n>=5?(locale==='zh-CN'?' · 行为观察':' · Behavior observation'):''}</option>)}</select></label><label>{t('Seed')}<input type="number" min="0" max="2147483647" value={seed} onChange={e=>setSeed(+e.target.value)}/></label></div>
       <fieldset className="training-environments"><legend>{t('Evaluation conditions')} · {conditions.length}/4</legend>
         <p className="training-hint">{t('The environment and seed above are condition 1. Add maps or seeds for the same candidate.')}</p>
         {extraConditions.map((condition,index)=><div key={index} className="extra-condition"><strong>{t('Condition')} {index+2}</strong><div className="training-pair">
@@ -159,6 +160,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       </fieldset>
       <label>{t('Evaluation budget')}<input type="number" min="2" max="96" value={budget} onChange={e=>setBudget(+e.target.value)}/></label>
       <div className={'training-budget '+(needed>budget?'over':'')}><strong>{needed} / {budget}</strong><span>{t('evaluations planned / limit')}</span><small>{population} × {generations} × {conditions.length}{mode==='contest'?' × 2':''} · {t(mode==='contest'?'Both spawn positions in every condition.':'One solo evaluation per condition and individual.')}</small></div>
+      <TrainingWorkload population={population} generations={generations} mode={mode} conditions={conditions} duration={duration}/>
       <p className="training-hint">{t('Simulations run in a queue and may take minutes. Closing this page does not stop training.')}</p>
       <button className="primary wide" disabled={!!busy||!profile||!sensoryReady||!fitnessReady||!!problem} onClick={start}>{busy==='create'?<Loader2 size={16} className="spin"/>:<Play size={16}/>} {t('Start training')}<ArrowRight size={16}/></button>
       {problem&&<p className="training-hint" role="status">{t(problem)}</p>}
