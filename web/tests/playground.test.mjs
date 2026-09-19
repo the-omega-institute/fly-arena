@@ -760,3 +760,55 @@ test('ordinary replay loads its compiled brain and labels canonical fallback whe
  assert.ok(requests.some(url=>url.includes('/connectome/neurons')))
  globalThis.fetch=()=>{throw Error('Unexpected request')}
 })
+
+const {NeuronActivityTrace}=require('./src/features/arena/NeuronActivityTrace.js')
+test('selected neuron history preserves missing samples, zero, participant identity and the body clock',async()=>{
+ const seeks=[]
+ const frames=[0,1,2,3,4].map((time,i)=>({time,brain:[
+  {sampled_nodes:i===2?[]:[{id:'a',activity:[0,12,null,4,12][i]}]},
+  {sampled_nodes:[{id:'a',activity:i===3?90:0}]}
+ ]}))
+ const props={neuronId:'a',frames,slot:0,time:2,onSeek:t=>seeks.push(t)}
+ await mount(NeuronActivityTrace,props)
+ assert.match(document.body.textContent,/4\/5 frames recorded/)
+ assert.match(document.querySelector('.neuron-activity-summary').textContent,/Current sample: — · 2.00 s/)
+ const d=document.querySelector('[data-neuron-trace]').getAttribute('d')
+ assert.equal((d.match(/M/g)||[]).length,2,'missing samples break the curve')
+ assert.match(d,/M0.00,76.00/,'recorded zero is a point, not missing')
+ assert.match(document.body.textContent,/Fixed scale: 0–12.00 Hz/)
+ await click('Go to recorded peak · 12.00 Hz / 1.00 s');assert.equal(seeks.at(-1),1)
+ const svg=document.querySelector('.neuron-activity-trace svg')
+ svg.getBoundingClientRect=()=>({left:100,width:400})
+ await act(async()=>svg.dispatchEvent(new dom.window.MouseEvent('click',{bubbles:true,clientX:410})))
+ assert.equal(seeks.at(-1),3,'curve clicks seek an actual replay sample')
+ await mount(NeuronActivityTrace,{...props,time:4})
+ assert.match(document.body.textContent,/Fixed scale: 0–12.00 Hz/)
+ assert.equal(document.querySelector('[data-neuron-cursor]').getAttribute('x1'),'600')
+ await mount(NeuronActivityTrace,{...props,slot:1})
+ await click('Go to recorded peak · 90.00 Hz / 3.00 s');assert.equal(seeks.at(-1),3)
+ await mount(NeuronActivityTrace,{...props,neuronId:'unsampled-neighbor'})
+ assert.match(document.body.textContent,/did not record this neuron/)
+ assert.equal(document.querySelector('[data-neuron-trace]'),null)
+ assert.equal(document.querySelector('.neuron-activity-seek'),null)
+ await mount(NeuronActivityTrace,{...props,frames:[{time:1,brain:[{top_nodes:[{id:'a',activity:0}]}]}]})
+ assert.match(document.body.textContent,/1\/1 frames recorded/)
+ assert.equal(document.querySelector('.neuron-activity-seek input').disabled,true)
+ assert.equal(document.querySelectorAll('.neuron-activity-trace circle').length,1,'isolated recorded zero stays visible')
+ await click('Go to recorded peak · 0.00 Hz / 1.00 s');assert.equal(seeks.at(-1),1)
+})
+
+test('local neuron selection opens its own history and peak seeks the surrounding replay',async()=>{
+ const {BrainTheater}=require('./src/features/arena/MatchObservations.js')
+ const seeks=[]
+ const subject={...own,artifact_id:'compiled-design',brain_graph:{schema:'brain-neighborhood/v1',artifact_id:'compiled-design',connectome_sha256:spec.connectome_sha256,circuits:{olfactory:connectedGraph}}}
+ const frames=[0,1,2].map((time,i)=>({time,brain:[{sampled_nodes:[{id:'a',activity:[0,20,0][i]},{id:'b',activity:[0,0,10][i]}]}]}))
+ await mount(BrainTheater,{frame:frames[0],frames,fly:subject,slot:0,season:{connectome:{circuits:[]}},events:[],activityScale:20,nodeScale:20,onSeek:t=>seeks.push(t)})
+ await click('Local graph')
+ assert.equal(document.querySelector('.neuron-activity-trace').dataset.neuronId,'a')
+ await click('Go to recorded peak · 20.00 Hz / 1.00 s');assert.equal(seeks.at(-1),1)
+ await act(async()=>document.querySelector('[data-neuron="b"]').dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Enter',bubbles:true})))
+ assert.equal(document.querySelector('.neuron-activity-trace').dataset.neuronId,'b')
+ await click('Go to recorded peak · 10.00 Hz / 2.00 s');assert.equal(seeks.at(-1),2)
+ await act(async()=>{const el=document.querySelector('select[aria-label="Focus neuron"]');el.value='c';el.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.querySelector('.neuron-activity-trace').textContent,/did not record this neuron/)
+})
