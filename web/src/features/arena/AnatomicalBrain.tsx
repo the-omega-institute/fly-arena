@@ -8,7 +8,6 @@ import {anatomySpace,loadAnatomy,spatialNodes} from './anatomy'
 import type {Anatomy} from './anatomy'
 import {LocalBrainGraph} from './LocalBrainGraph'
 import {NeuronActivityTrace} from './NeuronActivityTrace'
-import './anatomicalBrain.css'
 
 class CanvasBoundary extends Component<{children:ReactNode;fallback:ReactNode},{failed:boolean}>{
   state={failed:false}
