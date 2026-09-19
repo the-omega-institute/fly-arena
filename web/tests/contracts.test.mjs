@@ -97,9 +97,9 @@ test('comparison uses all effective conditions and retains implicit legacy condi
 });
 
 
-test('terrarium participates in the same bounded training conditions',()=>{
- assert.equal(planProblem({...trainingPlan,conditions:[{map_id:'terrarium',seed:42}],budget:4}),null);
- assert.equal(evaluationCount({...trainingPlan,conditions:[{map_id:'terrarium',seed:42}],mode:'contest'}),8);
+for(const mapId of ['terrarium','enclosure'])test(`${mapId} participates in the same bounded training conditions`,()=>{
+ assert.equal(planProblem({...trainingPlan,conditions:[{map_id:mapId,seed:42}],budget:4}),null);
+ assert.equal(evaluationCount({...trainingPlan,conditions:[{map_id:mapId,seed:42}],mode:'contest'}),8);
 });
 
 const {obstacleGeometry}=await moduleAt('../src/features/arena/obstacleGeometry.ts');

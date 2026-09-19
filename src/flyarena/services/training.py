@@ -39,7 +39,7 @@ def initialize(db):
 
 
 class EvaluationCondition(StrictModel):
-    map_id: Literal['orchard','maze','scarcity','ring','terrarium']
+    map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure']
     seed: int = Field(ge=0, le=2**31-1, strict=True)
 
 
@@ -54,7 +54,7 @@ class TrainingSpec(StrictModel):
     population: int = Field(default=3,ge=2,le=6)
     generations: int = Field(default=3,ge=1,le=8)
     max_evaluations: int = Field(default=18,ge=2,le=96)
-    map_id: Literal['orchard','maze','scarcity','ring','terrarium'] = 'orchard'
+    map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure'] = 'orchard'
     mode: Literal['forage','contest'] = 'forage'
     duration_seconds: int = Field(default=2,ge=1,le=10)
     seed: int = Field(default=42,ge=0,le=2**31-1)

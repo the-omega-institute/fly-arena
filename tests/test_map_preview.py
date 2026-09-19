@@ -42,3 +42,17 @@ def test_scarce_food_is_shared_finite_and_available_to_contests(client):
     assert TournamentRequest(name='Oasis',map_id='scarcity',fly_ids=ids).map_id=='scarcity'
     with pytest.raises(ValueError,match='ring'):
         MatchRequest(map_id='scarcity',mode='sumo',fly_ids=ids)
+
+
+def test_enclosure_can_be_selected_for_matches_tournaments_and_training(client):
+    from flyarena.contracts import MatchRequest, TournamentRequest
+    from flyarena.services.training import TrainingSpec
+    ids = ['a'*32, 'b'*32]
+    assert MatchRequest(map_id='enclosure', fly_ids=ids).map_id == 'enclosure'
+    assert TournamentRequest(name='Enclosed contest', map_id='enclosure', fly_ids=ids).map_id == 'enclosure'
+    training = TrainingSpec(founder_id=ids[0], map_id='enclosure', evaluation_conditions=[{'map_id':'enclosure', 'seed':42}])
+    assert training.conditions[0].map_id == 'enclosure'
+    scene = client.get('/api/v1/maps/enclosure/preview?seed=42').json()
+    assert scene['habitat'] == 'forest-floor'
+    assert len(scene['obstacles']) == 20
+    assert scene['modes'] == ['forage', 'contest']

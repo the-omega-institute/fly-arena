@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import numpy as np
 
 from .common import digest
@@ -54,6 +55,31 @@ MAPS = {
             {"position": [5.5, -6.5, .42], "size": [1.8, 1.5, .8], "shape": "ellipsoid", "material": "fruit", "color": "#b86c3d"},
         ],
         "food": [[-8, 5], [8, -5], [-10, 8], [10, -8], [-2, 10], [2, -10]],
+        "modes": ["forage", "contest"],
+    },
+    "enclosure": {
+        "id": "enclosure", "name": "封闭果园", "english": "Enclosed Orchard",
+        "description": "实体围挡保留探索空间；果蝇必须靠自己的神经输出继续觅食，也可能碰壁或停滞。",
+        "size": 28, "color": "#90a878", "habitat": "forest-floor",
+        "spawns": [[-7, -1, 0], [7, 1, math.pi]],
+        # Overlapping tangent segments form a closed physical perimeter.
+        # The renderer consumes these same obstacles, including their rotations.
+        # No position wrapping, scripted steering or neural reset at the wall.
+        "obstacles": [
+            {"position": [round(12.5 * math.cos(i * math.pi / 8), 12),
+                          round(12.5 * math.sin(i * math.pi / 8), 12), 2.0],
+             "size": [5.2, .8, 4.0],
+             "quaternion": [math.cos((i * math.pi / 8 + math.pi / 2) / 2), 0, 0,
+                            math.sin((i * math.pi / 8 + math.pi / 2) / 2)],
+             "material": "rock", "color": "#8b8167"}
+            for i in range(16)
+        ] + [
+            {"position": [-5, 7, .5], "size": [2.4, 1.6, 1], "shape": "ellipsoid", "material": "fruit", "color": "#b86c3d"},
+            {"position": [5, -7, .5], "size": [2.4, 1.6, 1], "shape": "ellipsoid", "material": "fruit", "color": "#b86c3d"},
+            {"position": [-7, 4, .1], "size": [4, 2, .2], "material": "leaf", "color": "#6f9f58"},
+            {"position": [7, -4, .1], "size": [4, 2, .2], "material": "leaf", "color": "#6f9f58"},
+        ],
+        "food": [[0, 0], [-3, 5], [3, -5], [6, 6], [-6, -6]],
         "modes": ["forage", "contest"],
     },
 }

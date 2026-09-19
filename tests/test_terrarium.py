@@ -154,3 +154,36 @@ def test_food_touch_is_read_from_mujoco_contact_buffer():
     food = bodies.food_geom_ids["food-0"]
     assert any({int(c.geom1), int(c.geom2)} == {mouth, food} and c.dist <= 0
                for c in bodies.data.contact)
+
+
+def test_enclosure_has_a_continuous_physical_perimeter_and_clear_spawns():
+    scene = scenario('enclosure', 42)
+    bodies = Bodies(scene, 2, 42)
+    obstacle_ids = _obstacle_geoms(bodies)
+    walls = set(obstacle_ids[:16])
+    # Rays in all directions must hit the actual compiled wall, including
+    # segment joints. Use a height above the small interior terrain.
+    for angle in np.linspace(0, 2 * math.pi, 128, endpoint=False):
+        hit = np.array([-1], dtype=np.int32)
+        distance = mj.mj_ray(bodies.model, bodies.data, np.array([0., 0., 3.]),
+                            np.array([math.cos(angle), math.sin(angle), 0.]), None, 1, -1, hit)
+        assert int(hit[0]) in walls
+        assert 11 < distance < 14
+    # The simulator's collision masks include both contestants.
+    assert all(bodies.model.geom_contype[i] == 4 and bodies.model.geom_conaffinity[i] == 3 for i in walls)
+    assert not any(int(c.geom1) in obstacle_ids or int(c.geom2) in obstacle_ids for c in bodies.data.contact)
+    assert [f['position'] for f in scene['food']] == [f['position'] for f in scenario('orchard', 42)['food']]
+
+
+def test_enclosure_wall_collides_with_body():
+    scene = scenario('enclosure', 42)
+    scene['spawns'] = [[11.8, 0, 0]]
+    bodies = Bodies(scene, 1, 42)
+    walls = set(_obstacle_geoms(bodies)[:16])
+    contacts = 0
+    for _ in range(500):
+        bodies.step(np.array([[1., 1.]]))
+        contacts += sum((int(c.geom1) in walls and int(c.geom2) in bodies.geom_slots) or
+                        (int(c.geom2) in walls and int(c.geom1) in bodies.geom_slots) for c in bodies.data.contact)
+    assert contacts > 0
+    assert np.isfinite(bodies.data.qpos).all()
