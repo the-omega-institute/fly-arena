@@ -180,10 +180,27 @@ def test_enclosure_wall_collides_with_body():
     scene['spawns'] = [[11.8, 0, 0]]
     bodies = Bodies(scene, 1, 42)
     walls = set(_obstacle_geoms(bodies)[:16])
+    mouth = bodies.mouth_contact_geom_ids[0]
     contacts = 0
     for _ in range(500):
         bodies.step(np.array([[1., 1.]]))
+        assert not any(mouth in (int(c.geom1), int(c.geom2)) and
+                       (int(c.geom1) in walls or int(c.geom2) in walls)
+                       for c in bodies.data.contact if c.dist <= 0)
         contacts += sum((int(c.geom1) in walls and int(c.geom2) in bodies.geom_slots) or
                         (int(c.geom2) in walls and int(c.geom1) in bodies.geom_slots) for c in bodies.data.contact)
     assert contacts > 0
     assert np.isfinite(bodies.data.qpos).all()
+
+
+def test_feeding_probes_do_not_push_another_fly():
+    scene = scenario('orchard', 42)
+    # Deliberately overlap anatomical bodies to exercise actual collision pairs.
+    # No integration or behavioral claim is made for this geometry fixture.
+    scene['spawns'] = [[0, 0, 0], [0, 0, math.pi]]
+    scene['food'] = []
+    bodies = Bodies(scene, 2, 42)
+    probes = set(bodies.mouth_contact_geom_ids.values())
+    assert bodies.contact_between_flies()
+    assert not any(probes.intersection((int(c.geom1), int(c.geom2)))
+                   for c in bodies.data.contact if c.dist <= 0)

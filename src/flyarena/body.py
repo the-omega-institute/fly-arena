@@ -76,7 +76,12 @@ class Bodies:
                           # a second foot that collides with the ground.
                           # Including the ground bit here changes locomotion
                           # before a fly has sensed anything.
-                          contype=1 << index, conaffinity=8,
+                          # MuJoCo accepts a pair if EITHER geom's type
+                          # matches the other's affinity. Giving the probe
+                          # a fly bit lets walls and opponents accept it,
+                          # despite its own food-only affinity. Advertise no
+                          # type; food's type 8 still matches our affinity.
+                          contype=0, conaffinity=8,
                           # A probe must also be massless; MuJoCo otherwise
                           # adds the invisible sphere to the fly's inertia.
                           density=0, rgba=(0, 0, 0, 0), friction=(0, 0, 0))
