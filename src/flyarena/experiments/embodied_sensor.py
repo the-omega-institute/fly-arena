@@ -15,9 +15,14 @@ PROFILE = {
     "status": "experimental", "ranking_eligible": False,
     "channels": ["odor_left", "odor_right", "visual_left", "visual_right", "touch"],
     "odor": {"background_mv": 8.0, "gain_mv": 40.0},
-    "visual": {"gain_mv": 12.0, "source": "raycast_engineered_observation_v1",
+    # These are deliberately small engineering currents.  The retained graph
+    # and the frozen odor-to-motor readout were calibrated without visual or
+    # tactile input; a large direct current overwhelms that bridge.  The gains
+    # are versioned here so the receipt records the actual experiment, not a
+    # hidden runtime knob.  They are not biological calibration constants.
+    "visual": {"gain_mv": 0.1, "source": "raycast_engineered_observation_v1",
                "selector": "visual_projection, annotated side L/R; unknown side excluded"},
-    "touch": {"gain_mv": 18.0, "source": "mujoco_food_contact_observation_v1",
+    "touch": {"gain_mv": 0.1, "source": "mujoco_food_contact_observation_v1",
               "selector": "class = mechanosensory_tactile; whole population"},
     "qualification": "engineered currents; no biological sensory validation",
 }
@@ -80,9 +85,12 @@ class EmbodiedSensor:
         # Reuse the unchanged odor encoder; zero extra inputs exactly preserve
         # its current, including on fixtures with overlapping circuit labels.
         brain.stimulate(float(odor_left), float(odor_right))
-        for name, value, gain in (("visual_left", visual_left, 12.),
-                                  ("visual_right", visual_right, 12.), ("touch", touch, 18.)):
+        gains = {"visual_left": PROFILE["visual"]["gain_mv"],
+                 "visual_right": PROFILE["visual"]["gain_mv"],
+                 "touch": PROFILE["touch"]["gain_mv"]}
+        for name, value in (("visual_left", visual_left),
+                            ("visual_right", visual_right), ("touch", touch)):
             if value:
-                brain.external[self.groups[name]] += gain * value
+                brain.external[self.groups[name]] += gains[name] * value
         return {"profile": PROFILE["id"], "values": dict(zip(PROFILE["channels"], raw.tolist())),
                 "group_manifest_sha256": self.sha256}

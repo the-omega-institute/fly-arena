@@ -315,3 +315,26 @@ scores:      [0.3120, 0.0608]
 这次修正解决了一个会让果蝇停滞的物理错误：透明口器探针此前同时碰撞地面并带有默认质量，改变了身体惯量。现在探针是零质量、只与食物几何接触，并且半径 `0.65 mm` 与 `0.45 mm` 食物球之和匹配 `1.1 mm` 的摄取阈值。`tests/test_terrarium.py` 与 `tests/test_embodied_sensor.py` 的相关检查已通过。
 
 这条记录是标准地图上的真实接触→摄取短验证，已经可以作为网页回放样本；它仍然不能替代第一阶段要求的 30 秒以上公开长回放。当前 `odor-only-v1` 将视觉和触碰作为带 provenance 的物理观测保存，只有明确选择 `engineered-multimodal-v1` 才把它们注入声明的实验性神经群组。后续必须在不改变这些科学边界的前提下，把同样事件链延长到 30 秒并完成浏览器肉眼验收。
+
+## 正式多模态短回放：视觉/触碰进入真实连接组
+
+在确认口器 probe 的物理修正后，使用正式版本化的 `engineered-multimodal-v1` profile 重新运行了同一标准地图：
+
+```text
+match:              47fcd57d58154e6ba44e720683cf5423
+map/mode/seed:      orchard / contest / 42
+duration:           2.0 s
+status:             verified
+receipt:            1421fadbe161e852f9763403bd335e6a14802a0ed6db918dd1de64f2302ab676
+visual_gain_mv:     0.1
+touch_gain_mv:      0.1
+food_contact:       tick 5700, slot 1, food-0
+first_intake:       tick 6000, slot 1
+food_collected:     1.4328
+neural_input_frames: 400
+touch_frames:       17
+```
+
+receipt 中的 profile 明确绑定了五个通道、MaleCNS 视觉左右群组、`mechanosensory_tactile` 群组哈希和实际增益。400 个记录帧都保存了送入脑状态的输入身份；224 个视觉观测帧和 17 个物理触碰帧被裁判保留。事件时间轴显示视觉/嗅觉检测、MuJoCo `food_contact`、摄取、果蝇间接触和出界，最终结果为 slot 1 胜出。
+
+这证明工程化视觉和触碰观测已经可以进入完整 MaleCNS 神经状态，并在声明为实验性的低增益桥下闭合到真实接触和摄取。`0.1 mV` 是为了避免未经校准的直接电流压过现有嗅觉到运动读出而选择的工程参数，不是果蝇生理学标定值；profile 仍然标记 `ranking_eligible: false`。这条 2 秒记录仍不能替代 30 秒以上长回放和浏览器肉眼验收，但它已经是当前最完整的多模态生命闭环样本。
