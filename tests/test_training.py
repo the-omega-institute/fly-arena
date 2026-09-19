@@ -453,3 +453,26 @@ def test_bundled_public_gallery_and_replay_artifacts_are_read_only(lab):
         assert client.get('/api/v1/training-showcase').json()[0]['id']=='bundled-run'
         assert client.get(f'/api/v1/matches/{match_id}').status_code==200
         assert client.get(f'/api/v1/matches/{match_id}/events').status_code==200
+
+
+def test_bundled_replay_is_listed_without_source_database(lab):
+    """A selected real replay can be served by a source-only deployment."""
+    from fastapi.testclient import TestClient
+    from flyarena.api import create_app
+    from flyarena.auth import AuthConfig
+    import json
+    store,service,_,_=lab
+    folder=store.root/'research'/'replay-gallery-v1';folder.mkdir(parents=True)
+    match_id='b'*32
+    match={'id':match_id,'status':'verified','progress':1,'attempt':2,
+           'request':{'fly_ids':[],'map_id':'orchard','mode':'contest','seed':42,'duration_seconds':30},
+           'result':{'scores':[0.0,1.4],'winner_slot':1,'outcome':'win','receipt_sha256':'c'*64}}
+    (folder/f'{match_id}-match.json').write_text(json.dumps(match))
+    for artifact,payload in {'scene':{'flies':[]},'frames':[],'events':[],'receipt':{'sha256':'c'*64}}.items():
+        (folder/f'{match_id}-{artifact}.json').write_text(json.dumps(payload))
+    with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
+        listed=client.get('/api/v1/matches').json()
+        assert any(item['id']==match_id for item in listed)
+        assert client.get(f'/api/v1/matches/{match_id}').json()['status']=='verified'
+        assert client.get(f'/api/v1/matches/{match_id}/scene').json()=={'flies':[]}
+        assert client.get(f'/api/v1/matches/{match_id}/receipt').status_code==200

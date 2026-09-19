@@ -425,3 +425,11 @@ judge:                event-conservation-v1
 ```
 
 这条记录从 tick 0 连续运行到 tick 300000，保存两只果蝇的完整脑 checkpoint、身体物理、感觉输入、回路 trace、规范神经元采样、事件账本和 receipt。独立裁判与 API smoke 已验证 `/matches/{id}`、`scene`、`events` 和 `receipt` 均返回 200；前端的首屏精选规则会优先选择这条 30 秒、多模态且有实际摄取的 verified 回放。slot 0 没有摄取不是失败数据，仍保留为 WT 的真实竞争结果。
+
+## 部署可见性增量：精选回放只读资产
+
+研究工作区的 SQLite、完整脑 checkpoint 和账户记录属于私有运行数据，不能随着源代码复制到 Mac Studio。为保证用户仍能打开真实生命样本，新增 `scripts/bundle_replay.py`：它从一条已验证比赛的单次 attempt 读取 `scene.json`、`frames.json`、`events.json` 和 `receipt.json`，先逐项验证 receipt 中的 SHA-256，再生成 `var/research/replay-gallery-v1/*-match.json` 及四个浏览器资产。包中明确记录比赛请求、结果、attempt 和 receipt 哈希，并排除数据库、全量 `brain-*.npz`、`physics.npz`、编译工件和账户字段。
+
+API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读取这些只读精选资产。这样部署实例即使没有源 SQLite，也会把实际验证过的比赛列在首页并提供相同的三维场景、时间轴、事件和 provenance；公开资产不会成为可写训练会话。同步通过 `scripts/sync_mac.py var/research/replay-gallery-v1` 在维护窗口中显式执行，不会把 `var/` 默认打进源代码包。
+
+当前本地已为 `aca9ac97af8a4cfcb863c3b45da5e857` 的 attempt 2 生成 68,547,647 字节精选包；它保持 30 秒双体竞争、slot 1 摄取和独立 receipt，不把旧回放与新回放拼接。NyxID 节点查询在 2026-09-19 仍因 `nyx-api.chrono-ai.fun` DNS 不可达而未能执行远端同步，因此没有声称 Mac Studio 或 4060 已更新；待连接恢复后按上述显式资产包流程同步并重新做 API smoke。

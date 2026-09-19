@@ -90,7 +90,17 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     for name, sha in receipt["files"].items():
         if Path(name).name != name or file_sha(folder / name) != sha:
             raise ValueError(f"Evidence hash mismatch: {name}")
-    request = MatchRequest.model_validate(receipt["request"])
+    # Check the recorded horizon against the immutable endpoint before applying
+    # the public admission bounds.  An adversary can resign a receipt with a
+    # longer horizon; reporting the truncated endpoint makes that evidence
+    # failure explicit instead of hiding it behind Pydantic's range error.
+    raw_request = receipt["request"]
+    raw_duration = raw_request.get("duration_seconds") if isinstance(raw_request, dict) else None
+    raw_end = receipt.get("final_tick")
+    if (type(raw_duration) is int and raw_duration > 30 and type(raw_end) is int
+            and raw_end != raw_duration * 10000):
+        raise ValueError("Run ended before the required endpoint")
+    request = MatchRequest.model_validate(raw_request)
     stored_scene = json.loads((folder / "scene.json").read_text())
     runtime_sensory = receipt["runtime"].get("sensory_profile", {"id": "odor-only-v1"})
     if runtime_sensory.get("id") != request.sensory_profile:

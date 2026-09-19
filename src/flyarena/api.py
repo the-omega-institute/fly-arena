@@ -342,7 +342,15 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
 
     @app.get("/api/v1/matches")
     def matches():
-        return store.matches()
+        result=store.matches()
+        seen={item['id'] for item in result}
+        # Public gallery assets are immutable read-only evidence.  Include
+        # them when the deployment database does not contain their records so
+        # a source-only deployment can still open its featured replay.
+        for item in training.gallery_matches()+training.bundled_replay_matches():
+            if item['id'] not in seen:
+                result.append(item);seen.add(item['id'])
+        return result
 
     @app.post("/api/v1/matches", status_code=202)
     def match_create(body: MatchRequest, owner: dict = Depends(identity),
@@ -358,7 +366,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
 
     @app.get("/api/v1/matches/{ident}")
     def match_get(ident: str):
-        result = store.match(ident) or training.gallery_match(ident)
+        result = store.match(ident) or training.gallery_match(ident) or training.bundled_replay_match(ident)
         if result is None:
             raise HTTPException(404, "Match not found")
         return result
@@ -367,12 +375,15 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def evidence(ident: str, artifact: str):
         if artifact not in {"scene", "frames", "events", "receipt"}:
             raise HTTPException(404, "Unknown replay artifact")
-        match = store.match(ident) or training.gallery_match(ident)
+        match = store.match(ident) or training.gallery_match(ident) or training.bundled_replay_match(ident)
         if match is None:
             raise HTTPException(404, "Match not found")
         if match["status"] != "verified":
             raise HTTPException(409, "Verified replay is not ready")
-        path=store.result_folder(match) / f"{artifact}.json" if store.match(ident) else training.gallery_artifact(ident,artifact)
+        if store.match(ident):
+            path=store.result_folder(match) / f"{artifact}.json"
+        else:
+            path=training.gallery_artifact(ident,artifact) or training.bundled_replay_artifact(ident,artifact)
         if path is None or not path.is_file():
             raise HTTPException(404, "Replay artifact not found")
         return FileResponse(path, media_type="application/json")

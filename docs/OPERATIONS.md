@@ -4,6 +4,23 @@ The deployment lives in `/Users/macstudio/fly-arena-mvp` on `macstudio-ssh` (Nyx
 
 `python scripts/sync_mac.py` sends an explicit source + built-web archive through NyxID exec, checks its SHA256 remotely, then extracts it. It does not transfer raw data, credentials, user databases or node configuration. Run `npm run build --prefix web` first. The remote directory is a deployment copy, not a Git checkout; the reviewable source lives on the feature branch in GitHub.
 
+To make a real replay visible on a source-only deployment, first create a
+read-only bundle from a verified match:
+
+```bash
+python scripts/bundle_replay.py --match-id <verified-match-id>
+python scripts/sync_mac.py var/research/replay-gallery-v1
+```
+
+The bundle contains the match request/result and the four browser artifacts
+(`scene`, `frames`, `events`, `receipt`). The command verifies the receipt's
+recorded hashes before copying anything. It deliberately excludes SQLite,
+accounts, compiled artifacts and full `brain-*.npz`/`physics.npz` checkpoints.
+The API lists these immutable records alongside database matches, so an empty
+deployment database can still open the selected replay. Keep the bundle under
+the same maintenance window as the source update; it is a read-only showcase,
+not a replacement for the private research ledger.
+
 Use a maintenance window for core updates: allow the queue to drain, stop the service, synchronize, and restart. A match admitted under an old runtime hash intentionally fails if a new runtime tries to execute it. Do not overwrite a running core and claim continuity. MVP updates are not transactional rolling releases.
 
 Back up `var/arena.sqlite3` via SQLite's backup API, plus `var/artifacts`, `var/runs`, and the frozen `data/connectome` directory. A DB-only backup cannot restore immutable weight artifacts or replay evidence. Source data may be redownloaded, but its hashes must agree. Do not recalibrate the readout in the middle of a season. A runtime hash includes source, lockfile, Python/platform, model and rules; cross-hardware bitwise equivalence is not promised.

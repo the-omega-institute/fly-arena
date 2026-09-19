@@ -281,6 +281,54 @@ class TrainingService:
                     if match.get('id')==ident:return self._public(match)
         return None
 
+    def gallery_matches(self):
+        """Return verified replay records shipped with the public gallery.
+
+        A deployment may intentionally omit its private SQLite database.  The
+        public gallery is still a real source of replay records, so the Arena
+        list endpoint must expose those records instead of making the landing
+        page look empty.  Duplicates are removed by match id; callers retain
+        database ordering for private and freshly produced matches.
+        """
+        result=[];seen=set()
+        for run in self._bundled_showcase():
+            for member in run.get('members',[]):
+                for match in member.get('matches',[]):
+                    ident=match.get('id')
+                    if not ident or ident in seen or match.get('status') not in {'verified','failed','queued','running'}:
+                        continue
+                    seen.add(ident);result.append(self._public(match))
+        return result
+
+    def _bundled_replay_folder(self):
+        return self.store.root/'research'/'replay-gallery-v1'
+
+    def bundled_replay_matches(self):
+        """Read explicitly selected, immutable replay records.
+
+        These files are produced by ``scripts/bundle_replay.py`` and contain
+        no account or worker state.  They let a source-only deployment serve a
+        small set of real replays without copying the private Arena database.
+        """
+        folder=self._bundled_replay_folder()
+        if not folder.is_dir():return []
+        result=[]
+        for path in sorted(folder.glob('*-match.json')):
+            try:value=json.loads(path.read_text())
+            except (OSError,ValueError):continue
+            if value.get('id') and value.get('status') in {'verified','failed'}:
+                result.append(self._public(value))
+        return result
+
+    def bundled_replay_match(self,ident):
+        return next((m for m in self.bundled_replay_matches() if m.get('id')==ident),None)
+
+    def bundled_replay_artifact(self,ident,artifact):
+        if artifact not in {'scene','frames','events','receipt'}:return None
+        folder=self._bundled_replay_folder()
+        path=folder/f'{ident}-{artifact}.json'
+        return path if path.is_file() else None
+
     def gallery_artifact(self,ident,artifact):
         if artifact not in {'scene','frames','events','receipt'}:return None
         for run in self._bundled_showcase():
