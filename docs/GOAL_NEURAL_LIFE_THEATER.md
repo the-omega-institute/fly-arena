@@ -400,6 +400,8 @@ Arena 首屏的初始焦点现在按生命证据选择：优先选择至少 30 �
 
 回放页的神经与行为记录面板现在还展开 `Replay provenance`。它显示比赛的地图、模式、种子、时长、感觉 profile、参赛者 FlySpec 的 connectome/model 摘要、MuJoCo/机器运行时、读出权重摘要和 receipt 哈希；这些值来自比赛请求、已保存设计和不可变 `receipt.json`。receipt 端点不可用或历史字段缺失时显示 `Unavailable`，不会根据当前机器或页面状态猜测实验条件。
 
+provenance 还会逐个 Slot 显示实际设计修改：功能回路倍率、edge delta 数量、τ 和 threshold 修改。缺失字段按历史 FlySpec 兼容规则显示 canonical/默认值，不会把当前编辑草稿当成已经参赛的设计。
+
 ## 正式 30 秒双体竞争回放
 
 新增并登记了一条完整双体样本，作为 Arena 首屏精选回放：
