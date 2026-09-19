@@ -1,10 +1,11 @@
 import {useEffect,useId,useState} from 'react'
+import type {ReactNode} from 'react'
 import type {NeuralGraph} from '../../types'
 import {useI18n} from '../../shared/i18n'
 
 /** Show actual incoming/outgoing edges around a selected canonical neuron.
  * The placement is schematic. Unsampled neighbors never acquire activity. */
-export function LocalBrainGraph({graph,activity,scale,selectedClass}:{graph:NeuralGraph;activity:Map<string,number>;scale:number;selectedClass:string|null}){
+export function LocalBrainGraph({graph,activity,scale,selectedClass,renderActivity}:{graph:NeuralGraph;activity:Map<string,number>;scale:number;selectedClass:string|null;renderActivity?:(neuronId:string)=>ReactNode}){
   const {locale}=useI18n(),zh=locale==='zh-CN',prefix=useId().replace(/:/g,'')
   const [focus,setFocus]=useState<string|null>(null),[selectedEdge,setSelectedEdge]=useState<number|null>(null)
   useEffect(()=>{setFocus(null);setSelectedEdge(null)},[selectedClass])
@@ -52,6 +53,7 @@ export function LocalBrainGraph({graph,activity,scale,selectedClass}:{graph:Neur
       })}
     </svg>
     <div className="local-brain-node-details"><span>{zh?'神经元':'Neuron'} <b>{node.id}</b></span><span>{zh?'类别 / 类型':'Class / type'} <b>{node.class||'—'} / {node.type||'—'}</b></span><span>{zh?'递质注释':'Transmitter annotation'} <b>{node.nt||'—'}</b></span><span>{zh?'这一帧的活动':'Activity in this frame'} <b>{recorded?value.toFixed(2)+' Hz':zh?'未记录':'Not recorded'}</b></span></div>
+    {renderActivity?.(node.id)}
     {edge?<div className="local-brain-edge-details"><label>{zh?'检查连接':'Inspect edge'} <select aria-label={zh?'检查连接':'Inspect edge'} value={edge.edge} onChange={e=>setSelectedEdge(Number(e.target.value))}>{edges.map(e=><option key={e.edge} value={e.edge}>{e.pre} → {e.post} · #{e.edge}</option>)}</select></label><div><span>{zh?'真实突触数量':'Anatomical synapses'}<b>{edge.count}</b></span><span>{zh?'模型基线权重':'Baseline model weight'}<b>{show(edge.baseline_weight)}</b></span><span>{zh?'设计权重倍率':'Design multiplier'}<b>×{show(edge.multiplier)}</b></span><span>{zh?'这只果蝇的权重':'This fly’s model weight'}<b>{show(edge.weight)}</b></span></div></div>:<p>{zh?'此展示样本中没有该神经元的连接。':'No connections for this neuron in the display sample.'}</p>}
     {edges.some(e=>e.weight===undefined)&&<p className="local-brain-note">{zh?'这份回放未提供逐连接权重；— 表示缺失，不是零权重。':'This replay did not provide per-edge weights; — means missing, not zero weight.'}</p>}
     <p className="local-brain-note">{zh?'箭头为真实连接方向；绿色为模型兴奋权重，粉色为模型抑制权重，灰色虚线为模型零权重；长虚线表示设计修改。权重来自本次参赛设计，单位为模型突触强度，不是实测生理强度。位置为示意，邻域只展示所选连接；未采样邻居不会补造活动。':'Arrows follow actual connections. Green: excitatory model weight; pink: inhibitory; gray dotted: zero model weight. Long dashes mark design edits. Weights belong to this contestant and use model synaptic strength, not measured physiology. Positions are schematic and the neighborhood is a display sample. Unsampled neighbors receive no invented activity.'}</p>
