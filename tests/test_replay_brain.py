@@ -61,3 +61,27 @@ def test_graph_requests_reuse_bounded_snapshot_for_reordered_samples(live_replay
     first=client.get(path,params={'ids':'101,102'});second=client.get(path,params={'ids':'102,101'})
     assert first.status_code==second.status_code==200
     assert first.json()==second.json() and len(calls)==1
+
+
+def test_sensory_anchors_have_real_neighbors_without_changing_canonical_groups(live_replay):
+    client,store,match,flies=live_replay
+    from flyarena.brain_graph import build
+    g=client.app.state.training.compiler().graph
+    g.side=np.array([0,1,-1])
+    metadata=[{'id':'101','class':'gustatory'},{'id':'102','class':'mechanosensory_tactile'},
+              {'id':'103','class':'mechanosensory_tactile'}]
+    (g.path/'neurons.json').write_text(json.dumps(metadata))
+    original=set(g.groups)
+    result=build(g,Compiler(g),flies[1],['101','102','103'],store.root)
+    assert set(g.groups)==original
+    assert {c['id'] for c in result['display_groups']}=={'taste','touch_left','touch_right'}
+    for key,ident in [('taste','101'),('touch_left','102'),('touch_right','103')]:
+        neighborhood=result['circuits'][key]
+        assert neighborhood['anchors']==[ident]
+        assert any(n['id']==ident for n in neighborhood['neurons'])
+        assert neighborhood['edges']
+        assert all('activity' not in n for n in neighborhood['neurons'])
+        for edge in neighborhood['edges']:
+            assert edge['weight']==pytest.approx(edge['baseline_weight']*edge['multiplier'])
+    old=build(g,Compiler(g),flies[1],[],store.root)
+    assert old['display_groups']==[] and 'touch_right' not in old['circuits']

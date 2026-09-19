@@ -357,3 +357,11 @@ Each replay records encoded channel values, sensory target groups, population re
 ```sh
 python scripts/custom_strategy.py --bridge-profile sensorimotor-research-v2 --sensory-profile engineered-kernel-contact-v1 --seconds 10 --generations 2 --population 2 --budget 4
 ```
+
+### Inspect individual taste and touch neurons
+
+New separated-contact replays record up to six fixed canonical neurons each from the taste, left tactile and right tactile input populations, alongside the original circuit samples. `brain.sampling.sensory_groups` lists those IDs. Each node's activity comes from the current simulation frame; group brightness uses the actual full-population mean rather than the mean of those six samples.
+
+Some VNC tactile neurons have no source soma coordinates. Selecting a group whose recorded anchors all lack coordinates from the anatomical view opens its actual local connection graph and explains the missing positions. Its recorded activity, edge weights and shared replay timeline remain available; schematic graph positions are not anatomical coordinates.
+
+The replay's compiled brain graph provides sensory display groups and their real local connections. They can be opened as functional groups, neuron classes, local neighborhoods or anatomical points, without changing the canonical genome's circuit selectors. Historical replays retain only their original observations; missing individual activity is not reconstructed from population averages. Additional neighbors are structural context and remain uncolored unless actually sampled.

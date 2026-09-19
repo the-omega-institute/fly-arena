@@ -6,6 +6,7 @@ import {useI18n} from '../../shared/i18n'
 const locations:Record<string,[number,number]>={
   olfactory:[150,76],projection:[340,76],local:[120,161],memory:[365,161],
   readout:[145,247],visual:[370,247],descending:[180,329],motor:[350,329],
+  taste:[100,442],touch_left:[260,530],touch_right:[420,442],
 }
 
 export function BrainActivityOverview({circuits,activity,scale,mutations=[],time,onOpen,mode='replay'}:{
@@ -18,7 +19,7 @@ export function BrainActivityOverview({circuits,activity,scale,mutations=[],time
   const ceiling=Number.isFinite(scale)&&scale>0?scale:1
   return <div className="brain-overview">
     <div className="brain-overview-heading"><span>{zh?'这一刻，大脑在做什么':'Inside this brain, now'}</span><b>{time===undefined?'—':time.toFixed(2)+' s'}</b></div>
-    <svg viewBox="0 0 520 395" className="brain-overview-map" role="group" aria-label={zh?'记录的全脑功能群活动':'Recorded brain functional group activity'}>
+    <svg viewBox={`0 0 520 ${circuits.some(c=>['taste','touch_left','touch_right'].includes(c.id))?585:395}`} className="brain-overview-map" role="group" aria-label={zh?'记录的全脑功能群活动':'Recorded brain functional group activity'}>
       <defs>{circuits.map(c=><radialGradient key={c.id} id={`${prefix}-${c.id}`}><stop offset="0" stopColor={c.color} stopOpacity=".9"/><stop offset="1" stopColor={c.color} stopOpacity="0"/></radialGradient>)}</defs>
       <path className="brain-overview-outline" d="M260 43 C206 9 82 18 52 91 C17 175 66 283 150 297 C153 349 191 377 260 378 C329 377 367 349 370 297 C454 283 503 175 468 91 C438 18 314 9 260 43Z"/>
       <path className="brain-overview-midline" d="M260 45 C245 116 272 187 260 271 L260 367"/>
