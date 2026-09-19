@@ -261,7 +261,7 @@ Mac Studio 运行交互 API、网页和轻量预览；4060 节点优先运行全
 
 1. 修正观测与神经输入的边界，保持已校准的 odor-only 行为基线；固定脑图显示样本，使活动按 canonical neuron ID 映射，未采样节点显示为未采样。
 2. 已加入 MuJoCo 口器接触探针和食物 contact buffer 读取；下一步要把同一证据展示在公开回放中，并完成浏览器肉眼检查。
-3. 已在 4060 上生成一条 30 秒、确实发生接触和摄取的新生命回放，并部署到 Mac Studio；下一步需要完成浏览器肉眼检查与更复杂地图的同等验收。
+3. 已生成并登记一条 30 秒、确实发生接触和摄取的正式多模态生命回放；当前 4060 的 NyxID DNS 暂不可用，因此这条证据由 Mac Studio CPU 完成，仍绑定完整运行时和独立裁判。下一步需要完成浏览器肉眼检查与更复杂地图的同等验收。
 4. 合并设计页的 FlySpec 与 mutation budget，提供固定刺激预览和真实环境评估。
 5. 接入随机搜索、遗传算法和 CEM 的可选实验配置，展示至少两条真实演化谱系。
 6. 增加双体竞技、脑图对比、AI 提交和 NyxID 身份适配器。
@@ -342,3 +342,26 @@ receipt 中的 profile 明确绑定了五个通道、MaleCNS 视觉左右群组�
 ## 当前实现进度：脑活动与真实神经元显示样本对齐
 
 回放固定采样现在使用每个 canonical 功能回路的前 6 个神经元，与 `/connectome/neurons` 的确定性展示窗口一致。这样 `frames.json` 中记录的 `sampled_nodes` 可以直接和网页请求的真实神经元元数据、局部连接及活动亮度连接起来；仿真仍运行完整 165,122 个神经元和全部连接，展示抽样不代表完整脑活动。该修复已合并到 `main`（`a77f47f`），后续新回放会使用这一对齐规则。
+
+## 正式 30 秒多模态生命回放
+
+在 Mac Studio 上用当前 `engineered-multimodal-v1` profile 完成了第一条连续 30 秒单体觅食记录。它没有把视觉、嗅觉、触碰或神经状态拼接到旧回放，而是从 tick 0 连续运行到 tick 300000，并通过本机独立裁判：
+
+```text
+match:               0aefa99328034f458d89aa68242364fe
+fly:                 Nectar / 花蜜
+map/mode/seed:       scarcity / forage / 42
+duration:            30.0 s
+status:              verified
+receipt:             0d19f2b939c83159451c042161166af9f60282d08e656762d0d747814e7e0048
+food_contact:        tick 3600, mouth_distance 1.0497 mm
+intake:              ticks 4000, 4500, 5000; total 1.1232
+visual_frames:       44
+touch_frames:        13
+neural_input_frames: 3000
+judge:               event-conservation-v1
+```
+
+该记录含 3001 个身体/感觉/脑活动采样帧、完整的 `brain-0.npz`、`physics.npz`、`scene.json`、`frames.json`、`events.json` 和 receipt，并已经写入本地 match 索引，可以通过 `/api/v1/matches/0aefa99328034f458d89aa68242364fe` 及其 `scene`、`frames`、`events`、`receipt` 端点打开。它证明了当前工程模型下“感觉输入 → 完整连接组状态 → 身体移动 → 物理接触 → 摄取 → 能量/分数”在 30 秒连续回放里闭合；视觉和触碰仍然是带 provenance 的工程观测，不能解释为已完成生理校准。
+
+同一批次还保存了一条 WT 在 `orchard / forage / 42` 中没有摄取的失败记录（match `f049421c0abf4c0a8f222ba3ed132d26`）。它同样是 30 秒、3001 帧并通过 receipt 校验，但结果为 0 contact、0 intake、一次出界。失败样本保留在生命档案中，用来显示设计差异和真实实验选择，不能被隐藏或改写成成功。
