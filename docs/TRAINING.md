@@ -274,7 +274,7 @@ remaining inside the habitat can also mean that a design got stuck.
 
 Choose **Sensory input profile / 感觉输入模式** when creating a session. Every generation, map/seed condition and mirrored contest position uses the recorded profile. Opening a saved candidate for competition carries the session's bridge, senses and first evaluation condition into the arena. Branching a candidate or public example also restores its sensory/environment settings.
 
-`TrainingSpec.sensory_profile` accepts the same IDs as matches. Its historical default is `odor-only-v1`. Experimental vision/touch profiles currently require `legacy-v1`; incompatible combinations are rejected before evaluation. The API binds the selected profile to the actual compute node runtime. Different sensory profiles are shown as different conditions when comparing algorithms.
+`TrainingSpec.sensory_profile` accepts the same IDs as matches. Its historical default is `odor-only-v1`. Legacy experimental vision/touch profiles require `legacy-v1`; `engineered-kernel-contact-v1` requires `sensorimotor-research-v2`. Incompatible combinations are rejected before evaluation. The API binds the selected profile to the actual compute node runtime. Different sensory profiles are shown as different conditions when comparing algorithms.
 
 Both agent clients accept the same option:
 
@@ -335,7 +335,7 @@ The training form separates **brain dynamics**, **sensorimotor setup**, and **we
 | Training setup | Brain | Inputs that enter the brain |
 | --- | --- | --- |
 | `legacy-v1`: linear readout and filtered drive | LIF or experimental rate | Odor, or the selected experimental visual/taste/touch profile |
-| `sensorimotor-research-v2`: kernel readout and motor transfer | LIF | Odor only; recorded vision and touch are observations |
+| `sensorimotor-research-v2`: kernel readout and motor transfer | LIF | Odor only, or explicit experimental kernel vision/taste/lateral touch |
 
 The second setup requires its compatible frozen readout bundle; missing or incompatible assets remain unavailable. Switching setups can also change encoding and initial headings, so compare each candidate against its own baseline under the same setup. Do not interpret cross-setup fitness differences as the effect of weight mutations alone.
 
@@ -346,3 +346,14 @@ python scripts/custom_strategy.py --bridge-profile sensorimotor-research-v2 --se
 ```
 
 When attaching with `--run`, the session's recorded setup is retained. Older deployments without the training setup catalog expose the existing legacy option only.
+
+
+### Multisensory input with the kernel readout
+
+`engineered-kernel-contact-v1` is an opt-in research-v2/LIF profile. It preserves the research bilateral odor encoder and its 48 mV, zero-background current, then adds engineered visual input (0.1 mV maximum), taste and bilateral tactile input (8 mV maximum). The geometric visual observation and MuJoCo mouth/environment contacts produce these inputs; normal upward foot support is excluded from lateral touch. These are simulation mappings, not a biological retina or validated receptors. The frozen decoder was trained on odor; successful behavior with additional input requires actual evaluation.
+
+Each replay records encoded channel values, sensory target groups, population responses and the same body/neural clock. Legacy profiles keep their original encoding and cannot be silently used with the research bridge. The new profile is excluded from public ranking and is available to compatible sandbox training. Example:
+
+```sh
+python scripts/custom_strategy.py --bridge-profile sensorimotor-research-v2 --sensory-profile engineered-kernel-contact-v1 --seconds 10 --generations 2 --population 2 --budget 4
+```

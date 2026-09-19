@@ -5,7 +5,7 @@ import {algorithmName} from './algorithms'
 import type {PublishedRun} from './TrainingShowcase'
 
 const multimodal=new Set(['engineered-multimodal-v1','engineered-multimodal-v2','engineered-touch-response-v1'])
-const separated=new Set(['engineered-contact-context-v1','engineered-contact-support-v1'])
+const separated=new Set(['engineered-contact-context-v1','engineered-contact-support-v1','engineered-kernel-contact-v1'])
 
 export function ExperimentGuide({run,maps,onReplay}:{run:PublishedRun;maps:ArenaMap[];onReplay:(match:Match)=>void}){
  const {locale,t}=useI18n(),zh=locale==='zh-CN'

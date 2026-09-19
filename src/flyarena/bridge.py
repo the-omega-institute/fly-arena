@@ -17,11 +17,11 @@ def training_profiles(data=DATA):
     profile = profile_manifest(data)
     return [
         {"id": "legacy-v1", "name": "Linear readout + filtered drive", "ready": True,
-         "models": list(PROFILES), "sensory_profiles": [p["id"] for p in catalog()],
+         "models": list(PROFILES), "sensory_profiles": [p["id"] for p in catalog() if "legacy-v1" in p.get("bridge_profiles", ["legacy-v1"])],
          "scope": "training"},
         {"id": "sensorimotor-research-v2", "name": "Kernel readout + motor transfer",
          "ready": bool(profile["ready"]), "models": ["malecns-lif-cpu-v1"],
-         "sensory_profiles": ["odor-only-v1"], "scope": "training",
+         "sensory_profiles": [p["id"] for p in catalog() if "sensorimotor-research-v2" in p.get("bridge_profiles", ["sensorimotor-research-v2"])], "scope": "training",
          **({} if profile["ready"] else {"reason": profile.get("reason", "Readout unavailable")})},
     ]
 

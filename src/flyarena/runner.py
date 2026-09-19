@@ -18,7 +18,7 @@ from .neural import Brain, PROFILE
 from .models import PROFILES, make_brain, require_model_bridge
 from .scenarios import RULES, VISUAL_OBSERVATION, arena_scene
 from .replay import POLICY, REPLAY_RECEIPT
-from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILE
+from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILES
 
 
 def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
@@ -123,7 +123,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     frames, events = [], []
     environment_touch = request.sensory_profile in ENVIRONMENT_PROFILES
     separated_contact = request.sensory_profile in SEPARATED_CONTACT_PROFILES
-    support_contact = request.sensory_profile == SUPPORT_CONTACT_PROFILE["id"]
+    support_contact = request.sensory_profile in SUPPORT_CONTACT_PROFILES
     touch_status = frozen_runtime["sensors"]["touch"]
     environment_latches = [set() for _ in flies]
     senses = [{"odor": [0.0, 0.0], "visual": [0.0, 0.0], "visual_status": VISUAL_OBSERVATION["id"],
@@ -245,7 +245,13 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             if v2:
                 backend = backends[slot]
                 encoded = encode_odor(*odor)
-                backend.stimulate(float(encoded[0]), float(encoded[1]))
+                if sensory_encoder:
+                    senses[slot]["neural_input"] = sensory_encoder.apply(
+                        brain, float(encoded[0]), float(encoded[1]),
+                        float(visual[0]), float(visual[1]),
+                        taste=taste, touch_left=touch_left, touch_right=touch_right, backend=backend)
+                else:
+                    backend.stimulate(float(encoded[0]), float(encoded[1]))
                 backend.advance(RULES["sense_ticks"])
                 command = decoder.command(backend.neural_output(decoder.neurons))
                 drives[slot] = motors[slot].advance(command)
@@ -262,17 +268,17 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 else:
                     brain.stimulate(float(encoded[0]), float(encoded[1]))
                 brain.advance(RULES["sense_ticks"])
-                if sensory_encoder:
-                    tactile_group = sensory_encoder.groups["touch"]
-                    senses[slot]["tactile_activity"] = (
-                        float(np.mean(brain.rates[tactile_group])) if len(tactile_group) else None)
-                    if separated_contact:
-                        senses[slot]["contact_activity"] = {
-                            name: float(np.mean(brain.rates[indices])) if len(indices) else None
-                            for name, indices in sensory_encoder.groups.items() if name in {"taste", "touch_left", "touch_right"}}
                 command = brain.rates[ro["neurons"]] / 100 @ ro["weights"]
                 # Fixed low-pass decoder; no access to food or world coordinates.
                 drives[slot] = .85 * drives[slot] + .15 * np.clip(command, 0, 1.5)
+            if sensory_encoder:
+                tactile_group = sensory_encoder.groups["touch"]
+                senses[slot]["tactile_activity"] = (
+                    float(np.mean(brain.rates[tactile_group])) if len(tactile_group) else None)
+                if separated_contact:
+                    senses[slot]["contact_activity"] = {
+                        name: float(np.mean(brain.rates[indices])) if len(indices) else None
+                        for name, indices in sensory_encoder.groups.items() if name in {"taste", "touch_left", "touch_right"}}
             if silence_output or eliminated[slot] or energy[slot] <= 0:
                 drives[slot] = 0
         for _ in range(RULES["sense_ticks"]):

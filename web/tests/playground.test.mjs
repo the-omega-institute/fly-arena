@@ -285,13 +285,13 @@ for(const supportsSenses of [true,false])test(`training controls retain selected
  }finally{await act(async()=>root.render(null));globalThis.fetch=priorFetch}
 });
 
-test('training setup selects a compatible bridge and preserves it when branching',async()=>{
+for(const kernelInput of [false,true])test(`training selects and branches compatible research input (multisensory=${kernelInput})`,async()=>{
  const mapFile=path.join(out,'src/features/arena/MapPreview.js');
  require.cache[mapFile]={id:mapFile,filename:mapFile,loaded:true,exports:{MapPreview:()=>React.createElement('div')}};
  const {TrainingSandbox}=require('./src/features/training/TrainingSandbox.js');
  const priorFetch=globalThis.fetch;let posted,stored;const runId='e'.repeat(32);
  const lif={...own,report:{budget_used:0,budget_limit:100}},rate={...wt,id:'f'.repeat(32),spec:{...wt.spec,model_profile:'malecns-rate-cpu-v1'}};
- const touch='engineered-contact-support-v1',bridge='sensorimotor-research-v2';
+ const touch='engineered-contact-support-v1',bridge='sensorimotor-research-v2',kernel='engineered-kernel-contact-v1';
  globalThis.fetch=async(url,options={})=>{
   const endpoint=String(url).replace('/api/v1','');let value;
   if(endpoint==='/training-showcase')value=[];
@@ -303,17 +303,19 @@ test('training setup selects a compatible bridge and preserves it when branching
   else throw Error('Unexpected test request '+endpoint);
   return new Response(JSON.stringify(value),{status:200,headers:{'Content-Type':'application/json'}});
  };
- const props={flies:[lif,rate],identity:{id:'owner',token:'fixture-token'},selected:lif.id,maps:[],onLogin:noop,onSaved:async()=>{},onCompete:noop,onReplay:noop,season:{connectome:{circuits:[]},match_profiles:[{id:'legacy-v1',ready:true},{id:bridge,ready:false}],training_bridge_profiles:[{id:'legacy-v1',ready:true,models:['malecns-lif-cpu-v1','malecns-rate-cpu-v1'],sensory_profiles:['odor-only-v1',touch]},{id:bridge,ready:true,models:['malecns-lif-cpu-v1'],sensory_profiles:['odor-only-v1']}],training_sensory_profiles:[{id:'odor-only-v1',ready:true},{id:touch,ready:true}]}};
+ const props={flies:[lif,rate],identity:{id:'owner',token:'fixture-token'},selected:lif.id,maps:[],onLogin:noop,onSaved:async()=>{},onCompete:noop,onReplay:noop,season:{connectome:{circuits:[]},match_profiles:[{id:'legacy-v1',ready:true},{id:bridge,ready:false}],training_bridge_profiles:[{id:'legacy-v1',ready:true,models:['malecns-lif-cpu-v1','malecns-rate-cpu-v1'],sensory_profiles:['odor-only-v1',touch]},{id:bridge,ready:true,models:['malecns-lif-cpu-v1'],sensory_profiles:['odor-only-v1',...(kernelInput?[kernel]:[])]}],training_sensory_profiles:[{id:'odor-only-v1',ready:true},{id:touch,ready:true},...(kernelInput?[{id:kernel,ready:true}]:[])]}};
  const change=async(select,value)=>act(async()=>{select.value=value;select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
  try{
   await mount(TrainingSandbox,props);
   const selector=document.getElementById('training-bridge-profile'),sense=document.getElementById('training-sensory-profile');
   await change(sense,touch);await change(selector,bridge);
   assert.equal(sense.value,'odor-only-v1');assert.equal([...sense.options].find(o=>o.value===touch).disabled,true);
-  assert.match(document.body.textContent,/Only odor enters the brain/);assert.equal(posted,undefined);
-  await click('Start training');assert.equal(posted.bridge_profile,bridge);assert.equal(posted.sensory_profile,'odor-only-v1');
+  assert.match(document.body.textContent,/Odor-only mode leaves vision and touch as observations/);assert.equal(posted,undefined);
+  if(kernelInput){assert.equal([...sense.options].find(o=>o.value===kernel).disabled,false);await change(sense,kernel)}
+  await click('Start training');assert.equal(posted.bridge_profile,bridge);assert.equal(posted.sensory_profile,kernelInput?kernel:'odor-only-v1');
   await change(selector,'legacy-v1');await click('Branch training from this fly');
   assert.equal(document.getElementById('training-bridge-profile').value,bridge);
+  assert.equal(document.getElementById('training-sensory-profile').value,kernelInput?kernel:'odor-only-v1');
   const founder=[...document.querySelectorAll('.training-setup label')].find(el=>el.textContent.startsWith('Starting fly')).querySelector('select');
   await change(founder,rate.id);
   assert.equal(button('Start training').disabled,true);

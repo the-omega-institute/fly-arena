@@ -18,6 +18,49 @@ def graph():
         baseline_weights=lambda:np.zeros(8,dtype=np.float32))
 
 
+def test_kernel_zero_extra_inputs_preserve_exact_research_state_and_currents():
+    from flyarena.backend import CPUBrainBackend
+    from flyarena.experiments.embodied_sensor import KERNEL_CONTACT_PROFILE
+    from flyarena.experiments.sensor import encode_odor
+    g=graph();g.groups['gustatory']=np.array([4]);g.groups['visual']=np.arange(8)
+    subject,baseline=Brain(g),Brain(g)
+    backend,reference=CPUBrainBackend(subject),CPUBrainBackend(baseline)
+    encoder=EmbodiedSensor(g,KERNEL_CONTACT_PROFILE['id'])
+    for raw in [(0,0),(.3,.6),(3.,1.),(0,1)]:
+        values=encode_odor(*raw)
+        record=encoder.apply(subject,*values,backend=backend)
+        reference.stimulate(*values)
+        np.testing.assert_array_equal(subject.external,baseline.external)
+        np.testing.assert_allclose(subject.external[:2],48*values)
+        backend.advance(100);reference.advance(100)
+        for key,value in subject.checkpoint().items():
+            np.testing.assert_array_equal(value,baseline.checkpoint()[key])
+        assert record['profile']==KERNEL_CONTACT_PROFILE['id']
+    before=subject.external.copy()
+    for wrong in [None,reference]:
+        with pytest.raises(ValueError,match='this brain'):
+            encoder.apply(subject,.2,.4,backend=wrong)
+        np.testing.assert_array_equal(subject.external,before)
+
+
+def test_kernel_inputs_reach_annotated_sides_and_reset_between_steps():
+    from flyarena.backend import CPUBrainBackend
+    from flyarena.experiments.embodied_sensor import KERNEL_CONTACT_PROFILE,validate_profile
+    g=graph();g.groups['gustatory']=np.array([4]);subject=Brain(g);backend=CPUBrainBackend(subject)
+    encoder=EmbodiedSensor(g,KERNEL_CONTACT_PROFILE['id'])
+    encoder.apply(subject,.2,.4,.7,.1,taste=1,touch_left=1,backend=backend)
+    np.testing.assert_allclose(subject.external,[9.6,19.2,.07,.01,8.07,.01,8,0])
+    backend.advance(1000)
+    assert subject.rates[6]>0 and subject.rates[7]==0
+    encoder.apply(subject,0,0,backend=backend)
+    assert not subject.external.any()
+    validate_profile('sensorimotor-research-v2',KERNEL_CONTACT_PROFILE['id'])
+    with pytest.raises(ValueError,match='requires sensorimotor'):
+        validate_profile('legacy-v1',KERNEL_CONTACT_PROFILE['id'])
+    with pytest.raises(ValueError,match='cannot use a kernel'):
+        EmbodiedSensor(g).apply(subject,0,0,backend=backend)
+
+
 @pytest.mark.parametrize('cls',[Brain,RateBrain])
 def test_stimuli_reach_only_declared_groups_and_change_neural_state(cls):
     g=graph(); encoder=EmbodiedSensor(g); baseline=cls(g); subject=cls(g)
