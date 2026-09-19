@@ -244,7 +244,13 @@ for(const supportsSenses of [true,false])test(`training controls retain selected
   if(supportsSenses)await act(async()=>{select.value=sensory;select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
   const objective=document.getElementById('training-fitness-objective');assert.equal(objective.options.length,supportsSenses?2:1);
   if(supportsSenses)await act(async()=>{objective.value='sustained-foraging-v1';objective.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
+  const duration=[...document.querySelectorAll('.training-setup label')].find(el=>el.textContent.startsWith('Seconds per evaluation')).querySelector('select');
+  assert.equal(duration.value,'1');assert.match(document.querySelector('.training-workload').textContent,/Planned simulation time4 s/);
+  await act(async()=>{duration.value='10';duration.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
+  assert.match(document.querySelector('.training-workload').textContent,/Planned simulation time40 s/);
+  assert.equal(posted,undefined,'Changing observation duration must not submit work');
   await click('Start training');
+  assert.equal(posted.duration_seconds,10);
   assert.equal(posted.fitness_objective,supportsSenses?'sustained-foraging-v1':undefined);
   assert.equal(posted.sensory_profile,supportsSenses?sensory:undefined);
   await click('Compete');
@@ -890,4 +896,41 @@ test('anatomical replay starts with all recorded circuits and can focus and rest
  assert.equal(document.querySelector('.neuron-activity-trace').dataset.neuronId,'d')
  await click('Descending neurons');assert.deepEqual(spatialCanvasProps.nodes.map(n=>n.id),['d'])
  await click('All recorded circuits');assert.deepEqual(spatialCanvasProps.nodes.map(n=>n.id),['a','b','c','d'])
+})
+
+
+test('training workload counts both brains separately from swapped matches and reacts to language',async()=>{
+ const {TrainingWorkload}=require('./src/features/training/TrainingWorkload.js')
+ const props={population:2,generations:2,duration:10,mode:'contest',conditions:[{map_id:'orchard',seed:42},{map_id:'orchard',seed:43}]}
+ await mount(TrainingWorkload,props)
+ const text=()=>document.querySelector('.training-workload').textContent
+ assert.match(text(),/Per evaluation10 s · 2 flies/)
+ assert.match(text(),/Planned simulation time160 s/)
+ assert.match(text(),/Simulation time across all brains320 s/)
+ assert.match(text(),/not a completion countdown/)
+ await mount(TrainingWorkload,{...props,mode:'forage',duration:1})
+ assert.match(text(),/Planned simulation time8 s/)
+ assert.match(text(),/Simulation time across all brains8 s/)
+ assert.match(text(),/may not have time to reach food/)
+ const language=document.querySelector('select[aria-label="Language"]')
+ await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(text(),/计划总仿真时长8 s/)
+ await mount(TrainingWorkload,{...props,population:NaN})
+ assert.doesNotMatch(text(),/NaN|Infinity/)
+})
+
+test('zero intake, inversion, equal contest advantage and missing behavior stay distinct beside replay',async()=>{
+ const {ConditionResults}=require('./src/features/training/ConditionResults.js')
+ const metric={schema:'sustained-foraging-v1',food:0,latter_half_food:0,upright_fraction:.327,recorded_seconds:10,first_inversion_s:3.27,fitness:0}
+ const match={id:'recorded-match',status:'verified',request:{mode:'contest'},result:{behavior:[metric,{...metric,food:10,latter_half_food:2,fitness:12,upright_fraction:1,first_inversion_s:null}]}}
+ const result={condition:{map_id:'enclosure',seed:43},fitness:0,evaluations_completed:2,evaluations_total:2,matches:[match]}
+ const replay=[]
+ await mount(ConditionResults,{results:[result],maps:[],onReplay:m=>replay.push(m.id)})
+ assert.match(document.body.textContent,/no average advantage/)
+ assert.match(document.body.textContent,/Recorded 10.00 s · No intake recorded in this window. First inversion 3.27 s/)
+ assert.match(document.body.textContent,/Total food 10.000. No inversion recorded/)
+ await click('Behavior and neural replay 1 · Replay');assert.deepEqual(replay,['recorded-match'])
+ await mount(ConditionResults,{results:[{...result,fitness:null,matches:[{...match,request:{mode:'forage'},result:{behavior:[null]}}]}],maps:[],onReplay:noop})
+ assert.match(document.body.textContent,/Awaiting complete condition/)
+ assert.doesNotMatch(document.body.textContent,/No intake|First inversion|no average advantage/)
 })
