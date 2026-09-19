@@ -484,6 +484,30 @@ test('shared food panel keeps both identities and seeks intake/depletion on the 
  assert.match(document.querySelector('.shared-resource-totals').textContent,/Same name—.*bbbbbbbb/)
 })
 
+test('per-patch intake follows replay time and selecting an opponent meal follows that fly',async()=>{
+ const scene={flies:[{id:'a',name:'Alpha',color:'mint'},{id:'b',name:'Beta',color:'amber'}],food:[{id:'food-0',initial:2},{id:'food-1',initial:2}]}
+ const frames=[{tick:0,time:0,food:[2,2],scores:[0,0]},{tick:10000,time:1,food:[1,2],scores:[1,0]},{tick:20000,time:2,food:[.5,2],scores:[1,.5]},{tick:30000,time:3,food:[.5,1],scores:[2,.5]}]
+ const events=[{type:'intake',tick:25000,slot:0,food:1,amount:1},{type:'intake',tick:15000,slot:1,food:0,amount:.5},{type:'intake',tick:10000,slot:0,food:0,amount:1}]
+ const actions=[],props={scene,frames,events,frame:frames[1],onSeek:t=>actions.push(['seek',t]),onObserveSlot:s=>actions.push(['observe',s])}
+ const row=id=>document.querySelector(`[data-food-shares="${id}"]`)
+ await mount(SharedResources,props)
+ assert.match(row('food-0').textContent,/1\.000.*0\.000/)
+ assert.ok(!row('food-0').textContent.includes('Both have fed'))
+ assert.equal(row('food-0').querySelectorAll('button')[1].disabled,true)
+ assert.match(row('food-1').textContent,/0\.000.*0\.000/,'future meals stay out of current allocation')
+ await mount(SharedResources,{...props,frame:frames[2]})
+ assert.match(row('food-0').textContent,/Both have fed here/)
+ await act(async()=>row('food-0').querySelectorAll('button')[1].click())
+ assert.deepEqual(actions,[['observe',1],['seek',2]],'select the actual contestant and first recorded frame after its intake')
+ await mount(SharedResources,{...props,frame:frames[3]})
+ assert.match(row('food-1').textContent,/1\.000.*0\.000/)
+ await mount(SharedResources,{...props,events:events.slice(1)})
+ assert.match(document.querySelector('.shared-food-table').textContent,/Complete per-patch intake events are unavailable/)
+ assert.ok([...row('food-0').querySelectorAll('button')].every(b=>b.disabled&&b.textContent==='—'))
+ await mount(SharedResources,{...props,events:events.map(e=>({...e,food:undefined}))})
+ assert.ok([...row('food-0').querySelectorAll('button')].every(b=>b.textContent==='—'))
+})
+
 test('observing the opponent switches body and brain together without changing the design selection',async()=>{
  const canvasFile=require.resolve('./src/ArenaCanvas.js')
  require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:props=>React.createElement('div',{'data-observed-body':props.selectedId,'data-following':String(props.followSelected)})}}

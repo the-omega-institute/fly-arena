@@ -1,4 +1,4 @@
-import type {Frame,Scene} from '../../types'
+import type {Frame,ReplayEvent,Scene} from '../../types'
 
 export const finiteResource=(value:unknown):number|null=>typeof value==='number'&&Number.isFinite(value)&&value>=0?value:null
 export function resourceTotal(values:unknown[]|undefined,count:number):number|null{
@@ -30,4 +30,27 @@ export function resourcePath(frames:Frame[],read:(f:Frame)=>number|null,total:nu
     const point=`${((f.time-start)/(end-start)*600).toFixed(2)},${(96-value/total*88).toFixed(2)}`
     const part=(connected?'L':'M')+point;connected=true;return part
   }).join(' ')
+}
+
+/** Attribute intake only when the event ledger accounts for the final scores.
+ * Missing food/slot metadata must not become invented per-patch zeroes. */
+export function resourceShares(scene:Scene,frames:Frame[],events:ReplayEvent[]|undefined,tick:number){
+  const last=frames.at(-1)
+  if(!events||!last||!Number.isFinite(tick)||!Number.isFinite(last.tick))return null
+  const intake=events.filter(e=>e.type==='intake')
+  if(intake.some(e=>!Number.isInteger(e.tick)||e.tick<0||e.tick>last.tick||
+    !Number.isInteger(e.slot)||e.slot!<0||e.slot!>=scene.flies.length||
+    typeof e.food!=='number'||!Number.isInteger(e.food)||e.food<0||e.food>=scene.food.length||finiteResource(e.amount)===null))return null
+  const finalScores=scene.flies.map(()=>0),finalFood=scene.food.map(()=>0)
+  const shares=scene.food.map(()=>({amounts:scene.flies.map(()=>0),firstTicks:scene.flies.map<number|null>(()=>null)}))
+  for(const e of intake){
+    const food=e.food as number,slot=e.slot!,amount=e.amount!
+    finalScores[slot]+=amount;finalFood[food]+=amount
+    if(e.tick>tick)continue
+    shares[food].amounts[slot]+=amount
+    if(amount>0)shares[food].firstTicks[slot]=Math.min(shares[food].firstTicks[slot]??e.tick,e.tick)
+  }
+  if(finalScores.some((v,i)=>finiteResource(last.scores?.[i])===null||Math.abs(v-last.scores![i])>1e-5)||
+    finalFood.some((v,i)=>finiteResource(scene.food[i].initial)===null||finiteResource(last.food?.[i])===null||Math.abs(scene.food[i].initial-last.food![i]-v)>1e-5))return null
+  return shares.map(row=>({...row,firstTimes:row.firstTicks.map(t=>t===null?null:frames.find(f=>f.tick>=t)?.time??null)}))
 }
