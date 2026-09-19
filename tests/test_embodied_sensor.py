@@ -98,6 +98,10 @@ def test_real_physics_records_inputs_and_encoder_manifest(tmp_path):
     out=tmp_path/'run';receipt=simulate(request,[fly],out,data=data,var=var)
     assert verify(out)['status']=='verified'
     scene=json.loads((out/'scene.json').read_text());frames=json.loads((out/'frames.json').read_text())
+    result=json.loads((out/'result.json').read_text())
+    events=json.loads((out/'events.json').read_text())
+    assert result['food_contact_ticks']==[[e['tick'] for e in events if e['type']=='food_contact' and e['slot']==0]]
+    assert result['intake_ticks']==[[e['tick'] for e in events if e['type']=='intake' and e['slot']==0]]
     assert scene['sensory_encoder']==EmbodiedSensor(graph).manifest
     assert receipt['runtime']['sensory_profile']==PROFILE
     for frame in frames[1:]:

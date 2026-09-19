@@ -201,6 +201,23 @@ def verify(folder: Path, *, expected_request: dict | None = None,
         else:
             raise ValueError("Unknown event type")
     initial = np.array([f["initial"] for f in scene["food"]])
+    # New runner results expose the event clocks explicitly.  Validate them
+    # against the immutable ledger when present, while accepting older
+    # receipts that only had the fly-to-fly ``contact_ticks`` counter.
+    if "food_contact_ticks" in result:
+        expected_food_contacts = [[] for _ in range(n)]
+        for event in events:
+            if event["type"] == "food_contact":
+                expected_food_contacts[event["slot"]].append(event["tick"])
+        if result["food_contact_ticks"] != expected_food_contacts:
+            raise ValueError("Food contact history differs from event ledger")
+    if "intake_ticks" in result:
+        expected_intakes = [[] for _ in range(n)]
+        for event in events:
+            if event["type"] == "intake":
+                expected_intakes[event["slot"]].append(event["tick"])
+        if result["intake_ticks"] != expected_intakes:
+            raise ValueError("Intake history differs from event ledger")
     if np.any(eaten > initial + 1e-7) or not np.allclose(initial - eaten, result["food_remaining"], atol=1e-7):
         raise ValueError("Food conservation failed")
     if not np.allclose(scores, result["scores"], atol=1e-7) or not np.allclose(scores, frames[-1]["scores"], atol=1e-5):

@@ -125,6 +125,12 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                "sensory_profile": request.sensory_profile} for _ in flies]
     sensory_latches = [{"odor": False, "visual": False, "touch": False} for _ in flies]
     contact_ticks = 0
+    # These are food-contact observations, kept separate from ``contact_ticks``
+    # which counts fly-to-fly physical contact in sumo/contest matches.  Store
+    # the event ticks in the result as well as events.json so API consumers do
+    # not have to guess which contact a legacy field meant.
+    food_contact_ticks = [[] for _ in flies]
+    intake_ticks = [[] for _ in flies]
     last_contact = False
     duration_ticks = request.duration_seconds * 10000
     consumption = np.zeros((len(flies), len(remaining)))
@@ -210,6 +216,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                                "mouth_distance": mouth_distance,
                                "food": contact_food,
                                "observation": "mujoco_food_contact"})
+                food_contact_ticks[slot].append(bodies.tick)
             sensory_latches[slot]["touch"] = bool(touch)
             if v2:
                 backend = backends[slot]
@@ -281,6 +288,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                     if consumption[slot, food] > 0:
                         events.append({"type": "intake", "tick": bodies.tick, "slot": slot,
                                        "food": food, "amount": float(consumption[slot, food])})
+                        intake_ticks[slot].append(bodies.tick)
             consumption.fill(0)
             snapshot()
             if progress:
@@ -293,6 +301,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             if consumption[slot, food] > 0:
                 events.append({"type": "intake", "tick": bodies.tick, "slot": slot,
                                "food": food, "amount": float(consumption[slot, food])})
+                intake_ticks[slot].append(bodies.tick)
     if frames[-1]["tick"] != bodies.tick:
         snapshot()
     for slot, brain in enumerate(brains):
@@ -301,7 +310,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     write_json(output / "frames.json", frames)
     write_json(output / "events.json", events)
     write_json(output / "result.json", {"scores": scores.tolist(), "exit_ticks": exit_ticks,
-               "final_tick": bodies.tick, "food_remaining": remaining.tolist(), "contact_ticks": contact_ticks})
+               "final_tick": bodies.tick, "food_remaining": remaining.tolist(),
+               "contact_ticks": contact_ticks,
+               "food_contact_ticks": food_contact_ticks,
+               "intake_ticks": intake_ticks})
     receipt = {"schema": REPLAY_RECEIPT, "replay_policy": dict(POLICY), "request": request.model_dump(),
                "flies": scene["flies"], "connectome_sha256": graph.manifest["sha256"],
                "neuron_count": graph.n, "edge_count": graph.e,
