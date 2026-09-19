@@ -2,6 +2,7 @@ import math
 
 import mujoco as mj
 import numpy as np
+import pytest
 
 from flyarena.body import Bodies
 from flyarena.scenarios import MAPS, scenario
@@ -154,6 +155,47 @@ def test_food_touch_is_read_from_mujoco_contact_buffer():
     food = bodies.food_geom_ids["food-0"]
     assert any({int(c.geom1), int(c.geom2)} == {mouth, food} and c.dist <= 0
                for c in bodies.data.contact)
+
+
+def visual_fixture(x, y, yaw=0., obstacles=()):
+    scene = scenario("orchard", 42)
+    scene["spawns"] = [[0, 0, yaw]]
+    scene["obstacles"] = list(obstacles)
+    # Rotate the entire target with the fly, retaining its head-local side.
+    scene["food"] = [{**scene["food"][0], "position": [
+        x * np.cos(yaw) - y * np.sin(yaw),
+        x * np.sin(yaw) + y * np.cos(yaw), .15]}]
+    return Bodies(scene, 1, 42)
+
+
+@pytest.mark.parametrize("yaw", [0., np.pi / 2, np.pi])
+def test_visual_channels_follow_head_left_right_under_rotation(yaw):
+    left = visual_fixture(7., 4., yaw).visual_food(0, np.array([10.]))
+    right = visual_fixture(7., -4., yaw).visual_food(0, np.array([10.]))
+    assert 0 < left[1] < left[0] < 1
+    assert 0 < right[0] < right[1] < 1
+    np.testing.assert_allclose(left, right[::-1], atol=1e-6)
+
+
+def test_visual_binocular_front_and_depleted_or_rear_food():
+    body = visual_fixture(7., 0.)
+    signal = body.visual_food(0, np.array([10.]))
+    assert min(signal) > 0
+    np.testing.assert_allclose(signal[0], signal[1], atol=1e-6)
+    np.testing.assert_allclose(body.visual_food(0, np.array([5.])), np.array(signal) / 2)
+    assert body.visual_food(0, np.array([0.])) == [0., 0.]
+    assert visual_fixture(-7., 0.).visual_food(0, np.array([10.])) == [0., 0.]
+
+
+def test_occluding_one_visual_origin_does_not_reassign_its_signal():
+    clear = visual_fixture(7., 0.)
+    target = clear.data.geom_xpos[next(iter(clear.food_geom_ids.values()))]
+    origin = clear.antennae(0)[0]
+    obstacle = {"position": ((origin + target) / 2).tolist(), "size": [.1, .1, .1]}
+    blocked = visual_fixture(7., 0., obstacles=[obstacle])
+    signal = blocked.visual_food(0, np.array([10.]))
+    assert signal[0] == 0
+    assert signal[1] == pytest.approx(clear.visual_food(0, np.array([10.]))[1])
 
 
 def test_enclosure_has_a_continuous_physical_perimeter_and_clear_spawns():
