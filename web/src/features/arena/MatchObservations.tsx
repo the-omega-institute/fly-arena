@@ -5,7 +5,7 @@ import {FeedingHistory} from './FeedingHistory'
 import {useEffect,useMemo,useState} from 'react'
 import {ArrowDownToLine,AudioLines,GitBranch} from 'lucide-react'
 import {api} from '../../api'
-import type {Fly,Frame,Match,ReplayEvent,ReplayParticipant,Scene,Season,NeuralGraph,Spec} from '../../types'
+import type {Fly,Frame,Match,ReplayEvent,ReplayParticipant,Scene,Season,NeuralGraph,BrainDesignGraph,Spec} from '../../types'
 import {colors} from '../../types'
 import {useI18n} from '../../shared/i18n'
 import {BrainActivityOverview} from './BrainActivityOverview'
@@ -48,8 +48,8 @@ type Graph=NeuralGraph
 type ReplayReceipt={replay_policy?:{event_ticks?:number};schema?:string;sha256?:string;connectome_sha256?:string;neuron_count?:number;edge_count?:number;request?:{bridge_profile?:string;sensory_profile?:string};runtime?:{rules?:{id?:string;feeding_contact?:string;physics_dt?:number;sense_ticks?:number};machine?:string;python?:string;mujoco?:string;bridge_profile?:string;readout_weights_sha256?:string;model?:{id?:string};sensory_profile?:{id?:string}}}
 type BrainView='region'|'class'|'local'
 
-export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,nodeScale}:{frame?:Frame;frames:Frame[];season:Season|null;fly?:ReplayParticipant;slot:number;events:ReplayEvent[];activityScale:number;nodeScale:number;onSeek:(time:number)=>void}) {
-  const {t,locale}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null); const [selectedEvent,setSelectedEvent]=useState<ReplayEvent|null>(null); const [responseMs,setResponseMs]=useState(100)
+export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activityScale,nodeScale,matchId}:{matchId?:string;frame?:Frame;frames:Frame[];season:Season|null;fly?:ReplayParticipant;slot:number;events:ReplayEvent[];activityScale:number;nodeScale:number;onSeek:(time:number)=>void}) {
+  const {t,locale}=useI18n(); const [circuit,setCircuit]=useState('olfactory'); const [graph,setGraph]=useState<Graph|null>(null); const [designWeights,setDesignWeights]=useState(false); const [view,setView]=useState<BrainView>('region'); const [selectedClass,setSelectedClass]=useState<string|null>(null); const [selectedEvent,setSelectedEvent]=useState<ReplayEvent|null>(null); const [responseMs,setResponseMs]=useState(100)
   const circuits=season?.connectome.circuits||[]; const sample=frame?.brain?.[slot];
   const sampleIds=useMemo(()=>{
     const ids=(sample?.sampled_nodes||sample?.top_nodes||[]).map(node=>node.id).filter(Boolean)
@@ -60,7 +60,25 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
   // Match-list polling creates fresh objects. Equal recorded graph content
   // must not clear the neuron/class the user is inspecting every 2.5 seconds.
   const frozenGraphContent=useMemo(()=>JSON.stringify(frozenGraph??null),[frozenGraph])
-  useEffect(()=>{let active=true;setGraph(null);setSelectedClass(null);if(frozenGraphContent!=='null'){setGraph(JSON.parse(frozenGraphContent) as Graph);return()=>{active=false}}const query='/connectome/neurons?circuit='+encodeURIComponent(circuit)+(sampleIds?'&ids='+encodeURIComponent(sampleIds)+'&limit=80':'&limit=80');api<Graph>(query).then(v=>{if(active)setGraph(v)}).catch(()=>{if(active)setGraph(null)});return()=>{active=false}},[circuit,sampleIds,frozenGraphContent])
+  useEffect(()=>{
+    let active=true;const controller=new AbortController();setGraph(null);setSelectedClass(null);setDesignWeights(false)
+    if(frozenGraphContent!=='null'){setGraph(JSON.parse(frozenGraphContent) as Graph);setDesignWeights(true);return()=>{active=false;controller.abort()}}
+    const query='/connectome/neurons?circuit='+encodeURIComponent(circuit)+(sampleIds?'&ids='+encodeURIComponent(sampleIds)+'&limit=80':'&limit=80')
+    async function load(){
+      if(matchId&&fly&&sampleIds){
+        try{
+          const snapshot=await api<BrainDesignGraph>('/matches/'+encodeURIComponent(matchId)+'/brain/'+slot+'?ids='+encodeURIComponent(sampleIds),{signal:controller.signal})
+          if(snapshot.artifact_id!==fly.artifact_id||snapshot.connectome_sha256!==fly.spec.connectome_sha256)throw new Error('Replay brain identity mismatch')
+          if(!snapshot.circuits[circuit])throw new Error('Replay circuit unavailable')
+          if(active){setGraph(snapshot.circuits[circuit]);setDesignWeights(true)}
+          return
+        }catch{if(!active)return}
+      }
+      try{const value=await api<Graph>(query,{signal:controller.signal});if(active)setGraph(value)}catch{if(active)setGraph(null)}
+    }
+    void load();return()=>{active=false;controller.abort()}
+  },[circuit,sampleIds,frozenGraphContent,matchId,slot,fly?.artifact_id,fly?.spec.connectome_sha256])
+
   const activity=useMemo(()=>new Map((sample?.sampled_nodes||sample?.top_nodes||[]).map(n=>[n.id,n.activity])),[sample])
   const mutations=fly?.spec?.weight_mutations; const edited=Array.isArray(mutations)&&mutations.some(m=>m.selector===circuit)
   const nodes=graph?.neurons||[]; const classes=useMemo(()=>{const groups=new Map<string,{count:number;recorded:number;active:number;peak:number|null}>();for(const node of nodes){const key=node.class||node.type||'unannotated';const prior=groups.get(key)||{count:0,recorded:0,active:0,peak:null};const value=activity.get(node.id);prior.count+=1;if(value!==undefined&&Number.isFinite(value)){prior.recorded+=1;prior.active+=value>0?1:0;prior.peak=Math.max(prior.peak??0,value)}groups.set(key,prior)}return [...groups.entries()].sort((a,b)=>(b[1].peak??-1)-(a[1].peak??-1))},[nodes,activity]);
@@ -75,6 +93,7 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
     {view==='region'&&<div className="brain-region-summary"><div><strong>{t(circuits.find(c=>c.id===circuit)?.label||circuit)}</strong><span>{t('Recorded functional region')}</span></div><div><strong>{season?.connectome.circuits.find(c=>c.id===circuit)?.neuron_count?.toLocaleString()||'—'}</strong><span>{t('canonical neurons')}</span></div><div><strong>{nodes.filter(n=>activity.has(n.id)).length}</strong><span>{t('sampled in this frame')}</span></div><button onClick={()=>setView('class')}>{t('Open neuron classes')} →</button></div>}
     {view==='class'&&<div className="brain-class-list">{classes.length?classes.map(([name,summary])=><button key={name} className={selectedClass===name?'active':''} onClick={()=>{setSelectedClass(name);setView('local')}}><span><strong>{name}</strong><small>{summary.recorded}/{summary.count} {locale==='zh-CN'?'已记录':'recorded'} · {summary.active} {t('active')}</small></span><b>{summary.peak===null?'—':summary.peak.toFixed(2)}</b></button>):<p className="empty">{t('No annotated neuron classes in this sample.')}</p>}</div>}
     {view==='local'&&<div className="brain-local-heading"><span>{selectedClass||t('All displayed classes')}</span><button onClick={()=>setView('class')}>{t('Back to classes')}</button></div>}
+    {view==='local'&&graph&&!designWeights&&<p className="training-hint">{locale==='zh-CN'?'当前显示基础连接结构；这份回放的设计权重尚未载入。活动仍来自实际回放记录。':'Showing canonical connection structure; this replay’s design weights are unavailable. Activity still comes from the recorded replay.'}</p>}
     {view==='local'&&(graph?<LocalBrainGraph graph={graph} activity={activity} scale={nodeScale} selectedClass={selectedClass}/>:<p className="empty">{t('Loading canonical neuron sample…')}</p>)}
     <div className="sensory-strip"><div><span>{t('Sensory profile')}</span><strong>{frame?.senses?.[slot]?.sensory_profile||'odor-only-v1'}</strong><small>{t('Versioned neural input')}</small></div><div><span>{t('Odor L / R')}</span><strong>{frame?.senses?.[slot]?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong></div><div><span>{t('Visual L / R')}</span><strong>{frame?.senses?.[slot]?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</strong><small>{frame?.senses?.[slot]?.visual_status?.includes('engineered')?t('geometric observation'):''}</small></div><div><span>{t('Touch')}</span><strong>{frame?.senses?.[slot]?.touch?'ON':'—'}</strong><small>{frame?.senses?.[slot]?.touch_status?.includes('mujoco')?t('MuJoCo contact observation'):''}</small></div><div><span>{t('Nearest food')}</span><strong>{frame?.senses?.[slot]?.nearest_food==null?'—':frame.senses[slot].nearest_food.toFixed(1)+' mm'}</strong></div></div>
     {frame?.senses?.[slot]?.contact_environment!==undefined&&<div className="sensory-strip"><div><span>{t('Contacted environment')}</span><strong>{frame.senses[slot].contact_environment?.join(' · ')||t('No contact')}</strong><small>{t('Ground support excluded')}</small></div><div><span>{t('Tactile population activity')}</span><strong>{frame.senses[slot].tactile_activity==null?'—':frame.senses[slot].tactile_activity.toFixed(3)}</strong><small>{t('Recorded population mean · model activity')}</small></div></div>}
@@ -140,7 +159,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     return <div className="observation-participant" key={entry?.id||index}>
       <div className="observation-participant-heading"><span><i style={{background:color}}/>{t('Slot')} {index+1} · {entry?.name}</span><small>{entry?.id.slice(0,8)}</small></div>
       {match&&<ReplayDesignActions participant={match.participants?.find(f=>f.id===entry.id)} matchId={match.id} onDesign={onDesignReplay}/>}
-      <BrainTheater frame={frame} frames={frames} season={season} fly={subjectFly} slot={index} events={visibleEvents} onSeek={onSeek} activityScale={activityScales.region} nodeScale={activityScales.node}/>
+      <BrainTheater matchId={match?.id} frame={frame} frames={frames} season={season} fly={subjectFly} slot={index} events={visibleEvents} onSeek={onSeek} activityScale={activityScales.region} nodeScale={activityScales.node}/>
       <FeedingHistory events={events} scene={scene} slot={index} endTime={frames.at(-1)?.time??0} time={frame?.time??0} physicsDt={receipt?.runtime?.rules?.physics_dt??null} accountingTicks={receipt?.replay_policy?.event_ticks??null} onSeek={onSeek}/>
       <BehaviorFitness metric={match?.result?.behavior?.[index]}/>
       <BehaviorChapters scene={scene} frame={frame} frames={frames} events={visibleEvents} slot={index} time={frame?.time??0} onSeek={onSeek}/>

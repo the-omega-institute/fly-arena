@@ -325,6 +325,49 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         owned_training(ident, owner)
         return training.publish(ident,owner['id'])
 
+    def replay_designs(match):
+        if match is None or 'participants' in match:
+            return match
+        artifacts = match.get('artifacts')
+        if not isinstance(artifacts, list) or len(artifacts) != len(match['request']['fly_ids']):
+            return match
+        participants = []
+        for slot, fly_id in enumerate(match['request']['fly_ids']):
+            fly = store.fly(fly_id)
+            if fly is None or fly['artifact_id'] != artifacts[slot]:
+                continue
+            participants.append({key: fly[key] for key in ('id', 'name', 'color', 'artifact_id', 'spec')}
+                                | {'report': {key: fly['report'][key] for key in ('budget_used', 'budget_limit') if key in fly['report']}})
+        return {**match, 'participants': participants}
+
+    @lru_cache(maxsize=8)
+    def compiled_neighborhood(artifact_id, spec_json, sample_ids):
+        from .brain_graph import build
+        with compile_lock:
+            return build(compiler().graph, compiler(), {'artifact_id': artifact_id, 'spec': json.loads(spec_json)}, sample_ids, store.root)
+
+    @app.get('/api/v1/matches/{ident}/brain/{slot}')
+    def match_brain(ident: str, slot: int, ids: str = Query(min_length=1, max_length=8192)):
+        match = replay_designs(store.match(ident) or training.gallery_match(ident) or training.bundled_replay_match(ident))
+        if match is None:
+            raise HTTPException(404, 'Match not found')
+        if match['status'] != 'verified':
+            raise HTTPException(409, 'Verified replay is not ready')
+        if slot < 0 or slot >= len(match['request']['fly_ids']):
+            raise HTTPException(404, 'Participant not found')
+        samples = tuple(sorted(ids.split(',')))
+        if len(samples) > 200 or len(set(samples)) != len(samples) or not all(samples):
+            raise ValueError('Provide up to 200 distinct neuron IDs')
+        participant = next((p for p in match.get('participants', []) if p['id'] == match['request']['fly_ids'][slot]), None)
+        if participant is None:
+            raise HTTPException(409, 'Recorded participant design is unavailable')
+        snapshot = participant.get('brain_graph')
+        if snapshot and snapshot['artifact_id'] == participant['artifact_id'] and snapshot['connectome_sha256'] == participant['spec']['connectome_sha256']:
+            return snapshot
+        if store.match(ident) is None:
+            raise HTTPException(404, 'Bundled brain graph is unavailable')
+        return compiled_neighborhood(participant['artifact_id'], json.dumps(participant['spec'], sort_keys=True), samples)
+
     @app.get("/api/v1/matches")
     def matches():
         result=store.matches()
@@ -335,7 +378,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         for item in training.gallery_matches()+training.bundled_replay_matches():
             if item['id'] not in seen:
                 result.append(item);seen.add(item['id'])
-        return result
+        return [replay_designs(match) for match in result]
 
     @app.post("/api/v1/matches", status_code=202)
     def match_create(body: MatchRequest, owner: dict = Depends(identity),
@@ -354,7 +397,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         result = store.match(ident) or training.gallery_match(ident) or training.bundled_replay_match(ident)
         if result is None:
             raise HTTPException(404, "Match not found")
-        return result
+        return replay_designs(result)
 
     @app.get("/api/v1/matches/{ident}/{artifact}")
     def evidence(ident: str, artifact: str):
