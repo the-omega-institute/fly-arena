@@ -573,6 +573,7 @@ test('legacy neural preview announces missing paired protocol without inventing 
 test('motor commands follow preview time and stimulus while missing motor samples remain blank',async()=>{
  const record=neuralRecord();record.data.schema='neural-design-preview/v3'
  record.data.motor_readout={available:true,id:'descending-ridge-v1'}
+ record.data.example.same_motor_readout_as_related_match=false
  for(const [trial,row] of record.data.stimuli.entries())for(const [i,sample] of row.samples.entries()){
   sample.motor={raw:[i/10,-.2],clipped:[i/10,0],drive:[i/100+trial/10,0]}
   sample.reference_motor={raw:[.5,.4],clipped:[.5,.4],drive:[.03,.02]}
@@ -591,6 +592,7 @@ test('motor commands follow preview time and stimulus while missing motor sample
  await mount(NeuralPreviewPanel,{record:{...record},stale:false,circuits:[],onImport:noop,onReplay:noop})
  assert.match(drive(),/—0\.030/)
  assert.match(document.body.textContent,/not speeds or observed turns/)
+ assert.match(document.body.textContent,/different motor decoder calibration/)
  assert.equal(document.querySelectorAll('.stimulus-preview__motor svg').length,2)
 })
 

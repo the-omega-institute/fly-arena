@@ -3170,6 +3170,8 @@
     "machine": "arm64",
     "wall_seconds": 5.72200654190965,
     "scope": "Recorded example of this exact Nectar design, not the current editor draft",
-    "recording": "new v3 observation with frozen motor readout"
+    "recording": "new v3 observation with frozen motor readout",
+    "related_match_readout_sha256": "a13e98ced40f288e8054aaa33973b1c477455a5edbb8cd8d5690404f2d9d2d0f",
+    "same_motor_readout_as_related_match": false
   }
 }
