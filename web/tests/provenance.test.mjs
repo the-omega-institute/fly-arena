@@ -41,6 +41,35 @@ const {ConditionResults} = require('./src/features/training/ConditionResults.js'
 test.after(() => fs.rmSync(output, {recursive:true, force:true}))
 const render = (Component, props) => renderToStaticMarkup(React.createElement(Component, props))
 const noop = () => {}
+test('brain overview distinguishes recorded silence, missing activity and design mutations',()=>{
+  const {BrainActivityOverview}=require('./src/features/arena/BrainActivityOverview.js')
+  const circuits=['olfactory','visual','motor'].map(id=>({id,label:id,name:id,color:'#98dbc0',neuron_count:100,edge_count:10}))
+  const props={circuits,activity:{olfactory:0,visual:4},scale:10,time:1.25,
+    mutations:[{selector:'visual',scale:1.1}],onOpen:noop}
+  const html=render(BrainActivityOverview,props)
+  assert.match(html,/aria-label="olfactory: 0.00 Hz"/)
+  assert.match(html,/aria-label="motor: Not recorded"/)
+  assert.match(html,/aria-label="visual: 4.00 Hz · ×1.10"/)
+  assert.match(html,/data-activity-glow="0.4"/)
+  assert.match(textOnly(html),/1.25 s/)
+  assert.match(textOnly(html),/Positions are schematic/)
+  assert.equal((html.match(/role="button"/g)||[]).length,3)
+  assert.equal((html.match(/tabindex="0"/g)||[]).length,3)
+  const later=render(BrainActivityOverview,{...props,time:2.5,activity:{olfactory:0,visual:8}})
+  assert.match(later,/data-activity-glow="0.8"/)
+  assert.match(textOnly(later),/0–10.00 Hz/)
+  assert.match(later,/aria-label="motor: Not recorded"/)
+})
+
+test('brain overview uses unique gradient identities when participants are compared',()=>{
+  const {BrainActivityOverview}=require('./src/features/arena/BrainActivityOverview.js')
+  const props={circuits:[{id:'olfactory',label:'Olfactory',color:'#98dbc0',neuron_count:100}],activity:{olfactory:1},scale:2,onOpen:noop}
+  const html=renderToStaticMarkup(React.createElement('div',null,
+    React.createElement(BrainActivityOverview,props),React.createElement(BrainActivityOverview,props)))
+  const ids=[...html.matchAll(/<radialGradient id="([^"]+)"/g)].map(match=>match[1])
+  assert.equal(ids.length,2)
+  assert.equal(new Set(ids).size,2)
+})
 test('actual training comparison shows negative results, condition differences and incomplete status',()=>{
   const run={id:'first',status:'stopped',evaluation_context:'runtime-a',spec:{name:'Run A',strategy:'evolution',founder_id:'ancestor',opponent_id:'opponent',map_id:'ring',mode:'contest',duration_seconds:2,seed:42,bridge_profile:'legacy-v1',population:2,generations:2,max_evaluations:8,circuits:['olfactory'],mutation_strength:.08},baseline_fitness:-2,evaluations_started:2,evaluations_completed:2,evaluations_total:8,members:[{generation:0,slot:0,fitness:-2},{generation:0,slot:1,fitness:null}]};
   const second={...run,id:'second',spec:{...run.spec,name:'Run B',seed:7}};
@@ -200,7 +229,9 @@ test('observations follow the selected second fly and show its real parent and z
   assert.match(text,/Food collected0.00/)
   assert.match(text,/Energy reserve0.0/)
   assert.match(text,/Left \/ right motor drive0.00 \/ 0.00/)
-  assert.doesNotMatch(text,/123.0|99.00|88.0/)
+  assert.doesNotMatch(text,/olfactory123\.0 Hz|Food collected99\.00|Energy reserve88\.0/)
+  assert.match(html,/aria-label="olfactory: 0.00 Hz"/)
+  assert.match(text,/Activity brightness 0–123.00 Hz/) // Shared scale includes both subjects, not their displayed values.
   assert.match(text,/Compare participants/)
   assert.doesNotMatch(html,/NaN|Infinity/)
   assert.match(html,/aria-pressed="true"[^>]*>.*Slot 2 · Descendant/)
