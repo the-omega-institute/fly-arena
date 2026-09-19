@@ -163,6 +163,32 @@ test('public gallery exposes real generations and branches without starting comp
  globalThis.fetch=()=>{throw Error('Unexpected network')}
 })
 
+test('experiment guide opens recorded candidate and baseline, explains inputs and leaves missing data unknown',async()=>{
+ const {ExperimentGuide}=require('./src/features/training/ExperimentGuide.js')
+ const opened=[]
+ const match=(id,flyId,status='verified')=>({id,status,request:{fly_ids:[flyId]}})
+ const run={best_fly_id:own.id,spec:{strategy:'evolution',map_id:'orchard',seed:42,duration_seconds:10,bridge_profile:'sensorimotor-research-v2',sensory_profile:'odor-only-v1'},members:[
+  {generation:0,slot:0,fly_id:wt.id,fly:wt,matches:[match('baseline',wt.id)]},
+  {generation:1,slot:1,fly_id:own.id,fly:own,matches:[match('wrong-individual',wt.id),match('unfinished',own.id,'running'),match('best',own.id)]},
+ ]}
+ await mount(ExperimentGuide,{run,maps:[],onReplay:m=>opened.push(m.id)})
+ assert.match(document.body.textContent,/vision and touch are environment observations only/)
+ assert.match(document.body.textContent,/Kernel readout and motor transfer/)
+ assert.match(document.body.textContent,/seed 42 · 10 s/)
+ await click('Watch best individual →');await click('Watch experiment baseline →')
+ assert.deepEqual(opened,['best','baseline'])
+ const language=document.querySelector('select[aria-label="Language"]')
+ await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.body.textContent,/视觉和触觉仅作环境观察/)
+ await mount(ExperimentGuide,{run:{...run,spec:{...run.spec,sensory_profile:'engineered-contact-support-v1',bridge_profile:'legacy-v1'}},maps:[],onReplay:noop})
+ assert.match(document.body.textContent,/味觉和左右触觉输入大脑/)
+ await mount(ExperimentGuide,{run:{...run,spec:{...run.spec,sensory_profile:undefined,bridge_profile:undefined},members:[]},maps:[],onReplay:noop})
+ assert.match(document.body.textContent,/感觉输入说明不可用/)
+ assert.equal(button('观看最佳个体 →').disabled,true)
+ assert.equal(button('观看实验基线 →').disabled,true)
+ assert.ok(!document.body.textContent.includes('malecns-lif-cpu-v1'))
+})
+
 test('life record inspects a zero result, prepares branches and appends corrections without compute',async()=>{
  const {LifeLedger}=require('./src/features/life/LifeLedger.js')
  history.replaceState(null,'','#tab=life&fly='+own.id)
