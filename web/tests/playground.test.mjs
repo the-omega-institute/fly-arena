@@ -1270,3 +1270,23 @@ test('a first visitor can start a solo run, sign in once and submit exactly once
  assert.deepEqual(writes.map(w=>w.path),['/identities','/matches','/flies','/matches'])
  assert.deepEqual(writes.at(-1).body.fly_ids,['d'.repeat(32)],'run the saved child rather than the selected WT')
 });
+
+test('long maze observations distinguish failure from arrival and seek actual time',async()=>{
+ const {TaskObservation}=require('./src/features/arena/TaskObservation.js')
+ const seek=[];const match={result:{task:{id:'maze-arrival-v1',observed_seconds:180,path_length_mm:[47.5],contact_seconds:0,contact_bouts:0,arrival_seconds:null,completed:false}}}
+ await mount(TaskObservation,{match,frames:[{time:0},{time:180}],onSeek:t=>seek.push(t)})
+ assert.match(document.body.textContent,/Goal not reached during observation/)
+ assert.doesNotMatch(document.body.textContent,/First arrival at 0/)
+ await click('2:00');assert.deepEqual(seek,[120])
+ await mount(TaskObservation,{match:{result:{task:{...match.result.task,arrival_seconds:82.25,completed:true}}},frames:[{time:0},{time:180}],onSeek:t=>seek.push(t)})
+ await click('Before first arrival');assert.equal(seek.at(-1),81.75)
+ assert.match(document.body.textContent,/First arrival at 82.25 s/)
+})
+
+test('contact arena labels measured contact and the limits of the motor model',async()=>{
+ const {TaskObservation}=require('./src/features/arena/TaskObservation.js')
+ await mount(TaskObservation,{match:{result:{task:{id:'contact-territory-v1',observed_seconds:180,path_length_mm:[47.5,43],contact_seconds:8.72,contact_bouts:21}}},frames:[{time:0},{time:180}],onSeek:noop})
+ assert.match(document.body.textContent,/Physical body contact: 8.72 s/)
+ assert.match(document.body.textContent,/21 contact onsets/)
+ assert.match(document.body.textContent,/lunging, grappling and injury actions are not implemented/)
+})

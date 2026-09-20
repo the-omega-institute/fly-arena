@@ -15,12 +15,19 @@ POLICY = {
     "terminal": "initial-and-unique-final",
 }
 
+LONG_POLICY = {**POLICY, "id": "pose-20hz-events-20hz-v1", "pose_ticks": 500}
+POLICIES = [POLICY, LONG_POLICY]
+
+def recording_policy(duration_seconds: int) -> dict:
+    return dict(LONG_POLICY if duration_seconds > 30 else POLICY)
+
 def policy_metadata() -> dict:
     return dict(POLICY)
 
 def validate_policy(value: object, rules: dict) -> None:
-    if (type(value) is not dict or value.keys() != POLICY.keys() or
-            any(type(value[k]) is not type(v) or value[k] != v for k, v in POLICY.items())):
+    if not any(type(value) is dict and value.keys() == policy.keys() and
+               all(type(value[k]) is type(v) and value[k] == v for k, v in policy.items())
+               for policy in POLICIES):
         raise ValueError("Unsupported or conflicting replay policy")
     if (type(rules.get("physics_dt")) is not float or
             type(rules.get("snapshot_ticks")) is not int or

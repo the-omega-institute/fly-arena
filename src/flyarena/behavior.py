@@ -63,3 +63,33 @@ def selection_score(result, slot, objective):
         return None
     value = metric.get('fitness')
     return value if isinstance(value, (int, float)) and math.isfinite(value) else None
+
+
+def territory_slot(scene, positions):
+    """Only an uncontested thorax inside the central cylinder earns control."""
+    task = scene["task"]
+    inside = [i for i, p in enumerate(positions)
+              if math.hypot(float(p[0]), float(p[1])) <= task["control_radius_mm"]
+              and 0 <= float(p[2]) <= task["control_max_height_mm"]]
+    return inside[0] if len(inside) == 1 else None
+
+
+def task_metrics(scene, frames, events, result):
+    task = scene.get("task", {})
+    if not task:
+        return None
+    elapsed = frames[-1]["time"]
+    paths = [sum(float(np.linalg.norm(np.asarray(b["positions"][i]) - a["positions"][i]))
+                 for a, b in zip(frames, frames[1:])) for i in range(len(frames[0]["positions"]))]
+    common = {"id":task["id"], "observed_seconds":elapsed, "path_length_mm":paths,
+              "energy":task["energy"], "path_sampling_hz":round(1/(frames[1]["time"]-frames[0]["time"])),
+              "contact_seconds":result["contact_ticks"] * .0001,
+              "contact_bouts":sum(e["type"] == "contact" for e in events)}
+    if task["id"] == "maze-arrival-v1":
+        first = next((e["tick"] * .0001 for e in events if e["type"] == "food_contact"
+                      and task["goal_food"] in e.get("food", [])), None)
+        common.update(arrival_seconds=first, completed=first is not None,
+                      status="reached" if first is not None else "not_reached_in_observation")
+    else:
+        common.update(control_seconds=result["scores"], scope=task["scope"])
+    return common
