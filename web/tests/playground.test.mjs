@@ -1195,3 +1195,38 @@ test('recorded tactile fibers remain selectable without a soma position and open
  assert.ok(document.querySelector('.morphology-expanded input[aria-label="Brain and match timeline"]'))
  await click('Close expanded brain');assert.equal(document.querySelector('.morphology-expanded'),null)
 })
+
+const {brainMoments,preEventBaseline,rateChanges,responseScale,responseFrame}=require('./src/features/arena/brainResponse.js')
+test('brain event baseline excludes the event frame and missing samples, preserving increases and decreases',()=>{
+ const frame=(time,rates)=>({time,tick:Math.round(time*10000),brain:[{sampled_nodes:Object.entries(rates).map(([id,activity])=>({id,activity}))},{sampled_nodes:[{id:'10',activity:900}]}]})
+ const frames=[frame(.89,{'10':900}),frame(.9,{'10':10,'20':400,'30':0}),frame(.95,{'10':20,'20':400}),frame(1,{'10':200,'20':400}),frame(1.1,{'10':5,'20':400,'30':40})],event={type:'food_contact',tick:10000,slot:0}
+ const base=preEventBaseline(frames,event,0)
+ assert.equal(base.rates.get('10'),15);assert.equal(base.rates.get('20'),400);assert.equal(base.rates.has('30'),false)
+ assert.equal(base.count,2);assert.equal(base.start,.9);assert.equal(base.end,.95)
+ const changes=rateChanges(new Map([['10',5],['20',400],['30',40]]),base.rates)
+ assert.deepEqual(changes.map(n=>[n.id,n.delta]),[['10',-10],['20',0]])
+ assert.equal(preEventBaseline(frames,{...event,tick:0},0),null)
+ assert.equal(responseFrame(frames,event,.5),undefined,'no invented post-event sample past the recording')
+ assert.ok(responseScale(frames,event,0,base.rates)>0)
+})
+test('brain moments retain contact participants and collapse continuous intake into episode onsets',()=>{
+ const events=[{type:'intake',slot:0,food:0,tick:10000},{type:'intake',slot:0,food:0,tick:10500},{type:'intake',slot:0,food:0,tick:15000},{type:'contact',slots:[0,1],tick:17000},{type:'contact',slots:[1,2],tick:18000},{type:'food_contact',slot:1,tick:19000}]
+ assert.deepEqual(brainMoments(events,0).map(e=>e.tick),[10000,15000,17000])
+})
+test('anatomical event controls keep body time and changed fibers on the same baseline',async()=>{
+ const sha='9'.repeat(64),neurons=['10','20'].map(id=>({id,type:'sample',class:null,superclass:'cb_intrinsic',side:'L',positions:[0,0,0,1,1,1],edges:[0,1],radii:[1,1]}))
+ const morphology={schema:'connectome-morphology/v1',connectome_sha256:sha,coordinate_unit_nm:8,neurons,missing_ids:[]}
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).endsWith('/morphology')?morphology:anatomyFixture(sha)})
+ const frames=[.9,.95,1.1,1.5].map(time=>({time,tick:Math.round(time*10000),brain:[{sampled_nodes:[{id:'10',activity:time<1?0:time<1.2?20:30},{id:'20',activity:400}]}],scores:[time<1?0:1],senses:[{contact_food:time<1?[]:['food-0'],contact_environment:[]}]}))
+ const graph={neurons:neurons.map(n=>({...n,position:[0,0,0]})),edges:[]},events=[{type:'food_contact',slot:0,tick:10000}],seeks=[]
+ function Harness(){const [time,setTime]=React.useState(1.1);const f=frames.find(f=>f.time===time);return React.createElement(AnatomicalBrain,{connectome:sha,graph,events,frames,slot:0,time,activity:new Map(f.brain[0].sampled_nodes.map(n=>[n.id,n.activity])),scale:400,onSeek:value=>{seeks.push(value);setTime(value)}})}
+ await mount(Harness,{})
+ assert.equal(spatialCanvasProps.changeMode,true);assert.equal(spatialCanvasProps.activity.get('20'),0)
+ await click('Before event');assert.equal(seeks.at(-1),.95);assert.equal(spatialCanvasProps.activity.get('10'),0)
+ await click('After event 500 ms');assert.equal(seeks.at(-1),1.5);assert.equal(spatialCanvasProps.activity.get('10'),30)
+ assert.match(document.querySelector('.brain-event-lens').textContent,/Food contact · 1.00 s/)
+ await click('Recorded activity');assert.equal(spatialCanvasProps.changeMode,false);assert.equal(spatialCanvasProps.activity.get('20'),400)
+ await click('Event-related changes');assert.equal(spatialCanvasProps.activity.get('20'),0)
+ await click('Focus strongest change');assert.equal(spatialCanvasProps.zoomId,'10')
+ await click('Reset anatomical view');assert.equal(spatialCanvasProps.zoomId,null)
+})

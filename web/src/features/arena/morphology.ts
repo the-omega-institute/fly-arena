@@ -28,10 +28,10 @@ export async function loadMorphology(expected:string,signal:AbortSignal):Promise
  if(cache.size>=2)cache.delete(cache.keys().next().value!)
  cache.set(expected,data);return data
 }
-export function morphologyActivity(neurons:NeuronMorphology[],activity:Map<string,number>,scale:number,focus:string|null):Uint8Array{
+export function morphologyActivity(neurons:NeuronMorphology[],activity:Map<string,number>,scale:number,focus:string|null,changeMode=false):Uint8Array{
  const bytes=new Uint8Array(neurons.length*4)
  neurons.forEach((n,i)=>{const value=activity.get(n.id),recorded=value!==undefined&&Number.isFinite(value)
-  bytes[4*i]=recorded?Math.round(255*Math.log1p(Math.max(0,value))/Math.log1p(Math.max(1,scale,Math.max(0,value)))):0
+  bytes[4*i]=recorded?Math.round(255*(changeMode?Math.pow(Math.min(1,Math.max(0,value)/Math.max(1,scale)),1.6):Math.log1p(Math.max(0,value))/Math.log1p(Math.max(1,scale,Math.max(0,value))))):0
   bytes[4*i+1]=recorded?255:0;bytes[4*i+2]=n.id===focus?255:0;bytes[4*i+3]=255
  });return bytes
 }

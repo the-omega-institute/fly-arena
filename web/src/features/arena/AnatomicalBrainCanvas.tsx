@@ -35,9 +35,9 @@ function Connections({graph,space,focus}:{graph:NeuralGraph;space:AnatomySpace;f
   return <lineSegments><bufferGeometry key={focus??'none'}><bufferAttribute attach="attributes-position" args={[lines.positions,3]}/><bufferAttribute attach="attributes-color" args={[lines.colors,3]}/></bufferGeometry><lineBasicMaterial vertexColors transparent opacity={.8}/></lineSegments>
 }
 
-export function AnatomicalBrainCanvas({space,nodes,graph,focus,onFocus,scale,angle,reset,morphology,activity,structure=false,wholeCns=false}:{space:AnatomySpace;nodes:SpatialNode[];graph:NeuralGraph;focus:string|null;onFocus:(id:string)=>void;scale:number;angle:BrainAngle;reset:number;morphology?:Morphology;activity?:Map<string,number>;structure?:boolean;wholeCns?:boolean}){
+export function AnatomicalBrainCanvas({space,nodes,graph,focus,onFocus,scale,angle,reset,morphology,activity,structure=false,wholeCns=false,changeMode=false,recordedIds,zoomId}:{space:AnatomySpace;nodes:SpatialNode[];graph:NeuralGraph;focus:string|null;onFocus:(id:string)=>void;scale:number;angle:BrainAngle;reset:number;morphology?:Morphology;activity?:Map<string,number>;structure?:boolean;wholeCns?:boolean;changeMode?:boolean;recordedIds?:string[];zoomId?:string|null}){
   const neighbors=new Set(graph.edges.filter(e=>e.pre===focus||e.post===focus).flatMap(e=>[e.pre,e.post]))
-  if(morphology&&activity)return <MorphologyCanvas data={morphology} activity={activity} focus={focus} onFocus={id=>{if(graph.neurons.some(n=>n.id===id))onFocus(id)}} scale={scale} angle={angle} reset={reset} structure={structure} wholeCns={wholeCns}/>
+  if(morphology&&activity)return <MorphologyCanvas zoomId={zoomId} recordedIds={recordedIds} changeMode={changeMode} data={morphology} activity={activity} focus={focus} onFocus={id=>{if(graph.neurons.some(n=>n.id===id))onFocus(id)}} scale={scale} angle={angle} reset={reset} structure={structure} wholeCns={wholeCns}/>
   return <Canvas frameloop="demand" dpr={[1,1.5]} camera={{position:[1.3,.7,2],near:.01,far:30,fov:42}} gl={{antialias:true,alpha:false}}>
     <color attach="background" args={['#10241f']}/>
     <points raycast={()=>{}}><bufferGeometry><bufferAttribute attach="attributes-position" args={[space.positions,3]}/></bufferGeometry><pointsMaterial color="#82968a" size={1.3} sizeAttenuation={false} transparent opacity={.08} depthWrite={false}/></points>
