@@ -59,6 +59,8 @@ def test_territory_requires_exclusive_occupancy_not_a_food_score():
     assert territory_slot(scene,[[1,0,1],[-1,0,1]]) is None
     assert territory_slot(scene,[[1,0,4],[-1,0,1]])==1
     assert territory_slot(scene,[[4,0,1],[-4,0,1]]) is None
+    assert territory_slot(scene,[[3.000004,0,1],[4,0,1]])==0
+    assert territory_slot(scene,[[3.000006,0,1],[4,0,1]]) is None
 
 
 def test_long_replay_preserves_real_endpoint_and_neural_clock(receipt_factory):

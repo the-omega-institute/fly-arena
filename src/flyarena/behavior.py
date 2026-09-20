@@ -68,6 +68,9 @@ def selection_score(result, slot, objective):
 def territory_slot(scene, positions):
     """Only an uncontested thorax inside the central cylinder earns control."""
     task = scene["task"]
+    # Score the same 1e-5 mm positions exported in body snapshots.
+    # Otherwise a rounded boundary crossing could disagree with the replay.
+    positions = np.round(np.asarray(positions, dtype=float), 5)
     inside = [i for i, p in enumerate(positions)
               if math.hypot(float(p[0]), float(p[1])) <= task["control_radius_mm"]
               and 0 <= float(p[2]) <= task["control_max_height_mm"]]
