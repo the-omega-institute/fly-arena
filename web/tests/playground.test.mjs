@@ -271,7 +271,7 @@ for(const supportsSenses of [true,false])test(`training controls retain selected
   const objective=document.getElementById('training-fitness-objective');assert.equal(objective.options.length,supportsSenses?2:1);
   if(supportsSenses)await act(async()=>{objective.value='sustained-foraging-v1';objective.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
   const duration=[...document.querySelectorAll('.training-setup label')].find(el=>el.textContent.startsWith('Seconds per evaluation')).querySelector('select');
-  assert.equal(duration.value,'1');assert.match(document.querySelector('.training-workload').textContent,/Planned simulation time4 s/);
+  assert.equal(duration.value,'5');assert.match(document.querySelector('.training-workload').textContent,/Planned simulation time20 s/);
   await act(async()=>{duration.value='10';duration.dispatchEvent(new dom.window.Event('change',{bubbles:true}))});
   assert.match(document.querySelector('.training-workload').textContent,/Planned simulation time40 s/);
   assert.equal(posted,undefined,'Changing observation duration must not submit work');
@@ -1126,4 +1126,25 @@ test('an event opens the responding neuron with its actual weights and retains f
  assert.equal(document.querySelector('select[aria-label="Focus neuron"]').value,'b')
  assert.match(document.querySelector('.local-brain-node-details').textContent,/30.00 Hz/)
  await click('View response sample · 1.10 s');assert.equal(seeks.at(-1),1.1)
+})
+
+test('research offspring retains kernel senses in playable unranked match setup',async()=>{
+ const canvasFile=require.resolve('./src/ArenaCanvas.js')
+ require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:()=>null}}
+ delete require.cache[require.resolve('./src/features/arena/ArenaFeature.js')]
+ const {ArenaFeature}=require('./src/features/arena/ArenaFeature.js')
+ const {compatibleSensory,defaultMatchProfile}=require('./src/types.js')
+ const kernel='sensorimotor-research-v2',senses='engineered-kernel-contact-v1';let submitted=0
+ const season={connectome:{circuits:[]},match_profiles:[{id:kernel,name:'Research',ready:false,sandbox_ready:true,sensory_profiles:['odor-only-v1',senses]}],sensory_profiles:[{id:senses,name:'Kernel contact',ready:true},{id:'legacy-touch',ready:true}]}
+ assert.equal(defaultMatchProfile(season),kernel)
+ assert.equal(compatibleSensory(season,kernel,senses),true)
+ assert.equal(compatibleSensory(season,kernel,'legacy-touch'),false)
+ const props={scene:null,frame:null,next:null,alpha:0,focused:'',preview:null,selectedFly:own,chosenMap:null,current:null,selected:own.id,identity:null,flies:[own,wt],frames:[],events:[],play:false,playtime:0,playbackSpeed:1,season,matches:[],maps:[],mapId:'enclosure',mode:'contest',opponent:wt.id,duration:20,seed:42,busy:'',bridgeProfile:kernel,sensoryProfile:senses,replayStatus:'idle',replayError:'',startMatch:()=>submitted++}
+ for(const key of ['setSelected','setSensoryProfile','setBridgeProfile','setPlay','setPlaytime','setPlaybackSpeed','setFocused','setMapId','setMode','setOpponent','setDuration','setSeed','startSeries'])props[key]=noop
+ await mount(ArenaFeature,props)
+ const select=document.querySelector('select[aria-label="Sensory input profile"]')
+ assert.equal(select.disabled,false);assert.equal(select.value,senses)
+ assert.deepEqual([...select.options].map(o=>o.value),['odor-only-v1',senses])
+ assert.match(document.body.textContent,/Results stay outside the public leaderboard/)
+ await click('Start match');assert.equal(submitted,1)
 })

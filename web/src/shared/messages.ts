@@ -509,6 +509,7 @@ export const catalog = {"Sustained foraging":{"en": "Sustained foraging", "zh-CN
     "en": "Connect your AI",
     "zh-CN": "接入你的 AI"
   },
+  "Research playground: real connectome structure with modeled neural dynamics, sensory encoding and gait control. Choose an optimizer between generations; experimental vision, taste and touch depend on the selected setup. Within-match learning is not enabled.": {"en": "Research playground: real connectome structure with modeled neural dynamics, sensory encoding and gait control. Choose an optimizer between generations; experimental vision, taste and touch depend on the selected setup. Within-match learning is not enabled.", "zh-CN": "研究沙箱：真实连接组结构配合建模的神经动力学、感觉编码与步态控制。可选择跨代优化算法；实验性视觉、味觉与触觉取决于所选方案。比赛中尚未启用在线学习。"},
   "研究预览：完整保留图采用简化 LIF 动力学；当前输入为双侧气味，运动读出与步态控制器固定。视觉与学习尚未接入。权重变化的行为效果需通过比赛验证。": {
     "en": "Research preview: simplified LIF dynamics on the retained connectome. Bilateral odor input with fixed motor readout and gait controller. Vision and learning are unavailable. Behavioral effects require matched-trial evidence.",
     "zh-CN": "研究预览：完整保留图采用简化 LIF 动力学；当前输入为双侧气味，运动读出与步态控制器固定。视觉与学习尚未接入。权重变化的行为效果需通过比赛验证。"

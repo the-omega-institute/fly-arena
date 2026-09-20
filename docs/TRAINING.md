@@ -14,11 +14,7 @@ sum to 320 simulated seconds. These figures exclude retries and early terminatio
 they are neither wall-clock estimates nor GPU billing. Editing the duration or
 conditions does not start work; only **Start training** submits the plan.
 
-The default 1-second window is labeled as a workflow trial. A fly may not reach
-food within 1–2 seconds. Select a longer window (up to 10 seconds) to inspect
-post-contact behavior, then compare against WT and conditions outside training.
-All admitted integer durations from 1 to 10 seconds remain selectable, including
-when branching from a published specimen.
+The default is 5 seconds. The 1–2 second options remain workflow trials; a fly may not reach food in that time. The API accepts 1–30 seconds; the web editor offers 1–10, 20 and 30 seconds. Use 20–30 seconds to observe what happens after the first food patch, then compare against WT and conditions outside training. Longer evaluations increase queued computation.
 
 Where behavior metrics are recorded, each replay shows actual observed duration,
 intake and first inversion without opening the formula details. No recorded
@@ -365,3 +361,7 @@ New separated-contact replays record up to six fixed canonical neurons each from
 Some VNC tactile neurons have no source soma coordinates. Selecting a group whose recorded anchors all lack coordinates from the anatomical view opens its actual local connection graph and explains the missing positions. Its recorded activity, edge weights and shared replay timeline remain available; schematic graph positions are not anatomical coordinates.
 
 The replay's compiled brain graph provides sensory display groups and their real local connections. They can be opened as functional groups, neuron classes, local neighborhoods or anatomical points, without changing the canonical genome's circuit selectors. Historical replays retain only their original observations; missing individual activity is not reconstructed from population averages. Additional neighbors are structural context and remain uncolored unless actually sampled.
+
+## Saved offspring and experimental competition
+
+**Compete** retains the training map, seed, duration, brain bridge and sensory profile. The Arena runs unranked sandbox matches, including research-v2 with `engineered-kernel-contact-v1` when its readout assets are compatible. A sandbox series swaps spawn positions and shows its own standings without adding public leaderboard points. This does not require behavioral qualification; it does require a runnable model and compatible inputs. The API opt-in is `"sandbox": true` on `/matches` and `/tournaments`. Omitting the flag retains the existing formal admission policy.

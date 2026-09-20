@@ -58,7 +58,7 @@ class TrainingSpec(StrictModel):
     max_evaluations: int = Field(default=18,ge=2,le=96)
     map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure'] = 'orchard'
     mode: Literal['forage','contest'] = 'forage'
-    duration_seconds: int = Field(default=2,ge=1,le=10)
+    duration_seconds: int = Field(default=5,ge=1,le=30)
     seed: int = Field(default=42,ge=0,le=2**31-1)
     evaluation_conditions: list[EvaluationCondition] | None = Field(default=None,min_length=1,max_length=4)
     bridge_profile: Literal['legacy-v1','sensorimotor-research-v2'] = 'legacy-v1'

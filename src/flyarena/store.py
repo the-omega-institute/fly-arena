@@ -292,7 +292,8 @@ class Store:
                             fly_ids=slots, map_id=spec['map_id'], mode=spec['mode'], seed=seed,
                             duration_seconds=spec['duration_seconds'],
                             bridge_profile=spec.get('bridge_profile','legacy-v1'),
-                            sensory_profile=spec.get('sensory_profile','odor-only-v1')).model_dump())
+                            sensory_profile=spec.get('sensory_profile','odor-only-v1'),
+                            sandbox=spec.get('sandbox',False)).model_dump())
             pending = db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')",(owner,)).fetchone()[0]
             if pending+len(schedule)>12:
                 raise ValueError(f'Tournament needs {len(schedule)} matches; {12-pending} queue slots available. Use fewer entrants or seeds.')
