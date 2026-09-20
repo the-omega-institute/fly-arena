@@ -10,6 +10,7 @@ import mujoco
 import numpy as np
 
 from .body import Bodies
+from .observation import display_indices, population_summary
 from .common import DATA, ROOT, VAR, digest, file_sha, write_json
 from .compiler import Compiler
 from .connectome import Connectome
@@ -43,7 +44,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                              "touch": sensory.get("touch", {}).get("source", "mujoco_food_contact_observation_v1")}}
     if bridge_profile != "legacy-v1":
         raise ValueError("Unknown arena bridge profile")
-    files = ["body.py", "behavior.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "experiments/embodied_sensor.py"]
+    files = ["body.py", "behavior.py", "runner.py", "neural.py", "scenarios.py", "judge.py", "compiler.py", "contracts.py", "replay.py", "models.py", "rate.py", "observation.py", "experiments/embodied_sensor.py"]
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
@@ -114,7 +115,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
     scene["flies"] = [{k: f[k] for k in ["id", "name", "color", "artifact_id"]} for f in flies]
     write_json(output / "scene.json", scene)
     remaining = np.array([f["initial"] for f in scene["food"]], dtype=float)
-    food_xy = np.array([f["position"][:2] for f in scene["food"]])
+    food_xy = np.array([f["position"][:2] for f in scene["food"]]).reshape(-1, 2)
     scores = np.zeros(len(flies))
     energy = np.full(len(flies), 100.)
     drives = np.zeros((len(flies), 2))
@@ -167,6 +168,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             sample_nodes.extend(int(i) for i in indices)
         sample_nodes = list(dict.fromkeys(sample_nodes))
 
+    sample_nodes = display_indices(graph, sample_nodes)
+
     def neural_sample(brain):
         rates = np.asarray(brain.rates)
         sampled = [{"id": str(int(graph.ids[i])), "activity": float(rates[i])}
@@ -177,11 +180,11 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 indices = sensory_encoder.groups[name]
                 if len(indices):
                     activity[name] = float(np.mean(rates[indices]))
-        return {"circuits": activity, "sampled_nodes": sampled,
+        return {"circuits": activity, "sampled_nodes": sampled, "population": population_summary(rates),
                 # Keep the old field for clients that still read v0.4.2 data.
                 "top_nodes": sampled,
                 "sampling": {"kind": "fixed-circuit-and-sensory-sample" if sensory_samples else "fixed-circuit-sample",
-                             "count": len(sampled),
+                             "count": len(sampled), "observation_version": "morphology-population-v1", "total_neurons": graph.n,
                              **({"sensory_groups": sensory_samples} if sensory_samples else {})}}
 
     def snapshot():

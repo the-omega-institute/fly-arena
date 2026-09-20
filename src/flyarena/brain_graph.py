@@ -51,6 +51,10 @@ def build(graph,compiler,participant,sampled_ids,var):
         display_groups.append({'id':key,'label':label,'name':label,'color':color,
                                'neuron_count':len(group),
                                'edge_count':sum(int(graph.indptr[i+1]-graph.indptr[i]) for i in group)})
+    ungrouped=set(map(int,anchors))-set().union(*groups.values())
+    if ungrouped:
+        groups['morphology']=ungrouped
+        display_groups.append({'id':'morphology','label':'Additional recorded anatomy','name':'Additional recorded anatomy','color':'#80bcbc','neuron_count':len(ungrouped),'edge_count':sum(int(graph.indptr[i+1]-graph.indptr[i]) for i in ungrouped)})
     for key,group in groups.items():
         seeds=[int(i) for i in anchors if int(i) in group]
         edge_ids=set()

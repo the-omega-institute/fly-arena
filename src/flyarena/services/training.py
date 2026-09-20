@@ -40,7 +40,7 @@ def initialize(db):
 
 
 class EvaluationCondition(StrictModel):
-    map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure']
+    map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure','canopy','switchback','blank']
     seed: int = Field(ge=0, le=2**31-1, strict=True)
 
 
@@ -56,7 +56,7 @@ class TrainingSpec(StrictModel):
     population: int = Field(default=3,ge=2,le=6)
     generations: int = Field(default=3,ge=1,le=8)
     max_evaluations: int = Field(default=18,ge=2,le=96)
-    map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure'] = 'orchard'
+    map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure','canopy','switchback','blank'] = 'orchard'
     mode: Literal['forage','contest'] = 'forage'
     duration_seconds: int = Field(default=5,ge=1,le=30)
     seed: int = Field(default=42,ge=0,le=2**31-1)
@@ -88,6 +88,7 @@ class TrainingSpec(StrictModel):
         if self.strategy == 'external':self.circuits = []
         elif not self.circuits:raise ValueError('Choose at least one circuit')
         if len(set(self.circuits))!=len(self.circuits):raise ValueError('Choose distinct circuits')
+        if self.mode=='contest' and any(c.map_id=='blank' for c in self.conditions):raise ValueError('Blank control is a single-fly observation')
         if self.mode=='contest' and self.opponent_id is None:raise ValueError('Choose a fixed opponent')
         if len({(c.map_id,c.seed) for c in self.conditions})!=len(self.conditions):
             raise ValueError('Choose distinct map/seed conditions')

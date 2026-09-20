@@ -360,8 +360,8 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if slot < 0 or slot >= len(match['request']['fly_ids']):
             raise HTTPException(404, 'Participant not found')
         samples = tuple(sorted(ids.split(',')))
-        if len(samples) > 200 or len(set(samples)) != len(samples) or not all(samples):
-            raise ValueError('Provide up to 200 distinct neuron IDs')
+        if len(samples) > 512 or len(set(samples)) != len(samples) or not all(samples):
+            raise ValueError('Provide up to 512 distinct neuron IDs')
         participant = next((p for p in match.get('participants', []) if p['id'] == match['request']['fly_ids'][slot]), None)
         if participant is None:
             raise HTTPException(409, 'Recorded participant design is unavailable')
@@ -372,9 +372,19 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
             raise HTTPException(404, 'Bundled brain graph is unavailable')
         return compiled_neighborhood(participant['artifact_id'], json.dumps(participant['spec'], sort_keys=True), samples)
 
+    @app.get('/api/v1/observations/wt-controls')
+    def wt_controls():
+        path=store.root/'research/wt-controls-v1/summary.json'
+        if not path.exists():raise HTTPException(404,'WT control samples are not installed')
+        return FileResponse(path,media_type='application/json')
+
     @app.get("/api/v1/matches")
     def matches():
         result=store.matches()
+        from .services.queue_status import queue_status
+        queue=queue_status(store)
+        for item in result:
+            if item["id"] in queue:item["queue"]=queue[item["id"]]
         seen={item['id'] for item in result}
         # Public gallery assets are immutable read-only evidence.  Include
         # them when the deployment database does not contain their records so
@@ -488,7 +498,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         meta = json.loads((g.path / "neurons.json").read_text())
         if ids:
             requested = [value for value in ids.split(",") if value]
-            if len(requested) > 200 or len(set(requested)) != len(requested):
+            if len(requested) > 512 or len(set(requested)) != len(requested):
                 raise ValueError("Invalid neuron ID sample")
             by_id = {str(ident): index for index, ident in enumerate(g.ids)}
             group = set(int(index) for index in g.groups[circuit])
