@@ -1,13 +1,14 @@
 import {useMemo} from 'react'
-import type {Frame,Scene} from '../../types'
+import type {Frame,ReplayEvent,Scene} from '../../types'
 import {colors} from '../../types'
 import {useI18n} from '../../shared/i18n'
-import {finiteResource,resourceMoments,resourcePath,resourceTotal} from './resourceAccounting'
+import {finiteResource,resourceMoments,resourcePath,resourceShares,resourceTotal} from './resourceAccounting'
 
-export function SharedResources({scene,frame,frames,onSeek}:{scene:Scene;frame?:Frame;frames:Frame[];onSeek:(time:number)=>void}){
+export function SharedResources({scene,frame,frames,events,onSeek,onObserveSlot}:{scene:Scene;frame?:Frame;frames:Frame[];events?:ReplayEvent[];onSeek:(time:number)=>void;onObserveSlot?:(slot:number)=>void}){
   const {locale}=useI18n(),zh=locale==='zh-CN'
   const initial=resourceTotal(scene.food?.map(f=>f.initial),scene.food?.length??0)
   const moments=useMemo(()=>scene.food?resourceMoments(scene,frames):{depletions:[],firstIntake:[]},[scene,frames])
+  const shares=useMemo(()=>scene.food?resourceShares(scene,frames,events,frame?.tick??NaN):null,[scene,frames,events,frame?.tick])
   const paths=useMemo(()=>{
     if(!initial||!scene.food)return []
     return [{id:'remaining',color:'#77877d',path:resourcePath(frames,f=>resourceTotal(f.food,scene.food.length),initial)},...scene.flies.map((fly,slot)=>({id:fly.id+':'+slot,color:colors[fly.color]||colors.mint,path:resourcePath(frames,f=>finiteResource(f.scores?.[slot]),initial)}))]
@@ -30,6 +31,7 @@ export function SharedResources({scene,frame,frames,onSeek}:{scene:Scene;frame?:
     </svg><div className="shared-resource-axis"><span>{first.toFixed(2)} s</span><span>{zh?'虚线：余量；实线：各自摄取。纵轴':'Dashed: remaining; solid: individual intake. Scale'} 0–{shown(initial)}</span><span>{last.toFixed(2)} s</span></div></>}
     <div className="shared-resource-moments">{scene.flies.map((fly,slot)=>moments.firstIntake[slot]!==null&&moments.firstIntake[slot]!==undefined?<button key={slot} onClick={()=>onSeek(moments.firstIntake[slot]!)}>{slot+1} · {fly.name} · {zh?'首次记录摄取':'First recorded intake'} {moments.firstIntake[slot]!.toFixed(2)} s →</button>:null)}{moments.depletions.map(d=><button key={'food-'+d.food} onClick={()=>onSeek(d.time)}>{scene.food[d.food].id} · {zh?'首次记录耗尽':'First observed depletion'} {d.time.toFixed(2)} s →</button>)}</div>
     <div className="shared-resource-patches">{scene.food.map((food,i)=><span key={food.id}><b>{food.id}</b><span>{shown(finiteResource(frame?.food?.[i]))} / {shown(finiteResource(food.initial))}</span></span>)}</div>
+    {scene.flies.length>1&&<div className="shared-food-table"><table><caption>{zh?'每处食物，被谁吃掉':'Who ate from each food patch'}</caption><thead><tr><th>{zh?'食物点':'Food patch'}</th>{scene.flies.map((fly,slot)=><th key={slot}>{slot+1} · {fly.name}</th>)}</tr></thead><tbody>{scene.food.map((food,i)=><tr key={food.id} data-food-shares={food.id}><th scope="row">{food.id}{shares&&shares[i].amounts.filter(v=>v>0).length>1&&<small>{zh?'双方都曾摄取':'Both have fed here'}</small>}</th>{scene.flies.map((fly,slot)=>{const value=shares?.[i].amounts[slot]??null,at=shares?.[i].firstTimes[slot]??null;return <td key={slot}><button disabled={at===null} aria-label={`${food.id} · ${slot+1} · ${fly.name} · ${zh?'查看首次摄取':'View first intake'}`} onClick={()=>{if(at!==null){onObserveSlot?.(slot);onSeek(at)}}}>{shown(value)}{at!==null&&<small>{zh?'首次':'First'} {at.toFixed(2)} s →</small>}</button></td>})}</tr>)}</tbody></table><p className="shared-resource-note">{shares?(zh?'数量随当前时间变化。点击摄取量，跟随对应果蝇并定位其首次摄取；“双方都曾摄取”不代表同时进食。':'Amounts follow the current time. Click an intake amount to follow that fly at its first recorded feeding. Both having fed here does not imply simultaneous feeding.'):(zh?'逐食物点的完整摄取事件尚不可用；不根据总分猜测分配。':'Complete per-patch intake events are unavailable; allocations are not inferred from total scores.')}</p></div>}
     <p className="shared-resource-note">{zh?'数值来自当前回放帧，缺失记录显示 —。各只果蝇的摄取量汇总所有食物点；耗尽属于共享环境，不归因给某一只果蝇。跳转定位首次观察到变化的采样时刻。食物单位为比赛规则中的资源量。':'Values come from the current replay frame; — means missing. Each fly’s intake totals all food patches. Depletion belongs to the shared environment and is not attributed to one fly. Jumps use the first sample showing the change. Food units follow the match rules.'}</p>
   </section>
 }
