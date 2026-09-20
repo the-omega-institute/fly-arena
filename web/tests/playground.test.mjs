@@ -841,6 +841,7 @@ test('synchronized life comparison seeks actual bodies and brains, shares scales
  try{
   const season={connectome:{circuits:[{id:'olfactory',label:'Olfactory',color:'#91bca5',neuron_count:1}]}}
   await mount(ReplayComparison,{match:current,scene:scene(a),frames:left,events:[{type:'intake',tick:500,slot:0,amount:1}],matches:[current,other,slow],season,selectedId:a.id})
+  await act(async()=>{for(const button of document.querySelectorAll('.brain-layer-tabs button'))if(button.textContent==='Functional region')button.click()})
   assert.deepEqual(comparisonWindow(left,right),{start:0,end:.2});assert.equal(comparisonWindow(left,[]),null);assert.equal(comparisonWindow(left,frames([1,2],1)),null)
   assert.deepEqual(comparisonActivityScales([left,right]),{region:20,node:40})
   assert.equal(document.querySelectorAll('[data-paired-body]').length,2)
@@ -956,6 +957,7 @@ test('recorded tactile group opens actual cell class, weights and history withou
  const frames=[0,1].map((time,i)=>({time,brain:[{circuits:{touch_right:i*9},sampled_nodes:[{id:'touch-r',activity:i*12}]}]}))
  const props={matchId:'sensory-match',frame:frames[1],frames,fly:subject,slot:0,season:{connectome:{circuits:[]}},events:[],activityScale:20,nodeScale:20,onSeek:t=>seeks.push(t)}
  await mount(BrainTheater,props)
+ await click('Functional region')
  await click('Right environmental touch')
  const region=document.querySelector('[data-circuit="touch_right"]');assert.equal(region.dataset.recorded,'true')
  assert.ok(document.querySelector('.brain-overview-map').getAttribute('viewBox').endsWith('585'))
