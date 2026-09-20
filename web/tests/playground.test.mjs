@@ -614,7 +614,7 @@ test('a replay participant becomes an editable saved child and the exact new tra
  assert.equal(writes.length,0)
  await click('Revisit the parent’s match');assert.match(location.hash,/match=replay-match/)
  await click('Design from this brain')
- const save=document.querySelector('.editor-actions .primary');assert.ok(save)
+ const save=button('Save fly');assert.ok(save)
  await act(async()=>save.click())
  assert.equal(writes.length,1);assert.equal(writes[0].parent_id,own.id)
  assert.deepEqual(writes[0].edge_deltas,participant.spec.edge_deltas)
@@ -1230,3 +1230,43 @@ test('anatomical event controls keep body time and changed fibers on the same ba
  await click('Focus strongest change');assert.equal(spatialCanvasProps.zoomId,'10')
  await click('Reset anatomical view');assert.equal(spatialCanvasProps.zoomId,null)
 })
+
+test('a first visitor can start a solo run, sign in once and submit exactly once',async t=>{
+ // React is imported before JSDOM; prevent its legacy autofocus polyfill in this test.
+ const focus=dom.window.HTMLElement.prototype.focus;dom.window.HTMLElement.prototype.focus=()=>{};t.after(()=>{dom.window.HTMLElement.prototype.focus=focus})
+ const canvasFile=require.resolve('./src/ArenaCanvas.js');require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:()=>null}}
+ const replayFile=require.resolve('./src/features/arena/useReplay.js');require.cache[replayFile]={id:replayFile,filename:replayFile,loaded:true,exports:{useReplay:()=>({scene:null,frames:[],events:[],status:'idle',error:''})}}
+ history.replaceState(null,'','#tab=arena');localStorage.clear()
+ const owner={id:'visitor',name:'Explorer',token:'test-only'},writes=[]
+ const arena={id:'orchard',name:'果园',english:'Orchard',modes:['forage','contest'],food:[],obstacles:[],size:28}
+ const season={connectome:{sha256:spec.connectome_sha256,neuron_count:100,edge_count:1000,circuits:[]},budget:{points:100},match_profiles:[{id:'legacy-v1',ready:true}],default_bridge_profile:'legacy-v1'}
+ const matches=[{id:'old',status:'verified',request:{fly_ids:[wt.id],mode:'forage',map_id:'orchard'}}]
+ const library=[{...wt,color:'mint',owner:'arena'}]
+ globalThis.fetch=async(url,options={})=>{
+  const path=String(url).replace('/api/v1','')
+  if(options.method==='POST'){
+   writes.push({path,body:JSON.parse(options.body||'{}')})
+   if(path==='/identities')return {ok:true,json:async()=>owner}
+   if(path==='/flies'){const saved={...own,id:'d'.repeat(32),color:'mint',owner:owner.id,spec:JSON.parse(options.body),report:{budget_used:0}};library.push(saved);return {ok:true,json:async()=>saved}}
+   assert.equal(path,'/matches');assert.equal(options.headers.Authorization,'Bearer test-only');assert.match(options.headers['Idempotency-Key'],/^[0-9a-f]{32}$/)
+   const match={id:'new-'+writes.length,status:'queued',progress:0,request:JSON.parse(options.body)};matches.unshift(match);return {ok:true,json:async()=>match}
+  }
+  const data=path==='/auth/config'?{mode:'local'}:path==='/season'?season:path==='/flies'?library:path==='/maps'?[arena]:path==='/matches'?matches:path==='/preview'?{}:[]
+  return {ok:true,json:async()=>data}
+ }
+ delete require.cache[require.resolve('./src/App.js')];const App=require('./src/App.js').default
+ await mount(App,{})
+ assert.equal(location.hash,'#tab=arena','opening the arena must not force an old replay')
+ assert.equal(document.querySelector('select[aria-label="Match mode"]').value,'forage')
+ assert.equal(document.querySelector('select[aria-label="Duration"]').value,'2')
+ assert.equal(button('Run my simulation').disabled,false)
+ await click('Run my simulation');assert.ok(document.querySelector('.modal'));assert.equal(writes.length,0)
+ await click('Close');assert.equal(document.querySelector('.modal'),null);assert.equal(writes.length,0)
+ await click('Run my simulation');await click('Create identity')
+ assert.deepEqual(writes.map(w=>w.path),['/identities','/matches'])
+ assert.deepEqual(writes[1].body.fly_ids,[wt.id]);assert.equal(writes[1].body.mode,'forage');assert.equal(writes[1].body.duration_seconds,2)
+ assert.match(location.hash,/match=new-/)
+ await click('Design your own fly');await click('Save and simulate 2 seconds')
+ assert.deepEqual(writes.map(w=>w.path),['/identities','/matches','/flies','/matches'])
+ assert.deepEqual(writes.at(-1).body.fly_ids,['d'.repeat(32)],'run the saved child rather than the selected WT')
+});

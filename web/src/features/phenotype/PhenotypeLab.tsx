@@ -2,7 +2,7 @@ import {FrozenSubjects} from './FrozenSubjects'
 import {savedFlyLabel} from '../../shared/flyIdentity'
 import {useEffect,useMemo,useState} from 'react'
 import {FlaskConical,RefreshCw,Play,Pause,ArrowUpRight} from 'lucide-react'
-import {api} from '../../api'
+import {api,newRequestKey} from '../../api'
 import type {Fly,Identity} from '../../types'
 import type {Experiment,ExperimentSubject,ProbeReport,ResearchCatalog,SubjectRole} from '../../shared/research'
 import {alignment,finite,metricUnit,parseSeeds,roleStyles,sampleAt,validateHorizon,designRoleLabel,plotTransform} from '../../shared/research'
@@ -23,7 +23,7 @@ export function PhenotypeLab({flies,identity,selected,experimentId,onExperiment,
  const subjects=experiment?.subjects||[];const reports=useMemo(()=>experiment?.reports.filter(r=>r.seed===seed&&subjects.some(s=>s.fly_id===r.fly_id&&s.artifact_id===r.artifact_id))||[],[experiment,seed]);const matched=alignment(reports,subjects);const end=experiment?.spec.duration_seconds||horizon;
  useEffect(()=>{if(!playing)return;let previous=performance.now();let handle:number;const tick=(now:number)=>{const dt=(now-previous)/1000;previous=now;setTime(value=>{if(value+dt>=end){setPlaying(false);return end}return value+dt});handle=requestAnimationFrame(tick)};handle=requestAnimationFrame(tick);return()=>cancelAnimationFrame(handle)},[playing,end]);
  const keys=[...new Set(reports.flatMap(r=>Object.keys(r.metrics||{})))];const traceKeys=[...new Set(reports.flatMap(r=>(r.neural_trace||[]).flatMap(p=>Object.keys(p).filter(k=>k!=='time'&&finite(p[k])))))];
- async function run(){if(!identity){onLogin();return}setLoading(true);setError('');try{const seedSet=parseSeeds(seeds);validateHorizon(horizon);const e=await api<Experiment>('/experiments',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({fly_id:design,probe_id:probe,seeds:seedSet,duration_seconds:horizon})},identity);setExperiments(xs=>[{id:e.id,owner:e.owner,status:e.status,spec:e.spec},...xs.filter(x=>x.id!==e.id)]);onExperiment(e.id)}catch(e){setError(e instanceof Error?t(e.message):String(e))}finally{setLoading(false)}}
+ async function run(){if(!identity){onLogin();return}setLoading(true);setError('');try{const seedSet=parseSeeds(seeds);validateHorizon(horizon);const e=await api<Experiment>('/experiments',{method:'POST',headers:{'Idempotency-Key':newRequestKey()},body:JSON.stringify({fly_id:design,probe_id:probe,seeds:seedSet,duration_seconds:horizon})},identity);setExperiments(xs=>[{id:e.id,owner:e.owner,status:e.status,spec:e.spec},...xs.filter(x=>x.id!==e.id)]);onExperiment(e.id)}catch(e){setError(e instanceof Error?t(e.message):String(e))}finally{setLoading(false)}}
  const roleName=(role:SubjectRole)=>t(role==='wildtype'?'Wild Type':role==='official'?'Official release':designRoleLabel(experiment?.owner,identity?.id));
  return <div className="phenotype-lab">
   <section className="panel lab-intro"><div><div className="eyebrow">{t('PHENOTYPE LAB')}</div><h2>{t('Three subjects. One frozen protocol.')}</h2><p>{t('Independent solo trials share the probe, seed, body, backend and horizon. Comparisons do not enter the match leaderboard.')}</p></div><span className={'availability '+(catalog?.profile.ready?'ready':'')}>{catalog?.profile.ready?t('Profile ready'):t('Profile unavailable')}</span></section>

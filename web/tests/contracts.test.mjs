@@ -160,3 +160,10 @@ test('selection objective differences cannot be presented as the same evaluation
  assert.deepEqual(comparisonDifferences([comparisonRun,food]),[])
  assert.ok(comparisonDifferences([food,{...food,spec:{...food.spec,fitness_objective:'sustained-foraging-v1'}}]).includes('Selection objective'))
 })
+
+const {newRequestKey}=await moduleAt('../src/api.ts');
+test('submission keys work on LAN HTTP without crypto.randomUUID',()=>{
+ const original=Object.getOwnPropertyDescriptor(globalThis,'crypto');let sequence=0
+ Object.defineProperty(globalThis,'crypto',{configurable:true,value:{getRandomValues(bytes){bytes.fill(++sequence);return bytes}}})
+ try{const a=newRequestKey(),b=newRequestKey();assert.match(a,/^[0-9a-f]{32}$/);assert.notEqual(a,b)}finally{if(original)Object.defineProperty(globalThis,'crypto',original);else delete globalThis.crypto}
+});
