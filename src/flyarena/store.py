@@ -227,7 +227,10 @@ class Store:
                 db.execute("UPDATE matches SET status=?,error='Worker lease expired',updated=? WHERE id=?", ("queued" if row["attempt"] < 2 else "failed", now, row["id"]))
             if db.execute("SELECT 1 FROM matches WHERE status='running' LIMIT 1").fetchone():
                 return None
-            row = db.execute("SELECT id,attempt FROM matches WHERE status='queued' ORDER BY created LIMIT 1").fetchone()
+            from .services.queue_status import queue_order
+            training = {r[0] for r in db.execute('SELECT match_id FROM training_evaluations')}
+            pending = db.execute("SELECT id,attempt,status,created FROM matches WHERE status='queued'").fetchall()
+            row = min(pending, key=lambda r: queue_order(r, training, now)) if pending else None
             if row is None:
                 return None
             lease, generation = uuid.uuid4().hex, row["attempt"] + 1

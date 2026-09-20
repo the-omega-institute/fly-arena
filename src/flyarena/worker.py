@@ -14,6 +14,7 @@ class Worker:
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self.run, name="arena-worker", daemon=True)
         self.process = None
+        self.last_job_kind = "match"
         from functools import lru_cache
         from .services.training import TrainingService
         @lru_cache(maxsize=1)
@@ -36,8 +37,12 @@ class Worker:
             try:
                 self.training.tick()
                 from .services.experiments import ExperimentRepository
-                research_claim = ExperimentRepository(self.store).claim()
+                with self.store.db() as db:
+                    match_waiting = db.execute("SELECT 1 FROM matches WHERE status='queued' LIMIT 1").fetchone()
+                research_claim = (None if self.last_job_kind == 'research' and match_waiting
+                                  else ExperimentRepository(self.store).claim())
                 if research_claim:
+                    self.last_job_kind = "research"
                     ident, lease, generation = research_claim
                     folder = self.store.root / 'research' / 'runs' / ident / str(generation)
                     folder.mkdir(parents=True, exist_ok=True)
@@ -49,6 +54,7 @@ class Worker:
                     continue
                 claim = self.store.claim()
                 if claim:
+                    self.last_job_kind = "match"
                     ident, lease, generation = claim
                     folder = self.store.root / "runs" / ident / str(generation)
                     folder.mkdir(parents=True, exist_ok=True)

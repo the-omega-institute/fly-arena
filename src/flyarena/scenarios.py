@@ -93,6 +93,58 @@ MAPS = {
     },
 }
 
+# Additional arenas leave historical layouts unchanged. Every solid is shared
+# by MuJoCo collision/raycast observations and the browser renderer.
+MAPS.update({
+    "canopy": {
+        "id":"canopy", "name":"叶桥争食场", "english":"Canopy Crossroads",
+        "description":"两侧缓坡通往中央叶台，地面可从南北绕行；中央与外围食物有限，形成抢占与换路的选择。视觉受实体遮挡，气味仍可穿墙。",
+        "size":32, "color":"#77ad85", "habitat":"forest-floor",
+        "spawns":[[-12,0,0],[12,0,math.pi]],
+        "obstacles": copy.deepcopy(MAPS["terrarium"]["obstacles"][:3]) + [
+            {"position":[x,y,z],"size":size,"material":material,"shape":shape,"color":color}
+            for x,y,z,size,material,shape,color in [
+                (-6,5,1.5,[5,1.2,3],"rock","box","#80715b"),
+                (6,-5,1.5,[5,1.2,3],"rock","box","#80715b"),
+                (-2,-7,.8,[3,2,1.6],"fruit","ellipsoid","#b56f45"),
+                (2,7,.8,[3,2,1.6],"fruit","ellipsoid","#b56f45"),
+                (-10,9,.65,[2,3,1.3],"rock","ellipsoid","#736e59"),
+                (10,-9,.65,[2,3,1.3],"rock","ellipsoid","#736e59"),
+                (-7,-9,.1,[5,3,.2],"leaf","box","#6c965b"),
+                (7,9,.1,[5,3,.2],"leaf","box","#6c965b"),
+            ]
+        ],
+        "food":[[0,0],[-6,-7],[6,7],[-10,6],[10,-6]],
+        "food_heights":[.95,.15,.15,.15,.15],"food_units":4.,
+        "modes":["forage","contest"],
+    },
+    "switchback": {
+        "id":"switchback", "name":"果壳回廊", "english":"Husk Switchbacks",
+        "description":"错位果壳屏障制造视线遮挡与绕行通路；分散的小食物点会耗尽，需要离开原地继续探索。气味穿墙，不等同真实扩散。",
+        "size":32,"color":"#bc9463","habitat":"forest-floor",
+        "spawns":[[-12,-4,0],[12,4,math.pi]],
+        "obstacles":[
+            {"position":[-4,3,1.5],"size":[1.2,12,3],"material":"fruit","color":"#976340"},
+            {"position":[4,-3,1.5],"size":[1.2,12,3],"material":"fruit","color":"#976340"},
+            {"position":[-8,-8,1.5],"size":[7,1.2,3],"material":"rock","color":"#766b58"},
+            {"position":[8,8,1.5],"size":[7,1.2,3],"material":"rock","color":"#766b58"},
+            {"position":[0,0,.7],"size":[2,3,1.4],"shape":"ellipsoid","material":"fruit","color":"#bb7945"},
+            {"position":[-9,8,.6],"size":[3,2,1.2],"shape":"ellipsoid","material":"rock","color":"#817763"},
+            {"position":[9,-8,.6],"size":[3,2,1.2],"shape":"ellipsoid","material":"rock","color":"#817763"},
+            {"position":[-1,-10,.1],"size":[5,3,.2],"material":"leaf","color":"#74975e"},
+            {"position":[1,10,.1],"size":[5,3,.2],"material":"leaf","color":"#74975e"},
+        ],
+        "food":[[-9,-3],[9,3],[0,-6],[0,6],[-8,11],[8,-11]],
+        "food_units":2.,"modes":["forage","contest"],
+    },
+    "blank": {
+        "id":"blank","name":"WT 无食物对照","english":"WT Blank Control",
+        "description":"没有食物和障碍，观察同一模型无食物刺激时的自发活动与运动；不用于觅食得分比较。",
+        "size":28,"color":"#93a7ab","spawns":[[-7,-1,0],[7,1,math.pi]],
+        "obstacles":[],"food":[],"modes":["forage"],
+    },
+})
+
 RULES = {
     "id": "arena-ground-contact-v2", "physics_dt": .0001, "neural_dt_ms": .1,
     "sense_ticks": 100, "snapshot_ticks": 500, "food_initial_units": 10.0,
@@ -110,7 +162,7 @@ def scenario(map_id: str, seed: int) -> dict:
     rng = np.random.default_rng(seed)
     # Only food is jittered; valid spawn geometry is identical across paired slots.
     result["food"] = [dict(id=f"food-{i}", position=[float(x + rng.uniform(-.25, .25)),
-                        float(y + rng.uniform(-.25, .25)), .15], initial=result.get("food_units", 10.0))
+                        float(y + rng.uniform(-.25, .25)), result.get("food_heights", [.15]*len(result["food"]))[i]], initial=result.get("food_units", 10.0))
                       for i, (x, y) in enumerate(result["food"])]
     result["sha256"] = digest(result)
     return result

@@ -27,7 +27,7 @@ def main():
     for slot,participant in enumerate(match['participants']):
         ids=sorted({str(n['id']) for frame in frames for n in (frame.get('brain',[{}]*len(match['participants']))[slot].get('sampled_nodes') or [])})
         if not ids:continue
-        if len(ids)>200:raise ValueError('Expected a bounded fixed replay sample')
+        if len(ids)>512:raise ValueError('Expected a bounded fixed replay sample')
         participant['brain_graph']=build(graph,compiler,participant,ids,args.var)
         stats.append({'fly':participant['id'],'sampled_neurons':len(ids),'circuits':{k:{'neurons':len(v['neurons']),'edges':len(v['edges'])} for k,v in participant['brain_graph']['circuits'].items()}})
     path.write_text(json.dumps(match,ensure_ascii=False,indent=2)+'\n')

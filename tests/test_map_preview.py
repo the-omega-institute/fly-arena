@@ -17,7 +17,7 @@ def test_preview_matches_runner_layout_without_loading_a_brain(client, map_id, p
     response=client.get(f'/api/v1/maps/{map_id}/preview',params={'seed':91,'bridge_profile':profile})
     assert response.status_code==200
     assert response.json()==arena_scene(map_id,91,profile)
-    assert response.json()['food']!=client.get(f'/api/v1/maps/{map_id}/preview?seed=92').json()['food']
+    if MAPS[map_id]['food']:assert response.json()['food']!=client.get(f'/api/v1/maps/{map_id}/preview?seed=92').json()['food']
     assert client.get('/api/v1/matches').json()==[]
 
 @pytest.mark.parametrize('path,status',[

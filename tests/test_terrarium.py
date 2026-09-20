@@ -354,3 +354,18 @@ def test_locomotion_terrain_feedback_excludes_opponents_and_food():
         # Initial feet are above the floor. Only the overlapping opponent
         # exerts forces, which must not be reclassified as terrain feedback.
         np.testing.assert_array_equal(observed.stumbling_contact_forces, 0)
+
+@pytest.mark.parametrize('map_id',['canopy','switchback'])
+def test_complex_arenas_compile_collision_geometry_and_clear_spawns(map_id):
+    scene=scenario(map_id,42);bodies=Bodies(scene,2,42)
+    assert len(_obstacle_geoms(bodies))==len(scene['obstacles'])
+    assert len(scene['obstacles'])>=9
+    assert len(scene['food'])>=5
+    for spawn in scene['spawns']:
+        for o in scene['obstacles']:
+            assert abs(spawn[0]-o['position'][0])>o['size'][0]/2+1 or abs(spawn[1]-o['position'][1])>o['size'][1]/2+1
+    assert all(f['initial']<=4 for f in scene['food'])
+    if map_id=='canopy':
+        target=scene['food'][0]
+        assert target['position'][2]==.95
+        assert bodies.data.geom_xpos[bodies.food_geom_ids[target['id']],2]==.95
