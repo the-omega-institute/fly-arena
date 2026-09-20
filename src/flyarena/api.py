@@ -379,7 +379,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         # Public gallery assets are immutable read-only evidence.  Include
         # them when the deployment database does not contain their records so
         # a source-only deployment can still open its featured replay.
-        for item in training.gallery_matches()+training.bundled_replay_matches():
+        for item in training.gallery_matches(include_brain=False)+training.bundled_replay_matches(include_brain=False):
             if item['id'] not in seen:
                 result.append(item);seen.add(item['id'])
         return [replay_designs(match) for match in result]
@@ -472,6 +472,13 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def anatomy():
         from .anatomy import build_anatomy
         return build_anatomy(DATA / 'connectome')
+
+    @app.get('/api/v1/connectome/morphology')
+    def morphology():
+        path = DATA / 'connectome' / 'morphology.json'
+        if not path.is_file():
+            raise HTTPException(404, 'MaleCNS neuron morphology has not been installed')
+        return FileResponse(path, media_type='application/json')
 
     @app.get("/api/v1/connectome/neurons")
     def neurons(circuit: str = "descending", limit: int = 80, ids: str = ""):

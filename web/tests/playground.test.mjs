@@ -841,6 +841,7 @@ test('synchronized life comparison seeks actual bodies and brains, shares scales
  try{
   const season={connectome:{circuits:[{id:'olfactory',label:'Olfactory',color:'#91bca5',neuron_count:1}]}}
   await mount(ReplayComparison,{match:current,scene:scene(a),frames:left,events:[{type:'intake',tick:500,slot:0,amount:1}],matches:[current,other,slow],season,selectedId:a.id})
+  await act(async()=>{for(const button of document.querySelectorAll('.brain-layer-tabs button'))if(button.textContent==='Functional region')button.click()})
   assert.deepEqual(comparisonWindow(left,right),{start:0,end:.2});assert.equal(comparisonWindow(left,[]),null);assert.equal(comparisonWindow(left,frames([1,2],1)),null)
   assert.deepEqual(comparisonActivityScales([left,right]),{region:20,node:40})
   assert.equal(document.querySelectorAll('[data-paired-body]').length,2)
@@ -956,6 +957,7 @@ test('recorded tactile group opens actual cell class, weights and history withou
  const frames=[0,1].map((time,i)=>({time,brain:[{circuits:{touch_right:i*9},sampled_nodes:[{id:'touch-r',activity:i*12}]}]}))
  const props={matchId:'sensory-match',frame:frames[1],frames,fly:subject,slot:0,season:{connectome:{circuits:[]}},events:[],activityScale:20,nodeScale:20,onSeek:t=>seeks.push(t)}
  await mount(BrainTheater,props)
+ await click('Functional region')
  await click('Right environmental touch')
  const region=document.querySelector('[data-circuit="touch_right"]');assert.equal(region.dataset.recorded,'true')
  assert.ok(document.querySelector('.brain-overview-map').getAttribute('viewBox').endsWith('585'))
@@ -1001,7 +1003,7 @@ test('anatomical brain uses matching static coordinates, selects real neurons an
  const frames=[0,1].map((time,i)=>({time,brain:[{sampled_nodes:[{id:'a',activity:i*12},{id:'b',activity:i*5},{id:'c',activity:i*7}]}]}))
  const props={connectome:sha,graph:positionedGraph,activity:new Map([['a',0],['b',0],['c',0]]),scale:12,frames,slot:0,time:0,onSeek:t=>seeks.push(t)}
  await mount(AnatomicalBrain,props)
- assert.deepEqual(requests,['/api/v1/connectome/anatomy','/examples/anatomy/'+sha+'.json'])
+ assert.deepEqual(requests.filter(url=>!url.endsWith('/morphology')),['/api/v1/connectome/anatomy','/examples/anatomy/'+sha+'.json'])
  assert.match(document.querySelector('.anatomical-brain-counts').textContent,/2 actual soma positions.*1 neurons without coordinates/)
  assert.equal(spatialCanvasProps.space.positions.length,6)
  assert.equal(document.querySelector('[aria-label="Spatial neuron a"]').dataset.activity,'0')
@@ -1018,12 +1020,12 @@ test('anatomical brain uses matching static coordinates, selects real neurons an
  // Same anatomy can be reused across participants, but activity must change.
  await mount(AnatomicalBrain,{...props,activity:new Map(),slot:1})
  assert.equal(document.querySelector('[aria-label="Spatial neuron b"]').dataset.activity,'missing')
- assert.equal(requests.length,2)
+ assert.equal(requests.filter(url=>!url.endsWith('/morphology')).length,2)
 })
 test('anatomical view rejects another connectome and discards a late response after switching replay',async()=>{
  let resolveOld
  const old='d'.repeat(64),next='e'.repeat(64)
- globalThis.fetch=async url=>String(url).startsWith('/api/')?new Promise(resolve=>{resolveOld=resolve}):{ok:true,json:async()=>anatomyFixture(old)}
+ globalThis.fetch=async url=>String(url).endsWith('/morphology')?{ok:false}:String(url).startsWith('/api/')?new Promise(resolve=>{resolveOld=resolve}):{ok:true,json:async()=>anatomyFixture(old)}
  const props={connectome:old,graph:positionedGraph,activity:new Map(),scale:1,frames:[],slot:0,time:0,onSeek:noop}
  await mount(AnatomicalBrain,props)
  globalThis.fetch=async()=>({ok:true,json:async()=>anatomyFixture('f'.repeat(64))})
@@ -1147,4 +1149,49 @@ test('research offspring retains kernel senses in playable unranked match setup'
  assert.deepEqual([...select.options].map(o=>o.value),['odor-only-v1',senses])
  assert.match(document.body.textContent,/Results stay outside the public leaderboard/)
  await click('Start match');assert.equal(submitted,1)
+})
+
+const {morphologyActivity,validateMorphology}=require('./src/features/arena/morphology.js')
+test('spatial colors follow each fiber segment across regions, not the neuron class',()=>{
+ const {regionColorMap,fiberRegionColor}=require('./src/features/arena/morphology.js')
+ const n={id:'10',class:'Kenyon_cell',positions:[0,0,0,8,8,8,16,16,16],edges:[0,1,1,2],edge_regions:[21,24]}
+ const data={schema:'connectome-morphology/v1',connectome_sha256:'c'.repeat(64),coordinate_unit_nm:8,neurons:[n],parcellation:{resolution_nm:[2048,2048,2048],regions:[{id:21,name:'EB',color:'#ff6600'},{id:24,name:'FB',color:'#00ccff'}]}}
+ validateMorphology(data,data.connectome_sha256)
+ const palette=regionColorMap(data)
+ assert.equal(fiberRegionColor(n,0,palette),'#ff6600');assert.equal(fiberRegionColor(n,1,palette),'#00ccff')
+ assert.equal(fiberRegionColor({...n,edge_regions:[0,0]},0,palette),'#526b78')
+ assert.throws(()=>validateMorphology({...data,neurons:[{...n,edge_regions:[21]}]},data.connectome_sha256))
+ assert.throws(()=>validateMorphology({...data,neurons:[{...n,edge_regions:[21,99]}]},data.connectome_sha256))
+})
+test('real fiber activity distinguishes zero from missing and changes with the observed contestant',()=>{
+ const neurons=['10','20','30'].map(id=>({id,positions:[0,0,0,8,8,8],edges:[0,1],radii:[1,1]}))
+ const value={schema:'connectome-morphology/v1',connectome_sha256:'a'.repeat(64),coordinate_unit_nm:8,neurons}
+ assert.equal(validateMorphology(value,'a'.repeat(64)),value)
+ assert.throws(()=>validateMorphology(value,'b'.repeat(64)))
+ assert.throws(()=>validateMorphology({...value,neurons:[{...neurons[0],edges:[0,2]}]},'a'.repeat(64)))
+ const first=morphologyActivity(neurons,new Map([['10',0],['20',100]]),100,null)
+ assert.equal(first[0],0);assert.equal(first[1],255,'zero has a recorded flag')
+ assert.equal(first[4],255);assert.equal(first[5],255)
+ assert.equal(first[8],0);assert.equal(first[9],0,'missing remains unrecorded')
+ const other=morphologyActivity(neurons,new Map([['30',50]]),100,'10')
+ assert.equal(other[1],0);assert.equal(other[2],255,'selection is separate from activity')
+ assert.ok(other[8]>0);assert.equal(other[9],255)
+})
+
+test('recorded tactile fibers remain selectable without a soma position and open the CNS view',async()=>{
+ const sha='8'.repeat(64),neuron={id:'802939',type:'SNta12',class:'mechanosensory_tactile',superclass:'vnc_sensory',side:'R',positions:[0,0,0,1,1,10],edges:[0,1],radii:[1,1]}
+ const morphology={schema:'connectome-morphology/v1',connectome_sha256:sha,coordinate_unit_nm:8,neurons:[neuron],missing_ids:[]}
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).endsWith('/morphology')?morphology:anatomyFixture(sha)})
+ const graph={neurons:[{id:'10001',position:[1,2,3]},{id:'802939',class:'mechanosensory_tactile',position:null}],edges:[]}
+ let toggles=0
+ await mount(AnatomicalBrain,{connectome:sha,graph,activity:new Map([['802939',12]]),scale:20,frames:[],slot:0,time:1,onSeek:noop,playback:{playing:false,onToggle:()=>toggles++}})
+ assert.equal(spatialCanvasProps.focus,'802939')
+ assert.equal(spatialCanvasProps.wholeCns,true);assert.equal(spatialCanvasProps.angle,'xz')
+ assert.match(document.querySelector('.morphology-legend').textContent,/1 real neuron skeletons · 1 with activity records/)
+ await click('Neuron morphology');assert.equal(spatialCanvasProps.structure,true)
+ await click('Recorded activity');assert.equal(spatialCanvasProps.structure,false)
+ await click('Expand brain');assert.ok(document.querySelector('.morphology-expanded'))
+ await click('Play brain and body');assert.equal(toggles,1)
+ assert.ok(document.querySelector('.morphology-expanded input[aria-label="Brain and match timeline"]'))
+ await click('Close expanded brain');assert.equal(document.querySelector('.morphology-expanded'),null)
 })

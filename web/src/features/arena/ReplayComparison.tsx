@@ -64,7 +64,7 @@ export function ReplayComparison({match,scene,frames,events,matches,season,selec
    <div className="replay-comparison-canvas"><ArenaCanvas scene={world} {...selection} selectedId={body?.id} followSelected={follow}/></div>
    <div className="replay-comparison-metrics"><span>{zh?'记录时刻':'Recorded sample'}<b>{frame?.time.toFixed(2)??'—'}s</b></span><span>{zh?'已摄取':'Consumed'}<b>{frame?.scores?.[slot]?.toFixed(3)??'—'}</b></span><span>{zh?'身体倾角':'Body tilt'}<b>{tilt===null?'—':`${tilt.toFixed(1)}°`}{tilt!==null&&tilt>90?(zh?' · 倒置':' · inverted'):''}</b></span></div>
    <small className="replay-comparison-context">{fly?.spec.model_profile||'—'} · {record.request.sensory_profile||'odor-only-v1'} · {record.request.bridge_profile||'legacy-v1'}</small>
-   <BrainTheater matchId={record.id} key={`${record.id}:${body?.id}`} frame={frame} frames={samples} season={season} fly={fly} slot={slot} events={ledger} onSeek={seek} activityScale={scales.region} nodeScale={scales.node}/>
+   <BrainTheater playback={{playing,onToggle:()=>{if(shownTime>=end)setTime(start);setPlaying(!playing)}}} matchId={record.id} key={`${record.id}:${body?.id}`} frame={frame} frames={samples} season={season} fly={fly} slot={slot} events={ledger} onSeek={seek} activityScale={scales.region} nodeScale={scales.node}/>
   </article>
  }
  return <section className="replay-comparison panel" aria-label={zh?'同步生命回放对照':'Synchronized life replays'}>
