@@ -1,7 +1,7 @@
 import {lifeHash} from '../life/navigation'
 import {useEffect,useRef,useState} from 'react'
 import {ArrowRight,Check,Dna,Download,GitBranch,Loader2,Pause,Play,Save,Square,TrendingUp} from 'lucide-react'
-import {api} from '../../api'
+import {api,newRequestKey} from '../../api'
 import type {ArenaMap,Fly,Identity,Match,Season,TrainingBridge} from '../../types'
 import {useI18n} from '../../shared/i18n'
 import {MapPreview} from '../arena/MapPreview'
@@ -108,7 +108,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
     if(!sensoryReady){setError(t('Selected sensory input is unavailable for training.'));return}
     if(!identity){onLogin();return}
     await act('create',async()=>{
-      const run=await api<Training>('/training',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({name,founder_id:founder,opponent_id:mode==='contest'?opponent:null,strategy,optimizer_name:strategy==='external'?optimizerName:'',circuits,mutation_strength:strength,population,generations,max_evaluations:budget,map_id:map,mode,duration_seconds:duration,seed,evaluation_conditions:extraConditions.length?conditions:null,bridge_profile:bridgeProfile,...(season?.training_fitness_objectives?{fitness_objective:fitnessObjective}:{}),...(season?.training_sensory_profiles?{sensory_profile:sensoryProfile}:{})})},identity)
+      const run=await api<Training>('/training',{method:'POST',headers:{'Idempotency-Key':newRequestKey()},body:JSON.stringify({name,founder_id:founder,opponent_id:mode==='contest'?opponent:null,strategy,optimizer_name:strategy==='external'?optimizerName:'',circuits,mutation_strength:strength,population,generations,max_evaluations:budget,map_id:map,mode,duration_seconds:duration,seed,evaluation_conditions:extraConditions.length?conditions:null,bridge_profile:bridgeProfile,...(season?.training_fitness_objectives?{fitness_objective:fitnessObjective}:{}),...(season?.training_sensory_profiles?{sensory_profile:sensoryProfile}:{})})},identity)
       accept(run);setGeneration(null)
     })
   }

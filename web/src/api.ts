@@ -10,3 +10,9 @@ export async function api<T>(path:string, options:RequestInit={}, identity?:Iden
   }
   return response.json()
 }
+
+/** getRandomValues also works on LAN HTTP origins where randomUUID is unavailable. */
+export function newRequestKey(){
+  const bytes=globalThis.crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes,b=>b.toString(16).padStart(2,'0')).join('')
+}

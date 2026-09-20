@@ -14,7 +14,7 @@ import {useReplay} from './features/arena/useReplay'
 import {selectReplayFrames} from './features/arena/replayFrames'
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react'
 import {ArrowDownToLine,ArrowRight,ArrowUpRight,AudioLines,Beaker,Bug,Check,ChevronDown,Code2,Copy,Dna,ExternalLink,FlaskConical,GitBranch,Leaf,Loader2,Pause,Play,Plus,RotateCcw,Settings2,ShieldCheck,Sparkles,Swords,Terminal,Trophy,UserRound,X} from 'lucide-react'
-import {api,setCsrfToken} from './api'
+import {api,setCsrfToken,newRequestKey} from './api'
 import {PhenotypeLab} from './features/phenotype/PhenotypeLab'
 import {AdvancedInterventions} from './features/design/AdvancedInterventions'
 import {assertSpec,composeSpec} from './features/design/spec'
@@ -22,7 +22,7 @@ import {Preferences,useI18n} from './shared/i18n'
 import type {InterventionSpec} from './shared/research'
 import {ArenaCanvas} from './ArenaCanvas'
 import type {ArenaMap,AuthSettings,Fly,Frame,Identity,Match,Preview,Report,Scene,Season,Spec} from './types'
-import {defaultMatchProfile,colors,modes,num,preferredReplay} from './types'
+import {defaultMatchProfile,colors,modes,num} from './types'
 
 import {readRoute,routeHash,type Tab} from './shared/navigation'
 type Ranking={fly:Fly;wins:number;draws:number;losses:number;matches:number;food:number;points:number}
@@ -72,6 +72,7 @@ export default function App(){
   const [freshToken,setFreshToken]=useState('')
   const [agentTokens,setAgentTokens]=useState<{id:string;expires:number}[]>([])
   const [login,setLogin]=useState(false)
+  const pendingIntent=useRef<'match'|'save-arena'|'save-train'|null>(null)
   const [identityName,setIdentityName]=useState('')
   const [invite,setInvite]=useState('')
   const [showToken,setShowToken]=useState(false)
@@ -79,9 +80,9 @@ export default function App(){
   const [error,setError]=useState('')
   const [toast,setToast]=useState('')
   const [mapId,setMapId]=useState('orchard')
-  const [mode,setMode]=useState('contest')
+  const [mode,setMode]=useState('forage')
   const [opponent,setOpponent]=useState('')
-  const [duration,setDuration]=useState(5)
+  const [duration,setDuration]=useState(2)
   const [seed,setSeed]=useState(42)
   const [focused,setFocusedState]=useState<string>(readRoute(location.hash).match)
   const [play,setPlay]=useState(false)
@@ -147,7 +148,7 @@ export default function App(){
   useEffect(()=>{
     if(!season)return
     const pending=sessionStorage.getItem('flyarena.pendingDesign')
-    if(pending){try{const draft=JSON.parse(pending);loadSpec(draft.spec||draft);if(draft.jsonEditor!==undefined)setJsonEditor(draft.jsonEditor);if(draft.tab)setTab(draft.tab);if(draft.replayOrigin){setReplayOrigin(draft.replayOrigin);setSelected('')}sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
+    if(pending){try{const draft=JSON.parse(pending);loadSpec(draft.spec||draft);if(draft.jsonEditor!==undefined)setJsonEditor(draft.jsonEditor);if(draft.tab)setTab(draft.tab);if(draft.intent)pendingIntent.current=draft.intent;if(draft.setup){setSelected(draft.setup.selected);setMapId(draft.setup.mapId);setMode(draft.setup.mode);setOpponent(draft.setup.opponent);setDuration(draft.setup.duration);setSeed(draft.setup.seed);setBridgeProfile(draft.setup.bridgeProfile);setSensoryProfile(draft.setup.sensoryProfile)}if(draft.replayOrigin){setReplayOrigin(draft.replayOrigin);setSelected('')}sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
   },[authSettings?.mode,season])
   useEffect(()=>{
     if(showToken&&authSettings?.mode==='nyxid'&&identity&&!identity.token)api<{id:string;expires:number}[]>('/auth/agent-tokens').then(setAgentTokens).catch(e=>setError(e.message))
@@ -155,7 +156,7 @@ export default function App(){
   },[showToken,authSettings?.mode,identity?.id])
   useEffect(()=>{
     Promise.all([api<Season>('/season'),api<Fly[]>('/flies'),api<ArenaMap[]>('/maps'),api<Match[]>('/matches')]).then(([s,f,m,ms])=>{
-      setSeason(s);setBridgeProfile(defaultMatchProfile(s));setFlies(f);setMaps(m);setMatches(ms);setFocusedState(old=>old||preferredReplay(ms)?.id||'')
+      setSeason(s);setBridgeProfile(defaultMatchProfile(s));setFlies(f);setMaps(m);setMatches(ms);setSelected(old=>old||matchingWildType(f)?.id||'')
       if(f.length){setOpponent(f.length>1?f[1].id:f[0].id)}
     }).catch(e=>setError(e.message))
     api<Preview>('/preview').then(setPreview).catch(e=>setError(t("身体模型加载失败：")+e.message))
@@ -186,16 +187,42 @@ export default function App(){
 
   function clone(fly:Fly){setReplayOrigin(null);setParentId(fly.id);setBaseSpec(fly.spec);setInterventions(fly.spec.interventions||[]);setSelected(fly.id);setName(fly.name.split(' / ')[0]+' 02');setColor(fly.color);const values:Record<string,number>=defaultScales();for(const m of fly.spec.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(fly.spec.neuron_parameters.tau_scale);setThreshold(fly.spec.neuron_parameters.threshold_shift_mv);setEdgeDeltas(fly.spec.edge_deltas);setReport(null)}
   async function action(label:string,fn:()=>Promise<void>){setBusy(label);setError('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
-  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify({spec,jsonEditor,tab,replayOrigin}));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
+  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify({spec,jsonEditor,tab,replayOrigin,intent:pendingIntent.current,setup:{selected,mapId,mode,opponent,duration,seed,bridgeProfile,sensoryProfile}}));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
   async function createAgentToken(){await action('agent-token',async()=>{const key=await api<{token:string}>('/auth/agent-tokens',{method:'POST'});setFreshToken(key.token);setAgentTokens(await api('/auth/agent-tokens'))})}
   async function logout(){await action('logout',async()=>{if(authSettings?.mode==='nyxid'&&!identity?.token)await api('/auth/logout',{method:'POST'});setIdentity(null);setCsrfToken(null);setFreshToken('');if(authSettings?.mode==='local')localStorage.removeItem('flyarena.identity');setShowToken(false)})}
   async function register(){await action('identity',async()=>{const user=await api<Identity>('/identities',{method:'POST',body:JSON.stringify({name:identityName||'Explorer'}),headers:{'X-Invite-Code':invite}});setIdentity(user);localStorage.setItem('flyarena.identity',JSON.stringify(user));setLogin(false);setToast(t("设计师身份已创建，现在可以保存与参赛。"))})}
   async function validate(){if(!identity){setLogin(true);return}await action('validate',async()=>{const r=await api<Report>('/flies/validate',{method:'POST',body:JSON.stringify(spec)},identity);setReport(r);setToast(t("权重、图谱版本和变异预算验证通过。"))})}
   async function previewNeural(){if(!identity){setLogin(true);return}await action('neural-preview',async()=>{const result=await api<NeuralPreview>('/flies/preview',{method:'POST',body:JSON.stringify(spec)},identity);setNeuralPreview({data:result,specKey:JSON.stringify(spec)});setToast(t('Neural preview recorded from the retained graph.'))})}
   async function previewExample(){await action('neural-example',async()=>{const response=await fetch('/examples/neural-preview-nectar-v3.json');if(!response.ok)throw Error(locale==='zh-CN'?'刺激样本暂不可用':'Stimulus example is unavailable');const data:NeuralPreview=await response.json();if(!['neural-design-preview/v2','neural-design-preview/v3'].includes(data.schema)||!data.example)throw Error('Invalid stimulus example');setNeuralPreview({data,specKey:null})})}
-  async function publish(){if(!identity){setLogin(true);return}await action('publish',async()=>{const fly=await api<Fly>('/flies',{method:'POST',body:JSON.stringify(spec)},identity);await refresh();setSelected(fly.id);setReport(fly.report);setBaseSpec(fly.spec);setParentId(fly.id);setReplayOrigin(null);setTab('train');setToast(t('Design saved. Choose a strategy and budget to start training.'))})}
-  async function startMatch(){if(!season?.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))){setError(t('Selected match profile is unavailable.'));return}if(!identity){setLogin(true);return}if(!selected){setError(t("请先选择或保存一只果蝇。"));return}await action('match',async()=>{const match=await api<Match>('/matches',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({fly_ids:mode==='forage'?[selected]:[selected,opponent||selected],map_id:mapId,mode,seed,duration_seconds:duration,bridge_profile:bridgeProfile,sensory_profile:selectedSensoryProfile,sandbox:true})},identity);setFocused(match.id);await refresh();setToast(t("比赛已进入仿真队列，完成后自动加载回放。"))})}
-  async function startSeries(){if(!season?.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))){setError(t('Selected match profile is unavailable.'));return}if(!identity){setLogin(true);return}if(selected===(opponent||selected)){setError(t("系列赛需要两只不同的果蝇"));return}await action('series',async()=>{const series=await api<{id:string;matches:Match[]}>('/tournaments',{method:'POST',headers:{'Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({name:t("双循环 / ")+(selectedFly?.name||'Fly'),fly_ids:[selected,opponent],map_id:mapId,mode:mode==='sumo'?'sumo':'contest',seeds:[seed],duration_seconds:duration,bridge_profile:bridgeProfile,sensory_profile:selectedSensoryProfile,sandbox:true})},identity);setFocused(series.matches[0].id);await refresh();setToast(t("双循环已创建：同一地图与种子，两场交换出生位置的比赛。"))})}
+  async function submitMatch(owner:Identity, flyIds:string[], setup:{map_id:string;mode:string;duration_seconds:number;seed:number}){
+    const match=await api<Match>('/matches',{method:'POST',headers:{'Idempotency-Key':newRequestKey()},body:JSON.stringify({...setup,fly_ids:flyIds,bridge_profile:bridgeProfile,sensory_profile:selectedSensoryProfile,sandbox:true})},owner)
+    setFocused(match.id);await refresh();setToast(t("比赛已进入仿真队列，完成后自动加载回放。"))
+  }
+  async function publish(destination:'train'|'arena'='train'){
+    if(!identity){pendingIntent.current=destination==='arena'?'save-arena':'save-train';setLogin(true);return}
+    await action('publish',async()=>{
+      const fly=await api<Fly>('/flies',{method:'POST',body:JSON.stringify(spec)},identity)
+      await refresh();setSelected(fly.id);setReport(fly.report);setBaseSpec(fly.spec);setParentId(fly.id);setReplayOrigin(null)
+      if(destination==='arena'){
+        setMapId('orchard');setMode('forage');setDuration(2);setSeed(42)
+        await submitMatch(identity,[fly.id],{map_id:'orchard',mode:'forage',duration_seconds:2,seed:42})
+      }else{setTab('train');setToast(t('Design saved. Choose a strategy and budget to start training.'))}
+    })
+  }
+  async function startMatch(){
+    if(!season?.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))){setError(t('Selected match profile is unavailable.'));return}
+    if(!identity){pendingIntent.current='match';setLogin(true);return}
+    if(!selected){setError(t("请先选择或保存一只果蝇。"));return}
+    await action('match',()=>submitMatch(identity,mode==='forage'?[selected]:[selected,opponent||selected],{map_id:mapId,mode,seed,duration_seconds:duration}))
+  }
+  useEffect(()=>{
+    if(!identity){if(!login&&authSettings?.mode==='local')pendingIntent.current=null;return}
+    if(!season)return
+    const intent=pendingIntent.current;pendingIntent.current=null
+    if(intent==='match')void startMatch()
+    else if(intent)void publish(intent==='save-arena'?'arena':'train')
+  },[identity,login,season])
+  async function startSeries(){if(!season?.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))){setError(t('Selected match profile is unavailable.'));return}if(!identity){setLogin(true);return}if(selected===(opponent||selected)){setError(t("系列赛需要两只不同的果蝇"));return}await action('series',async()=>{const series=await api<{id:string;matches:Match[]}>('/tournaments',{method:'POST',headers:{'Idempotency-Key':newRequestKey()},body:JSON.stringify({name:t("双循环 / ")+(selectedFly?.name||'Fly'),fly_ids:[selected,opponent],map_id:mapId,mode:mode==='sumo'?'sumo':'contest',seeds:[seed],duration_seconds:duration,bridge_profile:bridgeProfile,sensory_profile:selectedSensoryProfile,sandbox:true})},identity);setFocused(series.matches[0].id);await refresh();setToast(t("双循环已创建：同一地图与种子，两场交换出生位置的比赛。"))})}
   function loadSpec(value:Spec){assertSpec(value);setReplayOrigin(null);setParentId(value.parent_id||null);setBaseSpec(value);setInterventions(value.interventions||[]);setName(value.name);setColor(value.color);setSelected(value.parent_id||'');const values:Record<string,number>=defaultScales();for(const m of value.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(value.neuron_parameters?.tau_scale??1);setThreshold(value.neuron_parameters?.threshold_shift_mv??0);setEdgeDeltas(value.edge_deltas||[]);setReport(null);setTab('design');setToast(t("设计已导入；保存时将再次通过服务端验证。"))}
   function designFromReplay(draft:Spec,origin:ReplayDesignOrigin){loadSpec(draft);setReplayOrigin(origin);setSelected('');setNeuralPreview(null);setPlay(false)}
   const estimated=useMemo(()=>{
@@ -251,7 +278,7 @@ export default function App(){
             <p className="capability-note">{t('Start with olfactory → projection / local → readout. Vision depends on the match sensory profile; weight edits alone do not add learning or new motor channels.')}</p><div className="sliders">{season?.connectome.circuits.filter(c=>!['visual','memory','motor'].includes(c.id)).map(c=><label key={c.id} className={'slider-control '+(['visual','memory','motor'].includes(c.id)?'exploratory':'primary-control')}><span><span className="circuit-dot" style={{background:c.color}}/>{t(c.label)}<small>× {scales[c.id]?.toFixed(2)}</small></span><input aria-label={t(c.label)+' '+t('Weight')} type="range" min="0.5" max="2" step=".01" value={scales[c.id]??1} onChange={e=>{setScales(s=>({...s,[c.id]:Number(e.target.value)}));setReport(null)}}/></label>)}</div><details className="exploratory-controls"><summary>{t('Exploratory edits: vision, memory and motor')}</summary><p>{t('Experimental visual input requires a compatible sensory profile. Memory and motor edits remain exploratory.')}</p><div className="sliders">{season?.connectome.circuits.filter(c=>['visual','memory','motor'].includes(c.id)).map(c=><label key={c.id} className={'slider-control '+(['visual','memory','motor'].includes(c.id)?'exploratory':'primary-control')}><span><span className="circuit-dot" style={{background:c.color}}/>{t(c.label)}<small>× {scales[c.id]?.toFixed(2)}</small></span><input aria-label={t(c.label)+' '+t('Weight')} type="range" min="0.5" max="2" step=".01" value={scales[c.id]??1} onChange={e=>{setScales(s=>({...s,[c.id]:Number(e.target.value)}));setReport(null)}}/></label>)}</div></details>
             <details className="intrinsic"><summary>{t("神经元动力学")}<ChevronDown size={13}/></summary><label>{t("膜时间常数")}<b>× {tau.toFixed(2)}</b><input aria-label={t("膜时间常数")} type="range" min=".8" max="1.2" step=".01" value={tau} onChange={e=>{setTau(+e.target.value);setReport(null)}}/></label><label>{t("发放阈值变化")}<b>{threshold>0?'+':''}{threshold.toFixed(1)} {t("mV")}</b><input aria-label={t("发放阈值")} type="range" min="-1" max="1" step=".1" value={threshold} onChange={e=>{setThreshold(+e.target.value);setReport(null)}}/></label></details>
             <div className={'budget '+(used>100?'over':'')}><div><span>{report?t("已验证预算"):t("预算估算")}</span><strong>{used.toFixed(1)} <small>/ 100</small></strong></div><div className="budget-track"><span style={{width:Math.min(100,used)+'%'}}/></div><p>{report?`${num(report.changed_edges)} ${t('Changed connections')}`:t("强化与削弱都消耗预算，最终由服务端核算。")}</p>{!report&&(interventions.length>0||edgeDeltas.length>0)&&<p>{t('Estimate excludes advanced and edge edits. Validate for the authoritative total.')}</p>}</div>
-            <div className="editor-actions"><button className="secondary" onClick={validate} disabled={!!busy}>{busy==='validate'?<Loader2 className="spin" size={15}/>:<ShieldCheck size={15}/>}{t("验证")}</button><button className="secondary" onClick={previewNeural} disabled={!!busy||!season}>{busy==='neural-preview'?<Loader2 className="spin" size={15}/>:<AudioLines size={15}/>}{t('Preview neural response')}</button><button className="secondary" onClick={previewExample} disabled={!!busy}>{busy==='neural-example'?<Loader2 className="spin" size={15}/>:<Beaker size={15}/>} {locale==='zh-CN'?'查看真实刺激样本':'View recorded stimulus example'}</button><button className="primary" onClick={publish} disabled={!!busy||!season}>{busy==='publish'?<Loader2 className="spin" size={15}/>:<Plus size={15}/>}{t("保存果蝇")}</button></div>
+            <div className="editor-actions"><button className="primary" onClick={()=>publish('arena')} disabled={!!busy||!season||!season.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))}><Play size={15}/>{locale==='zh-CN'?'保存并试跑 2 秒':'Save and simulate 2 seconds'}</button><button className="secondary" onClick={validate} disabled={!!busy}>{busy==='validate'?<Loader2 className="spin" size={15}/>:<ShieldCheck size={15}/>}{t("验证")}</button><button className="secondary" onClick={previewNeural} disabled={!!busy||!season}>{busy==='neural-preview'?<Loader2 className="spin" size={15}/>:<AudioLines size={15}/>}{t('Preview neural response')}</button><button className="secondary" onClick={previewExample} disabled={!!busy}>{busy==='neural-example'?<Loader2 className="spin" size={15}/>:<Beaker size={15}/>} {locale==='zh-CN'?'查看真实刺激样本':'View recorded stimulus example'}</button><button className="primary" onClick={()=>publish()} disabled={!!busy||!season}>{busy==='publish'?<Loader2 className="spin" size={15}/>:<Plus size={15}/>}{t("保存果蝇")}</button></div>
           </aside>
         </div>
         {neuralPreview&&<NeuralPreviewPanel record={neuralPreview} stale={neuralPreview.specKey!==JSON.stringify(spec)} circuits={season?.connectome.circuits||[]} onImport={loadSpec} onReplay={id=>{setFocused(id);setTab('arena')}}/>}
@@ -260,7 +287,7 @@ export default function App(){
         <div className="map-grid">{maps.map((m,i)=><button className="map-card" key={m.id} onClick={()=>{setMapId(m.id);setMode(m.id==='ring'?'sumo':'contest');setFocused('');setPlay(false)}}><div className="map-card-top"><span>0{i+1} / {(locale==='en'?m.english:m.name).toUpperCase()}</span><ArrowUpRight size={17}/></div><MapDrawing map={m}/><div className="map-card-bottom"><div><h3>{locale==='en'?m.english:m.name}</h3><p>{m.id==='orchard'?t("感知 · 探索 · 觅食"):m.id==='maze'?t("路径 · 障碍 · 适应"):m.id==='scarcity'?t("稀缺 · 竞争 · 耗尽"):m.id==='terrarium'?(locale==='en'?'Slopes · routes · shared food':'坡地 · 多路 · 共享食物'):t("接触 · 推挤 · 争夺")}</p></div><span className="map-tag">{m.id==='ring'?t("对抗"):t("觅食")}</span></div></button>)}<div className="ai-card"><span className="ai-icon"><Sparkles size={21}/></span><span className="eyebrow">{t("CO-DESIGN WITH AI")}</span><h3>{t("让 AI，")}<br/>{t("设计它的第一只果蝇。")}</h3><p>{t("开放 FlySpec 与 API。")}<br/>{t("你的 agent，可以直接加入。")}</p><button onClick={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}>{t("接入你的 AI")}<ArrowRight size={16}/></button></div></div>
       </>}
 
-      {tab==='arena'&&<ArenaFeature onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={value=>{const id=typeof value==='function'?value(bridgeProfile):value;setBridgeProfile(id);if(!compatibleSensory(season,id,sensoryProfile))setSensoryProfile('odor-only-v1')}} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy||(replay.status==='loading'?'replay':'')} startMatch={startMatch} startSeries={startSeries}/>}
+      {tab==='arena'&&<ArenaFeature onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={value=>{const id=typeof value==='function'?value(bridgeProfile):value;setBridgeProfile(id);if(!compatibleSensory(season,id,sensoryProfile))setSensoryProfile('odor-only-v1')}} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy} startMatch={startMatch} startSeries={startSeries}/>}
 
       {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeed(setup.seed);setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
