@@ -1152,6 +1152,17 @@ test('research offspring retains kernel senses in playable unranked match setup'
 })
 
 const {morphologyActivity,validateMorphology}=require('./src/features/arena/morphology.js')
+test('spatial colors follow each fiber segment across regions, not the neuron class',()=>{
+ const {regionColorMap,fiberRegionColor}=require('./src/features/arena/morphology.js')
+ const n={id:'10',class:'Kenyon_cell',positions:[0,0,0,8,8,8,16,16,16],edges:[0,1,1,2],edge_regions:[21,24]}
+ const data={schema:'connectome-morphology/v1',connectome_sha256:'c'.repeat(64),coordinate_unit_nm:8,neurons:[n],parcellation:{resolution_nm:[2048,2048,2048],regions:[{id:21,name:'EB',color:'#ff6600'},{id:24,name:'FB',color:'#00ccff'}]}}
+ validateMorphology(data,data.connectome_sha256)
+ const palette=regionColorMap(data)
+ assert.equal(fiberRegionColor(n,0,palette),'#ff6600');assert.equal(fiberRegionColor(n,1,palette),'#00ccff')
+ assert.equal(fiberRegionColor({...n,edge_regions:[0,0]},0,palette),'#526b78')
+ assert.throws(()=>validateMorphology({...data,neurons:[{...n,edge_regions:[21]}]},data.connectome_sha256))
+ assert.throws(()=>validateMorphology({...data,neurons:[{...n,edge_regions:[21,99]}]},data.connectome_sha256))
+})
 test('real fiber activity distinguishes zero from missing and changes with the observed contestant',()=>{
  const neurons=['10','20','30'].map(id=>({id,positions:[0,0,0,8,8,8],edges:[0,1],radii:[1,1]}))
  const value={schema:'connectome-morphology/v1',connectome_sha256:'a'.repeat(64),coordinate_unit_nm:8,neurons}
@@ -1172,12 +1183,15 @@ test('recorded tactile fibers remain selectable without a soma position and open
  const morphology={schema:'connectome-morphology/v1',connectome_sha256:sha,coordinate_unit_nm:8,neurons:[neuron],missing_ids:[]}
  globalThis.fetch=async url=>({ok:true,json:async()=>String(url).endsWith('/morphology')?morphology:anatomyFixture(sha)})
  const graph={neurons:[{id:'10001',position:[1,2,3]},{id:'802939',class:'mechanosensory_tactile',position:null}],edges:[]}
- await mount(AnatomicalBrain,{connectome:sha,graph,activity:new Map([['802939',12]]),scale:20,frames:[],slot:0,time:1,onSeek:noop})
+ let toggles=0
+ await mount(AnatomicalBrain,{connectome:sha,graph,activity:new Map([['802939',12]]),scale:20,frames:[],slot:0,time:1,onSeek:noop,playback:{playing:false,onToggle:()=>toggles++}})
  assert.equal(spatialCanvasProps.focus,'802939')
  assert.equal(spatialCanvasProps.wholeCns,true);assert.equal(spatialCanvasProps.angle,'xz')
  assert.match(document.querySelector('.morphology-legend').textContent,/1 real neuron skeletons · 1 with activity records/)
  await click('Neuron morphology');assert.equal(spatialCanvasProps.structure,true)
  await click('Recorded activity');assert.equal(spatialCanvasProps.structure,false)
  await click('Expand brain');assert.ok(document.querySelector('.morphology-expanded'))
+ await click('Play brain and body');assert.equal(toggles,1)
+ assert.ok(document.querySelector('.morphology-expanded input[aria-label="Brain and match timeline"]'))
  await click('Close expanded brain');assert.equal(document.querySelector('.morphology-expanded'),null)
 })

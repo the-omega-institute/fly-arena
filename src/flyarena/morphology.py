@@ -3,6 +3,23 @@ from __future__ import annotations
 import math
 
 SOURCE = 'https://storage.googleapis.com/flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-swc/'
+ROI_SOURCE = 'https://storage.googleapis.com/flyem-male-cns/rois/fullbrain-roi-v4/'
+
+
+def segment_regions(positions, edges, volume, resolution_nm, offset=(0, 0, 0)):
+    """Sample official spatial labels at SWC edge midpoints; 0 stays unassigned.
+
+    SWC units are 8 nm. Labels describe spatial compartments, not cell types.
+    Out-of-volume fibers (including VNC) must never inherit a brain ROI.
+    """
+    import numpy as np
+    points = np.asarray(positions).reshape(-1, 3)
+    pairs = np.asarray(edges, dtype=int).reshape(-1, 2)
+    voxels = np.floor(points[pairs].mean(axis=1) * 8 / np.asarray(resolution_nm)).astype(int) - offset
+    valid = ((voxels >= 0) & (voxels < np.asarray(volume.shape))).all(axis=1)
+    labels = np.zeros(len(pairs), dtype=np.uint16)
+    labels[valid] = volume[tuple(voxels[valid].T)]
+    return labels.tolist()
 
 
 def parse_swc(text: str) -> dict:

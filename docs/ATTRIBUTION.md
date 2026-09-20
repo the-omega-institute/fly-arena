@@ -10,3 +10,5 @@ The model assigns ACh a positive sign and GABA/Glu a negative sign, leaving othe
 
 Current circuit labels identify annotation-derived groups of presynaptic neurons. They do not establish causal behavior labels such as “aggression +15%”. Current sliders therefore name actual circuits and require empirical comparison of behavior. Online learning and imported executable plasticity rules are deliberately absent from this alpha's contract.
 - MaleCNS neuron centerline skeletons: official `gs://flyem-male-cns/v1.0/segmentation/skeletons-malecns/skeletons-swc/`, Male CNS Connectome, Berg et al., Cell (2026), FlyEM / Janelia and collaborators, CC-BY 4.0. Arena preserves source coordinates and branches; display colors and activity overlays are Arena renderings. See [morphology notes](NEURAL_MORPHOLOGY.md).
+
+The brain-region fiber colors use MaleCNS `fullbrain-roi-v4` (JRC2018M-derived, manually refined neuropil segmentation), in the same EM coordinate space. Region names come from its segment properties. Display hues are Arena choices; midpoint assignments use 2048 nm voxels. Source: https://storage.googleapis.com/flyem-male-cns/rois/fullbrain-roi-v4/info .

@@ -19,8 +19,8 @@ The public SWC directory needs no account or neuPrint token. Its coordinates are
 
 The browser renders actual fibers with Three.js, retaining the existing body and event clock. Geometry remains fixed while a small per-neuron GPU texture changes activity brightness, so replay does not rebuild hundreds of thousands of branches at every frame. Brain/CNS framing, rotation, zoom, and an expanded view are available.
 
-- **Recorded activity:** a neuron’s recorded value controls brightness across its own real skeleton. Missing samples are dark gray and zero samples remain explicitly recorded. Gold indicates selection, independently of activity.
-- **Neuron morphology:** color identifies source-annotated groups and visual sides. This is a structural view, not an activity measurement.
+- **Recorded activity:** each neuron’s recorded value controls brightness across its real skeleton, preserving spatial region colors. Unrecorded fibers stay dim and never flash. Zero and missing retain separate recording flags. Selection does not override activity brightness.
+- **Neuron morphology:** color identifies the actual spatial neuropil compartment, not neuron class. Selection brightens the selected skeleton only in this static mode. The same neuron can cross several differently colored regions.
 - Current LIF/rate models represent neurons as single compartments. Uniformly coloring a neuron’s morphology does **not** simulate voltage propagation along its axon or dendrites. No traveling light waves are invented.
 - The prepared shape set is a sample, not 165,122 skeletons and not whole-brain activity imaging. Existing replays retain their original 66 activity samples. Loading additional skeletons cannot recover activity that was never recorded.
 
@@ -37,4 +37,17 @@ This writes `data/connectome/morphology.json`, served by `/api/v1/connectome/mor
 
 To display widespread activity over time, record dense neuron activity from new simulation runs into compact, time-chunked arrays and join by the canonical neuron IDs. The simulator already maintains a rate for every retained neuron; the current replay export only samples a small subset. Expand recording, not inference from the nearby soma or a group average.
 
-For a 20-second single-fly run sampled at 20 Hz, 165,122 neurons at float16 require approximately 132 MB before compression. Make this an explicit observation option, stream only visible time windows, and keep the original sampling interval and units. Historical 66-neuron replays must stay labeled as such. Independently add neuropil surfaces from the official ROI volume for brain-region context. These steps are not delivered merely by importing the skeletons.
+For a 20-second single-fly run sampled at 20 Hz, 165,122 neurons at float16 require approximately 132 MB before compression. Make this an explicit observation option, stream only visible time windows, and keep the original sampling interval and units. Historical 66-neuron replays must stay labeled as such. Optional translucent neuropil surfaces can complement the implemented spatial fiber colors. Dense activity is not delivered merely by importing skeletons or parcellation.
+
+## Spatial region colors
+
+`scripts/prepare_brain_regions.py` samples the official [fullbrain-roi-v4 volume](https://storage.googleapis.com/flyem-male-cns/rois/fullbrain-roi-v4/info), using the source [region labels](https://storage.googleapis.com/flyem-male-cns/rois/fullbrain-roi-v4/segment_properties/info). The offline preprocessing tool needs `tensorstore`; the web server and simulator do not.
+
+```sh
+uv pip install tensorstore
+python scripts/prepare_brain_regions.py
+```
+
+SWC coordinates are converted from 8 nm units to the volume’s 2048 nm voxel grid; each fiber segment receives the label of its midpoint’s containing voxel. This is a 2.048 µm anatomical assignment, with approximate compartment boundaries at that resolution. Neuron classes and soma locations are not used to guess regions. Gray means unassigned or outside the brain volume, including the VNC; zero labels are never filled by nearest-region guesses. Hues are a stable display palette, not experimentally measured colors.
+
+The current sample assigns 577,645 segments to 86 spatial regions; 145,745 segments remain unassigned. The collapsible legend names regions including left/right hemisphere labels. Region colors are preserved in both structure and activity modes. There are no point sprites, randomly timed flashes, or traveling synthetic spikes in the fiber renderer. Activity is recorded rate data on the shared body/brain replay clock. The enlarged brain has the same play/pause and seek controls, including synchronized comparison playback.

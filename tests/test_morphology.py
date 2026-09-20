@@ -7,6 +7,17 @@ from flyarena.store import Store
 from flyarena.morphology import parse_swc
 
 
+def test_spatial_regions_use_8nm_midpoints_and_keep_outside_unassigned():
+    import numpy as np
+    from flyarena.morphology import segment_regions
+    volume = np.array([[[21]], [[24]]], dtype=np.uint64)
+    # Source positions 0, 512, 768 become voxel midpoints 1 and 2.5 at 2048 nm.
+    # Use an offset to exercise volume registration, plus a negative coordinate.
+    positions = [0,0,0, 512,0,0, 768,0,0, -512,0,0]
+    assert segment_regions(positions, [0,1,1,2,0,3], volume, [2048]*3) == [24,0,0]
+    assert segment_regions(positions, [0,1,1,2,0,3], volume, [2048]*3, [1,0,0]) == [21,24,0]
+
+
 def test_swc_preserves_branches_forest_roots_and_source_units():
     shape = parse_swc('# example\n10 1 8 16 24 2 -1\n20 3 9 17 25 1 10\n30 3 8 20 30 0.5 10\n40 0 90 80 70 1 -1')
     assert shape['positions'] == [8,16,24,9,17,25,8,20,30,90,80,70]
