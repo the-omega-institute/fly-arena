@@ -1001,7 +1001,7 @@ test('anatomical brain uses matching static coordinates, selects real neurons an
  const frames=[0,1].map((time,i)=>({time,brain:[{sampled_nodes:[{id:'a',activity:i*12},{id:'b',activity:i*5},{id:'c',activity:i*7}]}]}))
  const props={connectome:sha,graph:positionedGraph,activity:new Map([['a',0],['b',0],['c',0]]),scale:12,frames,slot:0,time:0,onSeek:t=>seeks.push(t)}
  await mount(AnatomicalBrain,props)
- assert.deepEqual(requests,['/api/v1/connectome/anatomy','/examples/anatomy/'+sha+'.json'])
+ assert.deepEqual(requests.filter(url=>!url.endsWith('/morphology')),['/api/v1/connectome/anatomy','/examples/anatomy/'+sha+'.json'])
  assert.match(document.querySelector('.anatomical-brain-counts').textContent,/2 actual soma positions.*1 neurons without coordinates/)
  assert.equal(spatialCanvasProps.space.positions.length,6)
  assert.equal(document.querySelector('[aria-label="Spatial neuron a"]').dataset.activity,'0')
@@ -1018,12 +1018,12 @@ test('anatomical brain uses matching static coordinates, selects real neurons an
  // Same anatomy can be reused across participants, but activity must change.
  await mount(AnatomicalBrain,{...props,activity:new Map(),slot:1})
  assert.equal(document.querySelector('[aria-label="Spatial neuron b"]').dataset.activity,'missing')
- assert.equal(requests.length,2)
+ assert.equal(requests.filter(url=>!url.endsWith('/morphology')).length,2)
 })
 test('anatomical view rejects another connectome and discards a late response after switching replay',async()=>{
  let resolveOld
  const old='d'.repeat(64),next='e'.repeat(64)
- globalThis.fetch=async url=>String(url).startsWith('/api/')?new Promise(resolve=>{resolveOld=resolve}):{ok:true,json:async()=>anatomyFixture(old)}
+ globalThis.fetch=async url=>String(url).endsWith('/morphology')?{ok:false}:String(url).startsWith('/api/')?new Promise(resolve=>{resolveOld=resolve}):{ok:true,json:async()=>anatomyFixture(old)}
  const props={connectome:old,graph:positionedGraph,activity:new Map(),scale:1,frames:[],slot:0,time:0,onSeek:noop}
  await mount(AnatomicalBrain,props)
  globalThis.fetch=async()=>({ok:true,json:async()=>anatomyFixture('f'.repeat(64))})
@@ -1147,4 +1147,20 @@ test('research offspring retains kernel senses in playable unranked match setup'
  assert.deepEqual([...select.options].map(o=>o.value),['odor-only-v1',senses])
  assert.match(document.body.textContent,/Results stay outside the public leaderboard/)
  await click('Start match');assert.equal(submitted,1)
+})
+
+const {morphologyActivity,validateMorphology}=require('./src/features/arena/morphology.js')
+test('real fiber activity distinguishes zero from missing and changes with the observed contestant',()=>{
+ const neurons=['10','20','30'].map(id=>({id,positions:[0,0,0,8,8,8],edges:[0,1],radii:[1,1]}))
+ const value={schema:'connectome-morphology/v1',connectome_sha256:'a'.repeat(64),coordinate_unit_nm:8,neurons}
+ assert.equal(validateMorphology(value,'a'.repeat(64)),value)
+ assert.throws(()=>validateMorphology(value,'b'.repeat(64)))
+ assert.throws(()=>validateMorphology({...value,neurons:[{...neurons[0],edges:[0,2]}]},'a'.repeat(64)))
+ const first=morphologyActivity(neurons,new Map([['10',0],['20',100]]),100,null)
+ assert.equal(first[0],0);assert.equal(first[1],255,'zero has a recorded flag')
+ assert.equal(first[4],255);assert.equal(first[5],255)
+ assert.equal(first[8],0);assert.equal(first[9],0,'missing remains unrecorded')
+ const other=morphologyActivity(neurons,new Map([['30',50]]),100,'10')
+ assert.equal(other[1],0);assert.equal(other[2],255,'selection is separate from activity')
+ assert.ok(other[8]>0);assert.equal(other[9],255)
 })

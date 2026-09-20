@@ -161,7 +161,15 @@ export default function App(){
     api<Preview>('/preview').then(setPreview).catch(e=>setError(t("身体模型加载失败：")+e.message))
     api<Ranking[]>('/leaderboard').then(setRankings).catch(()=>{})
   },[])
-  useEffect(()=>{const timer=setInterval(()=>refresh().catch(()=>{}),2500);return()=>clearInterval(timer)},[refresh])
+  useEffect(()=>{
+    let stopped=false;let timer:ReturnType<typeof setTimeout>
+    async function poll(){
+      if(document.visibilityState!=='hidden')await refresh().catch(()=>{})
+      if(!stopped)timer=setTimeout(poll,2500)
+    }
+    timer=setTimeout(poll,2500)
+    return()=>{stopped=true;clearTimeout(timer)}
+  },[refresh])
   useEffect(()=>{if(toast){const timer=setTimeout(()=>setToast(''),4500);return()=>clearTimeout(timer)}},[toast])
   useEffect(()=>{setPlaytime(0);setPlay(replay.status==='ready')},[focused,replay.status])
   useEffect(()=>{

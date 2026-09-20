@@ -305,7 +305,14 @@ class TrainingService:
                     if match.get('id')==ident:return self._public(match)
         return None
 
-    def gallery_matches(self):
+    def public_match(self, match, include_brain=True):
+        if not include_brain and 'participants' in match:
+            match = {**match, 'participants': [
+                {k:v for k,v in participant.items() if k != 'brain_graph'}
+                for participant in match.get('participants', [])]}
+        return self._public(match)
+
+    def gallery_matches(self, include_brain=True):
         """Return verified replay records shipped with the public gallery.
 
         A deployment may intentionally omit its private SQLite database.  The
@@ -321,13 +328,13 @@ class TrainingService:
                     ident=match.get('id')
                     if not ident or ident in seen or match.get('status') not in {'verified','failed','queued','running'}:
                         continue
-                    seen.add(ident);result.append(self._public(match))
+                    seen.add(ident);result.append(self.public_match(match, include_brain))
         return result
 
     def _bundled_replay_folder(self):
         return self.store.root/'research'/'replay-gallery-v1'
 
-    def bundled_replay_matches(self):
+    def bundled_replay_matches(self, include_brain=True):
         """Read explicitly selected, immutable replay records.
 
         These files are produced by ``scripts/bundle_replay.py`` and contain
@@ -341,7 +348,7 @@ class TrainingService:
             try:value=json.loads(path.read_text())
             except (OSError,ValueError):continue
             if value.get('id') and value.get('status') in {'verified','failed'}:
-                result.append(self._public(value))
+                result.append(self.public_match(value, include_brain))
         return result
 
     def bundled_replay_match(self,ident):
