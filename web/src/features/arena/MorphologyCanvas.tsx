@@ -30,7 +30,7 @@ float alpha=state.r*(1.0-smoothstep(0.25,1.0,abs(across)))*0.8;
 gl_FragColor=vec4(hue,alpha);
 #include <colorspace_fragment>
 }`
-function Fibers({data,activity,scale,focus,onFocus,structure,wholeCns,angle,reset,changeMode=false,recordedIds=[]}:{data:Morphology;activity:Map<string,number>;scale:number;focus:string|null;onFocus:(id:string)=>void;structure:boolean;wholeCns:boolean;angle:BrainAngle;reset:number;changeMode?:boolean;recordedIds?:string[]}){
+function Fibers({data,activity,scale,focus,onFocus,structure,wholeCns,angle,reset,changeMode=false,recordedIds=[],zoomId}:{data:Morphology;activity:Map<string,number>;scale:number;focus:string|null;onFocus:(id:string)=>void;structure:boolean;wholeCns:boolean;angle:BrainAngle;reset:number;changeMode?:boolean;recordedIds?:string[];zoomId?:string|null}){
  const {camera,controls,invalidate,size}=useThree()
  const recordingKey=recordedIds.slice().sort().join(',')
  const resources=useMemo(()=>{
@@ -50,7 +50,15 @@ function Fibers({data,activity,scale,focus,onFocus,structure,wholeCns,angle,rese
  },[data,wholeCns,recordingKey])
  useEffect(()=>()=>{resources.geometry.dispose();resources.texture.dispose();resources.material.dispose();resources.ribbon.dispose();resources.ribbonMaterial.dispose()},[resources])
  useEffect(()=>{resources.texture.image.data.set(morphologyActivity(data.neurons,activity,scale,focus,changeMode));resources.texture.needsUpdate=true;resources.material.uniforms.structure.value=structure?1:0;resources.material.uniforms.viewport.value.set(size.width,size.height);invalidate()},[resources,data,activity,scale,focus,structure,changeMode,invalidate,size])
- useEffect(()=>{const orbit=controls as unknown as {target:THREE.Vector3;update:()=>void}|null;if(camera instanceof THREE.OrthographicCamera){const width=(resources.space.high[0]-resources.space.low[0])/resources.space.extent;const height=(resources.space.high[angle==='xz'?2:1]-resources.space.low[angle==='xz'?2:1])/resources.space.extent;camera.zoom=Math.min(size.width/(1.15*Math.max(.5,width)),size.height/(1.15*Math.max(.5,height)));camera.updateProjectionMatrix()}camera.up.set(0,angle==='xz'?0:1,angle==='xz'?1:0);camera.position.set(...(angle==='xz'?[0,-3.3,0]:angle==='xy'?[0,0,-3.3]:[.7,-.3,-3.3]) as [number,number,number]);orbit?.target.set(0,0,0);camera.lookAt(0,0,0);orbit?.update();invalidate()},[camera,controls,angle,reset,wholeCns,invalidate,size.width,size.height,resources])
+ useEffect(()=>{
+  const orbit=controls as unknown as {target:THREE.Vector3;update:()=>void}|null,space=resources.space
+  const selected=data.neurons.find(n=>n.id===zoomId),low=[Infinity,Infinity,Infinity],high=[-Infinity,-Infinity,-Infinity]
+  if(selected)for(let i=0;i<selected.positions.length;i+=3){if(!wholeCns&&selected.positions[i+2]>space.high[2])continue;for(let a=0;a<3;a++){low[a]=Math.min(low[a],selected.positions[i+a]);high[a]=Math.max(high[a],selected.positions[i+a])}}
+  const focused=Number.isFinite(low[0]),target=new THREE.Vector3(...(focused?low.map((v,i)=>((v+high[i])/2-space.center[i])/space.extent):[0,0,0]) as [number,number,number])
+  const bounds=focused?{low,high}:space
+  if(camera instanceof THREE.OrthographicCamera){const width=(bounds.high[0]-bounds.low[0])/space.extent,height=(bounds.high[angle==='xz'?2:1]-bounds.low[angle==='xz'?2:1])/space.extent;camera.zoom=Math.min(size.width/(1.2*Math.max(.18,width)),size.height/(1.2*Math.max(.18,height)));camera.updateProjectionMatrix()}
+  camera.up.set(0,angle==='xz'?0:1,angle==='xz'?1:0);camera.position.set(...(angle==='xz'?[0,-3.3,0]:angle==='xy'?[0,0,-3.3]:[.7,-.3,-3.3]) as [number,number,number]);camera.position.add(target);orbit?.target.copy(target);camera.lookAt(target);orbit?.update();invalidate()
+ },[camera,controls,angle,reset,wholeCns,invalidate,size.width,size.height,resources,data,zoomId])
  return <>
   <lineSegments geometry={resources.geometry} material={resources.material} onClick={event=>{if(event.index===undefined)return;event.stopPropagation();const i=resources.geometry.getAttribute('neuron').getX(event.index);onFocus(data.neurons[i].id)}}/>
   {!structure&&<mesh geometry={resources.ribbon} material={resources.ribbonMaterial} frustumCulled={false} renderOrder={2} raycast={()=>{}}/>}

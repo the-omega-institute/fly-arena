@@ -1227,4 +1227,6 @@ test('anatomical event controls keep body time and changed fibers on the same ba
  assert.match(document.querySelector('.brain-event-lens').textContent,/Food contact · 1.00 s/)
  await click('Recorded activity');assert.equal(spatialCanvasProps.changeMode,false);assert.equal(spatialCanvasProps.activity.get('20'),400)
  await click('Event-related changes');assert.equal(spatialCanvasProps.activity.get('20'),0)
+ await click('Focus strongest change');assert.equal(spatialCanvasProps.zoomId,'10')
+ await click('Reset anatomical view');assert.equal(spatialCanvasProps.zoomId,null)
 })
