@@ -2,8 +2,9 @@ import type {Frame,ReplayEvent} from '../../types'
 import {useI18n} from '../../shared/i18n'
 import {eventLabels,preEventBaseline,rateChanges,responseFrame} from './brainResponse'
 
-export function BrainEventLens({moments,event,pinned,onSelect,onFollow,baseline,changes,frame,frames,slot,onFocus}:{moments:ReplayEvent[];event:ReplayEvent|null;pinned:boolean;onSelect:(e:ReplayEvent,delay?:number)=>void;onFollow:()=>void;baseline:ReturnType<typeof preEventBaseline>;changes:ReturnType<typeof rateChanges>;frame:Frame|undefined;frames:Frame[];slot:number;onFocus:(id:string)=>void}){
+export function BrainEventLens({moments,event,pinned,onSelect,onFollow,baseline,changes,frame,frames,slot,onFocus,neurons=[]}:{moments:ReplayEvent[];event:ReplayEvent|null;pinned:boolean;onSelect:(e:ReplayEvent,delay?:number)=>void;onFollow:()=>void;baseline:ReturnType<typeof preEventBaseline>;changes:ReturnType<typeof rateChanges>;frame:Frame|undefined;frames:Frame[];slot:number;onFocus:(id:string)=>void;neurons?:{id:string;type?:string|null;class?:string|null}[]}){
  const {locale}=useI18n(),zh=locale==='zh-CN',name=(e:ReplayEvent)=>eventLabels[e.type]?.[zh?0:1]||e.type
+ const description=(id:string)=>{const neuron=neurons.find(n=>n.id===id);const group=neuron?.class||'';const label=zh?({gustatory:'味觉',ALLN:'触角叶局部',ALPN:'嗅觉投射',Kenyon_Cell:'Kenyon 细胞',MBON:'蘑菇体输出'} as Record<string,string>)[group]||group:group;return [neuron?.type,label].filter(Boolean).join(' · ')}
  const index=event?moments.findIndex(e=>e.tick===event.tick&&e.type===event.type):-1,sense=frame?.senses?.[slot]
  return <section className="brain-event-lens" aria-label={zh?'行为与神经变化':'Behavior and neural changes'}>
   <div className="brain-event-heading"><strong>{zh?'行为与神经变化':'Observe behavior and neural changes'}</strong><button onClick={onFollow} aria-pressed={!pinned}>{zh?'跟随比赛事件':'Follow match events'}</button></div>
@@ -13,7 +14,7 @@ export function BrainEventLens({moments,event,pinned,onSelect,onFollow,baseline,
   {baseline?<p>{zh?'基准：事件前 100 ms 内的实际采样均值':'Baseline: mean of actual samples within 100 ms before the event'} · {baseline.start.toFixed(2)}–{baseline.end.toFixed(2)} s · {changes.length} {zh?'个配对节点':'paired neurons'}</p>:<p>{zh?'没有事件前的采样，暂不显示差值；起始时的网络活动不能当作进食响应。':'No pre-event samples: changes are unavailable. Network startup activity is not a feeding response.'}</p>}
   <div className="brain-event-jumps"><button disabled={!baseline} onClick={()=>{if(event&&baseline)onSelect(event,-1)}}>{zh?'事件前':'Before event'}</button>{([.1,.5] as const).map(delay=><button key={delay} data-delay={delay} disabled={!event||!responseFrame(frames,event,delay)} onClick={()=>{if(event)onSelect(event,delay)}}>{zh?'事件后':'After event'} {delay*1000} ms</button>)}</div>
   {!!changes.length&&<button className="brain-focus-response" onClick={()=>onFocus(changes[0].id)}>{zh?'放大主要响应神经元':'Focus strongest change'}</button>}
-  {!!changes.length&&<div className="brain-event-changes">{changes.slice(0,3).map(n=><button key={n.id} onClick={()=>onFocus(n.id)}><span>{n.id}</span><b>{n.delta>=0?'+':''}{n.delta.toFixed(1)} Hz</b><small>{n.before.toFixed(1)} → {n.current.toFixed(1)}</small></button>)}</div>}
+  {!!changes.length&&<div className="brain-event-changes">{changes.slice(0,3).map(n=><button key={n.id} onClick={()=>onFocus(n.id)}><span>{n.id}</span><small>{description(n.id)}</small><b>{n.delta>=0?'+':''}{n.delta.toFixed(1)} Hz</b><small>{n.before.toFixed(1)} → {n.current.toFixed(1)}</small></button>)}</div>}
   <small>{zh?'亮度显示变化幅度，表中 ± 表示升高或降低。事件按时间对齐，不证明因果；进食记账与接触食物是不同记录。':'Brightness shows change magnitude; ± shows increases or decreases. Event timing does not establish causality. Intake accounting and food contact are distinct records.'}</small>
  </section>
 }
