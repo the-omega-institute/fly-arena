@@ -78,7 +78,7 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
   const habitat=scene?.habitat==='forest-floor'||layout?.habitat==='forest-floor'||layout?.id==='terrarium'
-  const cameraPosition:( [number,number,number])=design?[6,-9,5]:habitat?[17,-25,12]:[22,-28,26]
+  const cameraPosition:( [number,number,number])=design?[6,-9,5]:(scene?.task||layout?.task)?[16,-22,32]:habitat?[17,-25,12]:[22,-28,26]
   return <Canvas shadows dpr={[1,1.7]} camera={{position:cameraPosition,up:[0,0,1],fov:design?33:habitat?43:40,near:.05,far:250}} gl={{antialias:true,alpha:true}}>
     <ambientLight intensity={habitat?.65:.8}/><hemisphereLight args={[habitat?'#dbe8d0':tokens.sky,habitat?'#4b4034':tokens.ground,habitat?1.9:1.6]}/>
     <directionalLight position={habitat?[7,-10,18]:[6,-5,12]} intensity={habitat?3.8:3.2} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-bias={-.0003}/>
@@ -97,7 +97,7 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
         <mesh position={[0,0,-.14]} rotation={[Math.PI/2,0,0]} receiveShadow><cylinderGeometry args={[4.8,5,.18,96]} /><meshStandardMaterial color={tokens.platform} roughness={.93}/></mesh>
         <Grid args={[15,15]} rotation={[Math.PI/2,0,0]} position={[0,0,-.2]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={15} cellThickness={.35}/>
       </>}
-      {scene?.flies.map((fly,i)=>{const p=shown.positions?.[i],n=next?.positions?.[i]||p;if(!p)return null;return <Html key={'label-'+i} position={[p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,(p[2]||0)+1.6]} center style={{pointerEvents:'none'}}><ArenaWorldLabel fly={fly} slot={i} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]}/></Html>})}
+      {scene?.flies.map((fly,i)=>{const p=shown.positions?.[i],n=next?.positions?.[i]||p;if(!p)return null;return <Html key={'label-'+i} position={[p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,(p[2]||0)+(scene.task?(i===0?2.2:3.8):1.6)]} center style={{pointerEvents:'none'}}><ArenaWorldLabel fly={fly} slot={i} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]} compact={!!scene.task}/></Html>})}
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
     {scene?.task&&shown&&frames.length>0&&<RecordedTrails frames={frames} time={shown.time} scene={scene}/>}

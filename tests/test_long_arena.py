@@ -81,3 +81,30 @@ def test_long_replay_preserves_real_endpoint_and_neural_clock(receipt_factory):
     assert verify(folder)['final_tick']==1800000
     frames.pop(200);write_json(folder/'frames.json',frames);resign(folder)
     with pytest.raises(ValueError,match='missing ticks'):verify(folder)
+
+
+def test_duel_judge_reconstructs_territory_winner_from_positions(receipt_factory):
+    import numpy as np
+    folder=receipt_factory(end=600)
+    receipt=json.loads((folder/'receipt.json').read_text())
+    receipt['request'].update(map_id='duel',mode='duel',sandbox=True)
+    receipt['final_tick']=10000
+    old_scene=json.loads((folder/'scene.json').read_text())
+    scene=arena_scene('duel',42)
+    scene.update(body=old_scene['body'],flies=old_scene['flies'],replay_policy=POLICY)
+    frames=[dict(tick=t,time=t*.0001,poses=[[1,0,1,1,0,0,0],[5,0,1,1,0,0,0]],
+                 positions=[[1,0,1],[5,0,1]],energy=[100,100],food=[],drives=[[0,0],[0,0]],
+                 scores=[(t//500)*.05,0]) for t in range(0,10001,100)]
+    events=[dict(type='territory',tick=t,slot=0,amount=.05) for t in range(500,10001,500)]
+    result=dict(final_tick=10000,scores=[1.,0.],food_remaining=[],exit_ticks=[None,None],contact_ticks=0)
+    for name,value in [('receipt',receipt),('scene',scene),('frames',frames),('events',events),('result',result)]:
+        write_json(folder/(name+'.json'),value)
+    for name in ['physics.npz','brain-0.npz','brain-1.npz']:np.savez(folder/name,tick=np.array(10000),v=np.zeros(1))
+    resign(folder)
+    verdict=verify(folder)
+    assert verdict['winner_slot']==0
+    assert verdict['scores']==[1.,0.]
+    assert verdict['task']['control_seconds']==[1.,0.]
+    # A scoring claim cannot survive when both contestants occupy the region.
+    frames[5]['positions'][1]=[0,0,1];write_json(folder/'frames.json',frames);resign(folder)
+    with pytest.raises(ValueError,match='Territory score'):verify(folder)

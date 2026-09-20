@@ -1,5 +1,7 @@
-.arena-task-report{margin:12px 14px;padding:16px 18px;color:var(--text-primary,#d7dfc7);background:var(--panel-bg,#253b2e)}
+.arena-task-report{margin:12px 14px;padding:16px 18px;color:var(--text);background:var(--surface)}
 .arena-task-report h3{font-size:17px;margin:8px 0 12px;font-weight:500}
 .arena-task-report p{font-size:12px;line-height:1.8;margin:8px 0}
 .arena-task-report small{display:block;font-size:10px;line-height:1.7;opacity:.78}
 .arena-task-report .replay-camera-controls{padding:10px 0;border:0;flex-wrap:wrap}
+
+.fly-world-label.compact{padding:3px 6px;font-size:10px;border-radius:12px;opacity:.85}
