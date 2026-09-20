@@ -1166,3 +1166,18 @@ test('real fiber activity distinguishes zero from missing and changes with the o
  assert.equal(other[1],0);assert.equal(other[2],255,'selection is separate from activity')
  assert.ok(other[8]>0);assert.equal(other[9],255)
 })
+
+test('recorded tactile fibers remain selectable without a soma position and open the CNS view',async()=>{
+ const sha='8'.repeat(64),neuron={id:'802939',type:'SNta12',class:'mechanosensory_tactile',superclass:'vnc_sensory',side:'R',positions:[0,0,0,1,1,10],edges:[0,1],radii:[1,1]}
+ const morphology={schema:'connectome-morphology/v1',connectome_sha256:sha,coordinate_unit_nm:8,neurons:[neuron],missing_ids:[]}
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).endsWith('/morphology')?morphology:anatomyFixture(sha)})
+ const graph={neurons:[{id:'10001',position:[1,2,3]},{id:'802939',class:'mechanosensory_tactile',position:null}],edges:[]}
+ await mount(AnatomicalBrain,{connectome:sha,graph,activity:new Map([['802939',12]]),scale:20,frames:[],slot:0,time:1,onSeek:noop})
+ assert.equal(spatialCanvasProps.focus,'802939')
+ assert.equal(spatialCanvasProps.wholeCns,true);assert.equal(spatialCanvasProps.angle,'xz')
+ assert.match(document.querySelector('.morphology-legend').textContent,/1 real neuron skeletons · 1 with activity records/)
+ await click('Neuron morphology');assert.equal(spatialCanvasProps.structure,true)
+ await click('Recorded activity');assert.equal(spatialCanvasProps.structure,false)
+ await click('Expand brain');assert.ok(document.querySelector('.morphology-expanded'))
+ await click('Close expanded brain');assert.equal(document.querySelector('.morphology-expanded'),null)
+})

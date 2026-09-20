@@ -34,7 +34,8 @@ export function AnatomicalBrain({connectome,graph,activity,scale,frames,slot,tim
   const current=data?.connectome_sha256===connectome?data:null
   const space=useMemo(()=>current?anatomySpace(current):null,[current])
   const nodes=useMemo(()=>space?spatialNodes(graph,space,activity):[],[graph,space,activity])
-  const chosen=graph.neurons.find(n=>n.id===(focusId===undefined?focus:focusId))?.id||nodes.find(n=>n.position&&n.activity!==null)?.id||graph.neurons[0]?.id||null
+  const chosen=graph.neurons.find(n=>n.id===(focusId===undefined?focus:focusId))?.id||nodes.find(n=>n.activity!==null&&(n.position||morphology?.neurons.some(m=>m.id===n.id)))?.id||graph.neurons[0]?.id||null
+  useEffect(()=>{const neuron=morphology?.neurons.find(n=>n.id===chosen);if(neuron?.superclass?.startsWith('vnc_')){setWholeCns(true);setAngle('xz')}},[chosen,morphology])
   const selectFocus=(id:string)=>{setFocus(id);onFocus?.(id)}
   const selected=nodes.find(n=>n.id===chosen),position=graph.neurons.find(n=>n.id===chosen)?.position
   const noWebgl=<p className="empty">{zh?'此设备暂时无法显示三维视图。下方连接图和活动记录仍可查看。':'The 3D view is unavailable on this device. The connection graph and activity records below remain usable.'}</p>
