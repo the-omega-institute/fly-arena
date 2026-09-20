@@ -1290,3 +1290,12 @@ test('contact arena labels measured contact and the limits of the motor model',a
  assert.match(document.body.textContent,/21 contact onsets/)
  assert.match(document.body.textContent,/lunging, grappling and injury actions are not implemented/)
 })
+
+
+test('long task results expose measured posture failure and seek the first inversion',async()=>{
+ const {TaskObservation}=require('./src/features/arena/TaskObservation.js')
+ const seek=[]
+ await mount(TaskObservation,{match:{result:{task:{id:'maze-arrival-v1',observed_seconds:180,path_length_mm:[557.9],contact_seconds:0,contact_bouts:0,arrival_seconds:null},behavior:[{upright_fraction:.34,first_inversion_s:51.75}]}},frames:[{time:0},{time:180}],onSeek:t=>seek.push(t)})
+ assert.match(document.body.textContent,/Time upright 34.0%/)
+ await click('Inspect first inversion 51.75 s');assert.deepEqual(seek,[51.25])
+})
