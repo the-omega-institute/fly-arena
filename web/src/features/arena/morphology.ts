@@ -31,5 +31,5 @@ export function morphologyBounds(data:Morphology,wholeCns:boolean){
  const brain=data.neurons.filter(n=>/^(cb_|ol_|visual)/.test(n.superclass||''))
  for(const n of wholeCns||!brain.length?data.neurons:brain)for(let i=0;i<n.positions.length;i++){const a=i%3;low[a]=Math.min(low[a],n.positions[i]);high[a]=Math.max(high[a],n.positions[i])}
  const center=low.map((v,i)=>(v+high[i])/2) as [number,number,number]
- return {center,extent:Math.max(1,...high.map((v,i)=>v-low[i]))/2}
+ return {center,low,high,extent:Math.max(1,...high.map((v,i)=>v-low[i]))/2}
 }
