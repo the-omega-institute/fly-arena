@@ -1,4 +1,3 @@
-import './taskObservation.css'
 import type {Frame,Match} from '../../types'
 import {useI18n} from '../../shared/i18n'
 
