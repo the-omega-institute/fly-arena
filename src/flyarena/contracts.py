@@ -89,6 +89,7 @@ SensoryProfile = Literal["odor-only-v1", "engineered-multimodal-v1", "engineered
 
 
 class MatchRequest(StrictModel):
+    sandbox: bool = False
     bridge_profile: BridgeProfile = "legacy-v1"
     sensory_profile: SensoryProfile = "odor-only-v1"
     fly_ids: list[str] = Field(min_length=1, max_length=2)
@@ -116,6 +117,7 @@ class CreateIdentity(StrictModel):
 
 
 class TournamentRequest(StrictModel):
+    sandbox: bool = False
     bridge_profile: BridgeProfile = "legacy-v1"
     sensory_profile: SensoryProfile = "odor-only-v1"
     name: str = Field(min_length=1, max_length=80)

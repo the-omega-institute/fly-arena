@@ -192,3 +192,7 @@ has no paired WT or time course. Do not invent those missing observations. The
 current local static site also offers a precomputed Nectar example at
 `/examples/neural-preview-nectar-v2.json`; it belongs to that recorded FlySpec,
 not to any new draft. The paired API requires deployment of the updated backend.
+
+## Evaluate a saved research offspring
+
+Read `/season` for compatible `sensory_profiles` and `sandbox_ready` on each match profile. To compare a saved offspring with WT or a public fly, POST `/matches` with `sandbox: true`, both `fly_ids`, and the same `bridge_profile`, `sensory_profile`, map and duration used in training. Use a new seed to evaluate outside training. `/tournaments` also accepts `sandbox: true` and swaps positions. Sandbox results have replays and local series standings but do not earn public leaderboard points. Training accepts 1–30 seconds per evaluation; 1–2 seconds is only a workflow trial.

@@ -17,7 +17,7 @@ export function TrainingWorkload(props:Props){
   </dl>
   <p>{zh?'双体评估包含双方大脑；交换出生位置已计入评估次数。以上是模拟时间，实际等待取决于模型、硬件与队列，不是完成倒计时。':'Both brains run in a contest; swapped positions already count as separate evaluations. These are simulated seconds. Actual waiting depends on model, hardware and queue, not a completion countdown.'}</p>
   <p>{props.duration<=2
-   ?zh?'当前 1–2 秒窗口适合试通提交和回放，果蝇可能还来不及接近食物。评估觅食可选择 5–10 秒，并检查身体与脑活动。':'The current 1–2 s window is useful for trying submission and replay; the fly may not have time to reach food. For feeding evaluation, choose 5–10 s and inspect body and brain activity.'
+   ?zh?'当前 1–2 秒窗口适合试通提交和回放，果蝇可能还来不及接近食物。评估觅食可选择 5–30 秒，并检查身体与脑活动。':'The current 1–2 s window is useful for trying submission and replay; the fly may not have time to reach food. For feeding evaluation, choose 5–30 s and inspect body and brain activity.'
    :zh?'较长窗口可以观察接触后的行为；单个窗口的高分仍需与 WT 对照，并在未参与训练的条件下评估。':'A longer window can reveal behavior after contact. Compare high scores with WT and evaluate under conditions not used for training.'}</p>
  </section>
 }

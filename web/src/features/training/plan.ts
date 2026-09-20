@@ -7,7 +7,7 @@ export function planProblem(p:PlanLimits):string|null{
   if(!p.founder)return 'Choose a starting fly.'
   if(p.mode==='contest'&&!p.opponent)return 'Choose a fixed opponent.'
   if(p.strategy!=='external'&&!p.circuits.length)return 'Choose at least one circuit.'
-  for(const [value,min,max] of [[p.population,2,6],[p.generations,1,8],[p.budget,2,96],[p.duration,1,10],[p.seed,0,2147483647]]){
+  for(const [value,min,max] of [[p.population,2,6],[p.generations,1,8],[p.budget,2,96],[p.duration,1,30],[p.seed,0,2147483647]]){
     if(!Number.isInteger(value)||value<min||value>max)return 'Use whole numbers within the displayed limits.'
   }
   if(p.conditions){

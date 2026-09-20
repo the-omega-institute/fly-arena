@@ -4,7 +4,7 @@ export type Circuit = {id: string; label: string; name: string; color: string; n
 export type Spec = {schema_version: 'flyspec/v1'; name: string; description: string; color: string; parent_id: string|null; connectome_sha256: string; model_profile: string; weight_mutations: {selector:string;scale:number}[]; edge_deltas: {edge:number;log_delta:number}[]; neuron_parameters:{tau_scale:number;threshold_shift_mv:number};plasticity:string;interventions?:InterventionSpec[];[key:string]:unknown}
 export type Report = {artifact_id:string;budget_used:number;budget_limit:number;changed_edges:number;weight_points:number;intrinsic_points:number;neuron_count:number;edge_count:number;effective_changed_edges?:number;affected_neurons?:number;synaptic_contacts?:number;interventions?:unknown[];[key:string]:unknown}
 export type Fly = {source?:{kind:string;run_id:string};id:string;owner:string;designer:string;name:string;color:string;artifact_id:string;created:number;spec:Spec;report:Report;reference_kind?:'wildtype'|'official'|'user'|'ai'|null;release_id?:string|null;submission_channel?:'web'|'api'|'seed'|null;experiment_id?:string|null;experiment_error?:string|null}
-export type SensoryProfile = {id:string;name?:string;ready:boolean;reason?:string;qualification?:string;profile?:Record<string,unknown>}
+export type SensoryProfile = {id:string;name?:string;ready:boolean;reason?:string;qualification?:string;bridge_profiles?:string[];profile?:Record<string,unknown>}
 export type TrainingBridge = {id:string;name?:string;ready:boolean;models?:string[];sensory_profiles?:string[];reason?:string}
 export type Season = {id:string;name:string;connectome:{sha256:string;neuron_count:number;edge_count:number;synaptic_contacts:number;circuits:Circuit[]};budget:{points:number};invite_required:boolean;runtime_sha256:string;default_bridge_profile?:string;match_profiles?:MatchProfile[];sensory_profiles?:SensoryProfile[];training_sensory_profiles?:SensoryProfile[];training_bridge_profiles?:TrainingBridge[];training_fitness_objectives?:{id:string;name:string;ready:boolean}[];gallery_copy_available?:boolean}
 export type ArenaObstacle = {position:number[];size:number[];shape?:'box'|'ellipsoid';quaternion?:number[];color?:string;material?:'leaf'|'rock'|'fruit'}
@@ -28,8 +28,13 @@ export const num = (n:number) => Intl.NumberFormat('en-US').format(n)
 
 export type AuthSettings = {mode:"local"|"nyxid";nyxid_enabled:boolean;login_url:string|null;local_registration_enabled:boolean}
 
-export type MatchProfile={id:string;name:string;ready:boolean;reason?:string}
-export function defaultMatchProfile(season:Season){return season.match_profiles?.find(p=>p.id==='sensorimotor-research-v2'&&p.ready)?.id||season.default_bridge_profile||''}
+export type MatchProfile={id:string;name:string;ready:boolean;sandbox_ready?:boolean;sensory_profiles?:string[];reason?:string}
+export function playableProfile(p:MatchProfile|undefined){return !!p&&(p.ready||p.sandbox_ready===true)}
+export function compatibleSensory(season:Season|null,bridge:string,senses:string){
+ const profile=season?.match_profiles?.find(p=>p.id===bridge)
+ return profile?.sensory_profiles?profile.sensory_profiles.includes(senses):senses==='odor-only-v1'||bridge==='legacy-v1'
+}
+export function defaultMatchProfile(season:Season){return season.match_profiles?.find(p=>p.id==='sensorimotor-research-v2'&&playableProfile(p))?.id||season.default_bridge_profile||''}
 export function recordedMatchProfile(match:Match){return match.request.bridge_profile||'legacy-v1'}
 
 /** Prefer a complete multimodal life sample for the first Arena view.

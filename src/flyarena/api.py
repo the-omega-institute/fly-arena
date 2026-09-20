@@ -129,6 +129,9 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def season():
         graph = compiler().graph
         profiles = match_profiles()
+        playable = {p["id"]: p for p in training_profiles()}
+        profiles = [p | {"sandbox_ready": playable[p["id"]]["ready"],
+                         "sensory_profiles": playable[p["id"]]["sensory_profiles"]} for p in profiles]
         return {"default_bridge_profile": "sensorimotor-research-v2" if profiles[1]["ready"] else "legacy-v1",
                 "match_profiles": profiles, "id": "genesis-alpha", "name": "GENESIS / 创生季", "connectome": graph.manifest,
                 "model": PROFILE, "models": model_catalog(), "budget": BUDGET, "rules": RULES,
@@ -389,7 +392,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         prior = store.prior_submission(owner["id"], idempotency_key, body.model_dump())
         if prior is not None:
             return prior
-        require_bridge(body.bridge_profile)
+        (require_training_bridge if body.sandbox else require_bridge)(body.bridge_profile)
         return store.add_match(owner["id"], body.model_dump(),
                                digest(match_runtime(body.bridge_profile, body.sensory_profile)), key=idempotency_key)
 
@@ -425,7 +428,7 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         prior = store.prior_submission(owner["id"], idempotency_key, body.model_dump(), tournament=True)
         if prior is not None:
             return prior
-        require_bridge(body.bridge_profile)
+        (require_training_bridge if body.sandbox else require_bridge)(body.bridge_profile)
         return store.add_tournament(owner["id"], body.model_dump(),
                                     digest(match_runtime(body.bridge_profile, body.sensory_profile)), idempotency_key)
 
