@@ -80,7 +80,8 @@ class LifeLedger:
             if origin and origin['owner']!=owner and not db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(origin['id'],)).fetchone():origin=None
         from .training import TrainingService
         training=TrainingService(self.store,None)
-        public_matches={m['id']:m for m in training.gallery_matches() if ident in m.get('request',{}).get('fly_ids',[])}
+        public_matches={m['id']:m for m in training.gallery_matches()+training.bundled_replay_matches()
+                        if ident in m.get('request',{}).get('fly_ids',[])}
         match_ids+= [mid for mid in public_matches if mid not in match_ids]
         experiences=[]
         for mid in match_ids:
@@ -159,7 +160,7 @@ class LifeLedger:
         from .training import TrainingService
         training=TrainingService(self.store,None)
         local=self.store.match(mid)
-        match=local or training.gallery_match(mid)
+        match=local or training.gallery_match(mid) or training.bundled_replay_match(mid)
         if not match or ident not in match['request']['fly_ids'] or not self.visible_match(match,owner):return None
         if match['status']!='verified':return {'status':match['status'],'observations':None}
         folder=self.store.result_folder(match)

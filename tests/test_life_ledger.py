@@ -97,3 +97,25 @@ def test_life_api_auth_note_corrections_and_readonly_records(lab,monkeypatch):
         assert client.delete(path+'/notes/'+r.json()['id']).status_code in [404,405]
         client.headers.clear();assert len(client.get(path).json()['notes'])==1
         assert client.get('/api/v1/lives/'+'a'*32).status_code==404
+
+
+def test_deployed_replay_appears_in_life_history_and_observations(lab):
+    store,service,user,parent=lab
+    ledger=LifeLedger(store);mid='b'*32
+    folder=store.root/'research'/'replay-gallery-v1';folder.mkdir(parents=True)
+    match={'id':mid,'status':'verified','attempt':1,'request':{'fly_ids':[parent['id']]},
+           'result':{'scores':[0]}}
+    (folder/f'{mid}-match.json').write_text(json.dumps(match))
+    frames=[{'time':0,'positions':[[0,0,1]],'energy':[100],'traces':[{'descending':0}]},
+            {'time':1,'positions':[[3,4,1]],'energy':[98],'traces':[{'descending':12}]}]
+    (folder/f'{mid}-frames.json').write_text(json.dumps(frames))
+    (folder/f'{mid}-events.json').write_text('[]')
+    (folder/f'{mid}-receipt.json').write_text(json.dumps({'runtime':{'rules':{'physics_dt':.0001}},'total_spikes':[1000]}))
+    assert store.match(mid) is None
+    record=ledger.get(parent['id'])
+    assert [e['match']['id'] for e in record['experiences']]==[mid]
+    assert record['experiences'][0]['scores']==[0]
+    observation=ledger.observation(parent['id'],mid)['observations'][0]
+    assert observation['sampled_path_mm']==5
+    assert observation['total_spikes']==1000
+    assert observation['food_consumed']==0
