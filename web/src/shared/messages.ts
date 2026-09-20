@@ -1,4 +1,8 @@
 export const catalog = {
+"接触对抗 / 领地争夺":{"en": "Contact / territory contest", "zh-CN": "接触对抗 / 领地争夺"},
+"封闭折返通道与死胡同。单蝇寻找远端食物，以首次实际口部接触计到达；未到达显示未完成。到达后继续记录脑活动与探索。":{"en": "Closed switchback corridors and dead ends. One fly seeks the distant food; arrival requires physical mouth contact. Failure stays unfinished, and observation continues after arrival.", "zh-CN": "封闭折返通道与死胡同。单蝇寻找远端食物，以首次实际口部接触计到达；未到达显示未完成。到达后继续记录脑活动与探索。"},
+"两只果蝇在同一封闭物理世界接触、推挤并争夺中央区域。记录接触与独占中央时间；当前运动模型不含专门的攻击、抓抱或伤害动作。":{"en": "Two flies contact, push and contest the center of one enclosed physical world. Record contact and exclusive center occupancy; dedicated attack, grapple and injury actions are not implemented.", "zh-CN": "两只果蝇在同一封闭物理世界接触、推挤并争夺中央区域。记录接触与独占中央时间；当前运动模型不含专门的攻击、抓抱或伤害动作。"},
+
 "两侧缓坡通往中央叶台，地面可从南北绕行；中央与外围食物有限，形成抢占与换路的选择。视觉受实体遮挡，气味仍可穿墙。": {"en": "Gentle ramps lead to a raised leaf bridge, with ground detours on either side. Limited central and peripheral food creates route and resource choices. Solids occlude vision; odor still crosses walls.", "zh-CN": "两侧缓坡通往中央叶台，地面可从南北绕行；中央与外围食物有限，形成抢占与换路的选择。视觉受实体遮挡，气味仍可穿墙。"},
 "错位果壳屏障制造视线遮挡与绕行通路；分散的小食物点会耗尽，需要离开原地继续探索。气味穿墙，不等同真实扩散。": {"en": "Staggered husk barriers block sightlines and create detours. Small food patches deplete, requiring further exploration. The analytic odor field crosses walls; it is not physical diffusion.", "zh-CN": "错位果壳屏障制造视线遮挡与绕行通路；分散的小食物点会耗尽，需要离开原地继续探索。气味穿墙，不等同真实扩散。"},
 "没有食物和障碍，观察同一模型无食物刺激时的自发活动与运动；不用于觅食得分比较。": {"en": "No food or obstacles: observe activity and motion without food input. This control is not intended for foraging score comparisons.", "zh-CN": "没有食物和障碍，观察同一模型无食物刺激时的自发活动与运动；不用于觅食得分比较。"},

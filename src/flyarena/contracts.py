@@ -93,10 +93,10 @@ class MatchRequest(StrictModel):
     bridge_profile: BridgeProfile = "legacy-v1"
     sensory_profile: SensoryProfile = "odor-only-v1"
     fly_ids: list[str] = Field(min_length=1, max_length=2)
-    map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium", "enclosure", "canopy", "switchback", "blank"] = "orchard"
-    mode: Literal["forage", "contest", "sumo"] = "contest"
+    map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium", "enclosure", "canopy", "switchback", "blank", "labyrinth", "duel"] = "orchard"
+    mode: Literal["forage", "contest", "sumo", "duel"] = "contest"
     seed: int = Field(default=42, ge=0, le=2**31 - 1)
-    duration_seconds: int = Field(default=5, ge=1, le=30)
+    duration_seconds: int = Field(default=5, ge=1, le=300)
 
     @model_validator(mode="after")
     def slots(self):
@@ -107,6 +107,12 @@ class MatchRequest(StrictModel):
         expected = 1 if self.mode == "forage" else 2
         if len(self.fly_ids) != expected:
             raise ValueError(f"{self.mode} requires {expected} flies")
+        if self.map_id in {"labyrinth", "duel"} and not self.sandbox:
+            raise ValueError("Long observation tasks are experimental sandbox runs")
+        if self.map_id == "labyrinth" and self.mode != "forage":
+            raise ValueError("Labyrinth is a single-fly benchmark")
+        if (self.mode == "duel") != (self.map_id == "duel"):
+            raise ValueError("Duel mode requires the closed duel arena")
         if self.map_id == "blank" and self.mode != "forage":
             raise ValueError("Blank control is a single-fly observation")
         if self.mode == "sumo" and self.map_id != "ring":
@@ -124,7 +130,7 @@ class TournamentRequest(StrictModel):
     sensory_profile: SensoryProfile = "odor-only-v1"
     name: str = Field(min_length=1, max_length=80)
     fly_ids: list[str] = Field(min_length=2, max_length=8)
-    map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium", "enclosure", "canopy", "switchback", "blank"] = "orchard"
+    map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium", "enclosure", "canopy", "switchback", "blank", "labyrinth", "duel"] = "orchard"
     mode: Literal["contest", "sumo"] = "contest"
     seeds: list[int] = Field(default_factory=lambda: [42], min_length=1, max_length=3)
     duration_seconds: int = Field(default=5, ge=1, le=30)

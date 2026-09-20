@@ -18,7 +18,7 @@ from .contracts import MatchRequest
 from .neural import Brain, PROFILE
 from .models import PROFILES, make_brain, require_model_bridge
 from .scenarios import RULES, VISUAL_OBSERVATION, arena_scene
-from .replay import POLICY, REPLAY_RECEIPT
+from .replay import POLICY, POLICIES, REPLAY_RECEIPT, recording_policy
 from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILES
 
 
@@ -36,7 +36,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
             raise ValueError(f"Research bridge unavailable: {profile.get('reason')}")
         return {"schema": "arena-runtime/v2", "bridge_profile": bridge_profile,
                 "profile": profile, "closure": runtime_closure(), "rules": RULES,
-                "replay_policy": dict(POLICY),
+                "replay_policy": dict(POLICY), "replay_policies": POLICIES,
                 "scene_version": "arena-offaxis-v2", "actual_backend": "cpu-numba",
                 "sensory_profile": sensory,
                 "sensors": {"olfaction": "analytic_bilateral_v2",
@@ -48,7 +48,7 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
     return {"sources": {name: file_sha(ROOT / "src/flyarena" / name) for name in files
                         if (ROOT / "src/flyarena" / name).exists()},
             "lock_sha256": file_sha(ROOT / "uv.lock"), "model": PROFILE, "models": PROFILES, "rules": RULES,
-            "replay_policy": dict(POLICY),
+            "replay_policy": dict(POLICY), "replay_policies": POLICIES,
             "sensory_profile": sensory,
             "sensors": {"olfaction": "analytic_bilateral_v1",
                         "vision": VISUAL_OBSERVATION["id"],
@@ -106,7 +106,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             backends.append(backend)
             motors.append(MotorTransfer())
     scene = arena_scene(request.map_id, request.seed, request.bridge_profile)
-    scene["replay_policy"] = dict(POLICY)
+    policy = recording_policy(request.duration_seconds)
+    scene["replay_policy"] = policy
     scene["visual_observation"] = dict(VISUAL_OBSERVATION)
     if sensory_encoder:
         scene["sensory_encoder"] = sensory_encoder.manifest
@@ -182,7 +183,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                     activity[name] = float(np.mean(rates[indices]))
         return {"circuits": activity, "sampled_nodes": sampled, "population": population_summary(rates),
                 # Keep the old field for clients that still read v0.4.2 data.
-                "top_nodes": sampled,
+                **({"top_nodes": sampled} if request.duration_seconds <= 30 else {}),
                 "sampling": {"kind": "fixed-circuit-and-sensory-sample" if sensory_samples else "fixed-circuit-sample",
                              "count": len(sampled), "observation_version": "morphology-population-v1", "total_neurons": graph.n,
                              **({"sensory_groups": sensory_samples} if sensory_samples else {})}}
@@ -204,13 +205,13 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             antennae = bodies.antennae(slot)
             sources = food_xy
             strength = remaining / 10
-            if request.mode == "sumo":
+            if request.mode in {"sumo", "duel"}:
                 sources = np.array([bodies.pose(j)[0][:2] for j in range(len(flies)) if j != slot])
                 strength = np.ones(len(sources))
             odor = []
             for antenna in antennae:
                 distance2 = np.sum((sources - antenna[:2]) ** 2, axis=1)
-                raw = float(np.sum(strength * np.exp(-distance2 / (2 * RULES["odor_sigma_mm"]**2))))
+                raw = float(np.sum(strength * np.exp(-distance2 / (2 * scene.get("task", {}).get("odor_sigma_mm", RULES["odor_sigma_mm"])**2))))
                 odor.append(raw if v2 else float(np.clip(raw, 0, 1)))
             position, rotation = bodies.pose(slot)
             nearest = None
@@ -218,10 +219,10 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 delta = source - position[:2]
                 distance = float(np.linalg.norm(delta))
                 nearest = distance if nearest is None else min(nearest, distance)
-            visual = [0.0, 0.0] if request.mode == "sumo" else bodies.visual_food(slot, remaining)
+            visual = [0.0, 0.0] if request.mode in {"sumo", "duel"} else bodies.visual_food(slot, remaining)
             mouth = bodies.mouth(slot)
             mouth_distance = float(np.min(np.linalg.norm(food_xy - mouth[:2], axis=1))) if len(food_xy) else None
-            contact_food = [] if request.mode == "sumo" else bodies.food_contacts(slot)
+            contact_food = [] if request.mode in {"sumo", "duel"} else bodies.food_contacts(slot)
             contact_environment = bodies.environment_contacts(slot) if environment_touch else []
             touch = float(bool(contact_food or contact_environment))
             contact_sides = bodies.lateral_environment_contacts(slot, exclude_support=support_contact) if separated_contact else None
@@ -301,8 +302,9 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                 drives[slot] = 0
         for _ in range(RULES["sense_ticks"]):
             bodies.step(drives)
-            energy[:] = np.maximum(0, energy - drives.mean(axis=1) * 2 * RULES["physics_dt"])
-            if request.mode != "sumo":
+            if scene.get("task", {}).get("energy") != "unlimited-observation-v1":
+                energy[:] = np.maximum(0, energy - drives.mean(axis=1) * 2 * RULES["physics_dt"])
+            if request.mode not in {"sumo", "duel"}:
                 eligible = bodies.feeding_eligibility()
                 eligible &= (~eliminated)[:, None]
                 counts = eligible.sum(axis=0)
@@ -334,11 +336,18 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             last_contact = touching
         # Intake/progress retain their historical 20 Hz clock. Pose recording
         # is independent and samples the already-stepped MuJoCo state at 100 Hz.
-        if (bodies.tick % POLICY["pose_ticks"] == 0 and
+        if (bodies.tick % policy["pose_ticks"] == 0 and
                 bodies.tick % RULES["snapshot_ticks"] != 0 and
                 (not frames or frames[-1]["tick"] != bodies.tick)):
             snapshot()
         if bodies.tick % RULES["snapshot_ticks"] == 0:
+            if request.mode == "duel":
+                from .behavior import territory_slot
+                owner = territory_slot(scene, [bodies.pose(i)[0] for i in range(len(flies))])
+                if owner is not None:
+                    amount = RULES["snapshot_ticks"] * RULES["physics_dt"]
+                    scores[owner] += amount
+                    events.append({"type":"territory", "tick":bodies.tick, "slot":owner, "amount":amount})
             for slot in range(len(flies)):
                 for food in range(len(remaining)):
                     if consumption[slot, food] > 0:
@@ -370,7 +379,7 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                "contact_ticks": contact_ticks,
                "food_contact_ticks": food_contact_ticks,
                "intake_ticks": intake_ticks})
-    receipt = {"schema": REPLAY_RECEIPT, "replay_policy": dict(POLICY), "request": request.model_dump(),
+    receipt = {"schema": REPLAY_RECEIPT, "replay_policy": policy, "request": request.model_dump(),
                "flies": scene["flies"], "connectome_sha256": graph.manifest["sha256"],
                "neuron_count": graph.n, "edge_count": graph.e,
                "readout_sha256": readout["sha256"], "runtime": frozen_runtime,

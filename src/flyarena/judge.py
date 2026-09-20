@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .behavior import behavior_metrics
+from .behavior import behavior_metrics, task_metrics, territory_slot
 from .common import digest, file_sha
 from .contracts import MatchRequest
 from .scenarios import RULES, receipt_scene
@@ -28,6 +28,10 @@ def _replay_cadence(receipt: dict, stored_scene: dict) -> int:
     if version == REPLAY_RECEIPT:
         for container in (receipt, runtime, stored_scene):
             validate_policy(container.get("replay_policy"), rules)
+        selected = receipt["replay_policy"]
+        if (stored_scene["replay_policy"] != selected or
+                selected not in runtime.get("replay_policies", [runtime["replay_policy"]])):
+            raise ValueError("Conflicting replay policy")
         sources = (runtime.get("closure", {}).get("sources", {})
                    if receipt["request"].get("bridge_profile") == "sensorimotor-research-v2"
                    else runtime.get("sources", {}))
@@ -100,7 +104,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
     raw_request = receipt["request"]
     raw_duration = raw_request.get("duration_seconds") if isinstance(raw_request, dict) else None
     raw_end = receipt.get("final_tick")
-    if (type(raw_duration) is int and raw_duration > 30 and type(raw_end) is int
+    if (type(raw_duration) is int and raw_duration > 300 and type(raw_end) is int
             and raw_end != raw_duration * 10000):
         raise ValueError("Run ended before the required endpoint")
     request = MatchRequest.model_validate(raw_request)
@@ -208,7 +212,7 @@ def verify(folder: Path, *, expected_request: dict | None = None,
         prior_tick = tick
         if event["type"] == "intake":
             slot, food, amount = event["slot"], event["food"], event["amount"]
-            if request.mode == "sumo" or not (0 <= slot < n and 0 <= food < nf) or not math.isfinite(amount) or amount <= 0:
+            if request.mode in {"sumo", "duel"} or not (0 <= slot < n and 0 <= food < nf) or not math.isfinite(amount) or amount <= 0:
                 raise ValueError("Invalid intake event")
             key = (tick, slot, food)
             if key in seen_intake:
@@ -218,6 +222,14 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                 raise ValueError("Intake rate exceeded")
             scores[slot] += amount
             eaten[food] += amount
+        elif event["type"] == "territory":
+            slot, amount = event.get("slot"), event.get("amount")
+            if (request.mode != "duel" or type(slot) is not int or slot not in (0, 1)
+                    or type(amount) not in (int, float) or amount != .05 or tick <= 0 or tick % 500
+                    or (tick, slot, "territory") in seen_intake):
+                raise ValueError("Invalid territory event")
+            seen_intake.add((tick, slot, "territory"))
+            scores[slot] += amount
         elif event["type"] == "exit":
             slot = event["slot"]
             if not 0 <= slot < n or exits[slot] is not None:
@@ -247,6 +259,13 @@ def verify(folder: Path, *, expected_request: dict | None = None,
                 raise ValueError("Invalid food contact event")
         else:
             raise ValueError("Unknown event type")
+    if request.mode == "duel":
+        expected_control = [(f["tick"], territory_slot(scene, f["positions"])) for f in frames
+                            if f["tick"] > 0 and f["tick"] % 500 == 0]
+        expected_control = [(t, slot) for t, slot in expected_control if slot is not None]
+        actual_control = [(e["tick"], e["slot"]) for e in events if e["type"] == "territory"]
+        if actual_control != expected_control:
+            raise ValueError("Territory score differs from physical positions")
     initial = np.array([f["initial"] for f in scene["food"]])
     # New runner results expose the event clocks explicitly.  Validate them
     # against the immutable ledger when present, while accepting older
@@ -292,4 +311,5 @@ def verify(folder: Path, *, expected_request: dict | None = None,
             "outcome": "solo" if n == 1 else "draw" if winner is None else "win",
             "receipt_sha256": receipt["sha256"], "final_tick": end,
             "judge": "event-conservation-v1",
+            "task": task_metrics(stored_scene, frames, events, result),
             "behavior": behavior_metrics(stored_scene, frames, events, n, RULES["physics_dt"])}

@@ -145,6 +145,40 @@ MAPS.update({
     },
 })
 
+# New task layouts have explicit observation rules; historical maps are frozen.
+def _walls(half):
+    return [{"position": pos, "size": size, "material": "rock", "color": "#697782"}
+            for pos, size in [([-half,0,2.5],[1,2*half+1,5]),
+                              ([half,0,2.5],[1,2*half+1,5]),
+                              ([0,-half,2.5],[2*half+1,1,5]),
+                              ([0,half,2.5],[2*half+1,1,5])]]
+
+MAPS.update({
+    "labyrinth": {
+        "id":"labyrinth", "name":"折返迷宫 · 单蝇基准", "english":"Labyrinth Benchmark",
+        "description":"封闭折返通道与死胡同。单蝇寻找远端食物，以首次实际口部接触计到达；未到达显示未完成。到达后继续记录脑活动与探索。",
+        "size":32, "color":"#88acbf", "spawns":[[-11,-10,0],[11,10,math.pi]],
+        "obstacles": _walls(14) + [
+            {"position":[-5,-4,2.5],"size":[1,19,5],"material":"rock","color":"#7893a0"},
+            {"position":[5,4,2.5],"size":[1,19,5],"material":"rock","color":"#7893a0"},
+            {"position":[-12,1,2.5],"size":[4,1,5],"material":"rock","color":"#7893a0"},
+            {"position":[12,-1,2.5],"size":[4,1,5],"material":"rock","color":"#7893a0"},
+        ],
+        "food":[[10,10]], "food_units":10., "modes":["forage"],
+        "task":{"id":"maze-arrival-v1","goal_food":"food-0", "continue_after_goal":True, "odor_sigma_mm":18.,
+                "energy":"unlimited-observation-v1", "metric":"first physical mouth contact; no arrival is null"},
+    },
+    "duel": {
+        "id":"duel", "name":"封闭对抗场 · 领地争夺", "english":"Closed Contact Arena",
+        "description":"两只果蝇在同一封闭物理世界接触、推挤并争夺中央区域。记录接触与独占中央时间；当前运动模型不含专门的攻击、抓抱或伤害动作。",
+        "size":18, "color":"#cb927f", "spawns":[[-2.8,0,0],[2.8,0,math.pi]],
+        "obstacles":_walls(7), "food":[], "modes":["duel"],
+        "task":{"id":"contact-territory-v1", "control_radius_mm":3., "control_max_height_mm":3.,
+                "energy":"unlimited-observation-v1", "metric":"exclusive center occupancy seconds sampled at 20 Hz",
+                "scope":"locomotion and physical pushing; no attack or injury controller"},
+    },
+})
+
 RULES = {
     "id": "arena-ground-contact-v2", "physics_dt": .0001, "neural_dt_ms": .1,
     "sense_ticks": 100, "snapshot_ticks": 500, "food_initial_units": 10.0,

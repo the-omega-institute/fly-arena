@@ -32,7 +32,7 @@ def font(size):
 class Exporter:
     def __init__(self, scene, frame=None):
         self.scene = scene
-        self.count = len(scene.get("flies", [])) or (len(frame["positions"]) if frame else 2)
+        self.count = len(scene.get("flies", [])) or (len(frame["positions"]) if frame else (1 if scene.get("modes") == ["forage"] else 2))
         self.playback_label = "0.25x playback"
         self.bodies = Bodies(scene, self.count, 42)
         self.model, self.data = self.bodies.model, self.bodies.data
