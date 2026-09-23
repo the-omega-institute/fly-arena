@@ -40,3 +40,9 @@ export function sceneGrid(size:number){
  const cell=step*(ratio>=5?5:ratio>=2?2:1)
  return {cell,section:cell*5,fade:size*2}
 }
+
+/** Presentation only: nearby bodies and follow mode need less label obstruction. */
+export function replayLabelOpacity(distance:number,follow:boolean){
+ const overview=.12+.73*Math.min(1,Math.max(0,(distance-8)/32))
+ return follow?Math.min(.18,overview):overview
+}

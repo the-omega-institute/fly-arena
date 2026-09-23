@@ -91,3 +91,19 @@ test('profile admission preserves chosen senses, supports sandbox readiness and 
  const rate=[subject,wt].map(f=>({...f,spec:{...spec,model_profile:'malecns-rate-cpu-v1'}}))
  assert.equal(build(kernel,rate).plan,null);assert.ok(build({},rate).plan)
 })
+
+test('issue 82 maps are solo observations and never paired food comparisons',()=>{
+ for(const id of ['maze','switchback','labyrinth']){
+  const map={id,modes:['forage','contest']}
+  assert.equal(intentMode('contest',map),undefined)
+  assert.equal(intentMode('forage',map),'forage')
+  for(const mode of ['contest','forage']){
+   const {plan}=buildExperimentPlan({...setup,mapId:id,mode},[subject,wt],[map],season)
+   assert.equal(!!plan,mode==='forage')
+  }
+  assert.match(experimentScore('forage',id),/Observation only.*not a scored outcome yet.*#82/)
+ }
+ const metadata={competition_eligible:false}
+ assert.equal(intentMode('contest',{id:'orchard',modes:['forage','contest'],metadata}),undefined)
+ assert.match(experimentScore('forage','orchard',metadata),/Observation only/)
+})

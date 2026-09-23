@@ -35,6 +35,13 @@ def test_training_map_admission_matches_queued_match_contract(bridge, map_id, mo
             TrainingSpec(**values)
         return
     plan = TrainingSpec(**values)
+    if map_id in {'maze', 'switchback'}:
+        with pytest.raises(ValueError, match='observation only.*#82'):
+            plan.validate_admission()
+        with pytest.raises(ValueError, match='#82'):
+            plan.conditions[-1].validate_admission()
+    else:
+        plan.validate_admission()
     assert plan.conditions[-1].map_id == map_id
     for condition in plan.conditions:
         match = MatchRequest(fly_ids=['a'*32] if mode == 'forage' else ['a'*32, 'b'*32],
@@ -50,3 +57,11 @@ def test_nontraining_maps_are_rejected_in_primary_and_extra_conditions(map_id):
         TrainingSpec(founder_id='a'*32, map_id=map_id)
     with pytest.raises(ValidationError):
         TrainingSpec(founder_id='a'*32, evaluation_conditions=[{'map_id': map_id, 'seed': 42}])
+
+
+def test_primary_blank_cannot_bypass_solo_restriction_with_explicit_conditions():
+    plan = TrainingSpec(founder_id='a'*32, opponent_id='b'*32, map_id='blank', mode='contest',
+                        population=2, generations=1, max_evaluations=4,
+                        evaluation_conditions=[{'map_id': 'orchard', 'seed': 42}])
+    with pytest.raises(ValueError, match='single-fly observation'):
+        plan.validate_admission()

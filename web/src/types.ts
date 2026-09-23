@@ -1,3 +1,4 @@
+import type {MapMetadata} from './features/arena/mapPurpose'
 import type {InterventionSpec} from './shared/research'
 export type {InterventionSpec,CellSelector,Experiment,ExperimentSpec,ExperimentSubject,ProbeReport,ComparisonReport,BackendProfile,ScenarioSpec,ResearchCatalog} from './shared/research'
 export type Circuit = {id: string; label: string; name: string; color: string; neuron_count: number; edge_count: number}
@@ -10,7 +11,7 @@ export type Season = {id:string;name:string;connectome:{sha256:string;neuron_cou
 export type ArenaObstacle = {position:number[];size:number[];shape?:'box'|'ellipsoid';quaternion?:number[];color?:string;material?:'leaf'|'rock'|'fruit'}
 export type ArenaTask = {id:string;goal_food?:string;control_radius_mm?:number;energy:string}
 export type TaskMetric = {id:string;observed_seconds:number;path_length_mm:number[];contact_seconds:number;contact_bouts:number;arrival_seconds?:number|null;completed?:boolean;control_seconds?:number[]}
-export type ArenaMap = {task?:ArenaTask;id:string;name:string;english:string;description:string;size:number;color:string;obstacles:ArenaObstacle[];food:number[][];modes:string[];ring_radius?:number;habitat?:string}
+export type ArenaMap = {metadata?:MapMetadata;task?:ArenaTask;id:string;name:string;english:string;description:string;size:number;color:string;obstacles:ArenaObstacle[];food:number[][];modes:string[];ring_radius?:number;habitat?:string}
 export type NeuralGraph = {neurons:{id:string;type?:string|null;class?:string|null;side?:string|null;nt?:string|null;position?:number[]|null}[];edges:{pre:string;post:string;edge:number;count:number;baseline_weight?:number;weight?:number;multiplier?:number}[];anchors?:string[]}
 export type BrainDesignGraph = {schema:'brain-neighborhood/v1';artifact_id:string;connectome_sha256:string;weights_sha256:string;selection:string;circuits:Record<string,NeuralGraph>;display_groups?:Circuit[]}
 export type ReplayParticipant = Pick<Fly,'id'|'name'|'color'|'artifact_id'|'spec'> & {report?:Pick<Report,'budget_used'|'budget_limit'>;brain_graph?:BrainDesignGraph}
@@ -53,3 +54,55 @@ export function preferredReplay(matches:Match[]){
 export type ArenaLayout = {task?:ArenaTask;id:string;size:number;obstacles:ArenaObstacle[];food:{position:number[];initial:number;id:string}[];spawns:number[][];ring_radius?:number;habitat?:string}
 
 export type BehaviorMetric={schema:"sustained-foraging-v1";food:number;latter_half_food:number;upright_fraction:number;recorded_seconds:number;first_inversion_s:number|null;fitness:number}
+
+// Historical catalogs omit metadata. Contract tests pin this fallback to MAP_METADATA.
+export const mapEligibilityDefaults = {
+  "orchard": {
+    "training_eligible": true,
+    "competition_eligible": true
+  },
+  "maze": {
+    "training_eligible": false,
+    "competition_eligible": false
+  },
+  "scarcity": {
+    "training_eligible": true,
+    "competition_eligible": true
+  },
+  "ring": {
+    "training_eligible": true,
+    "competition_eligible": true
+  },
+  "terrarium": {
+    "training_eligible": true,
+    "competition_eligible": true
+  },
+  "enclosure": {
+    "training_eligible": true,
+    "competition_eligible": true
+  },
+  "canopy": {
+    "training_eligible": true,
+    "competition_eligible": true
+  },
+  "switchback": {
+    "training_eligible": false,
+    "competition_eligible": false
+  },
+  "blank": {
+    "training_eligible": true,
+    "competition_eligible": false
+  },
+  "labyrinth": {
+    "training_eligible": false,
+    "competition_eligible": false
+  },
+  "duel": {
+    "training_eligible": false,
+    "competition_eligible": true
+  }
+} as const
+export function mapEligibility(map:Pick<ArenaMap,'id'|'metadata'>){
+ const defaults=mapEligibilityDefaults[map.id as keyof typeof mapEligibilityDefaults]
+ return {training_eligible:!!defaults?.training_eligible&&map.metadata?.training_eligible!==false,competition_eligible:!!defaults?.competition_eligible&&map.metadata?.competition_eligible!==false}
+}

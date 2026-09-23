@@ -94,7 +94,7 @@ test('every map/seed and mirrored position is charged before training starts',()
  assert.equal(planProblem({...trainingPlan,conditions,budget:8}),null);
  assert.equal(evaluationCount({...trainingPlan,conditions,mode:'contest'}),16);
  for(const invalid of [[],[...conditions,...conditions],[{map_id:'maze',seed:NaN}],[{map_id:'unknown',seed:42}],Array.from({length:5},(_,seed)=>({map_id:'maze',seed}))])assert.ok(planProblem({...trainingPlan,conditions:invalid,budget:96}));
- assert.equal(planProblem({...trainingPlan,conditions:Array.from({length:4},(_,seed)=>({map_id:'maze',seed})),budget:16}),null);
+ assert.equal(planProblem({...trainingPlan,conditions:Array.from({length:4},(_,seed)=>({map_id:'orchard',seed})),budget:16}),null);
 });
 test('comparison uses all effective conditions and retains implicit legacy conditions',()=>{
  const legacy=comparisonRun;
@@ -191,3 +191,20 @@ test('static hosting routes API calls to the configured service without sending 
   assert.equal(serviceUrl('/docs'),'https://compute.example/docs');
  }finally{globalThis.fetch=priorFetch;if(priorDocument===undefined)delete globalThis.document;else globalThis.document=priorDocument}
 });
+
+test('catalog spreads never silently overwrite keys from another message module',async()=>{
+ const url=new URL('../src/shared/messages.ts',import.meta.url),source=fs.readFileSync(url,'utf8')
+ const sf=ts.createSourceFile('messages.ts',source,ts.ScriptTarget.Latest,true)
+ const bindings=new Map(),objects=new Map()
+ for(const statement of sf.statements){
+  if(ts.isImportDeclaration(statement))for(const binding of statement.importClause?.namedBindings?.elements||[])bindings.set(binding.name.text,{name:binding.propertyName?.text||binding.name.text,path:statement.moduleSpecifier.text})
+  if(ts.isVariableStatement(statement))for(const d of statement.declarationList.declarations){let value=d.initializer;while(value&&ts.isAsExpression(value))value=value.expression;if(value&&ts.isObjectLiteralExpression(value))objects.set(d.name.getText(sf),value)}
+ }
+ const seen=new Map()
+ for(const spread of objects.get('catalog').properties){
+  assert.ok(ts.isSpreadAssignment(spread),'Catalog entries must be checked explicitly')
+  const name=spread.expression.getText(sf),binding=bindings.get(name)
+  const keys=binding?Object.keys((await moduleAt('../src/shared/'+binding.path+'.ts'))[binding.name]):objects.get(name).properties.map(p=>p.name.text)
+  for(const key of keys){assert.ok(!seen.has(key),`${key}: duplicated in ${seen.get(key)} and ${name}`);seen.set(key,name)}
+ }
+})

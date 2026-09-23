@@ -1,4 +1,4 @@
-.arena-layout>.experiment-setup{grid-column:1/-1;grid-row:1;padding:0 22px 22px;min-width:0}
+.experiment-disclosure>.experiment-setup{grid-column:1/-1;grid-row:1;padding:0 22px 22px;min-width:0}
 .experiment-setup .panel-heading h2{font-size:18px;font-weight:500}
 .experiment-setup p{font-size:12px;line-height:1.65;margin:10px 0}
 .experiment-setup fieldset{border:0;padding:0;margin:0;min-width:0}
@@ -12,5 +12,8 @@
 .experiment-plan li{font-size:12px;line-height:1.7;margin:6px 0}.experiment-plan ol,.experiment-errors{padding-left:20px}
 .experiment-errors{border-left:3px solid #b87750;margin:12px 0;padding-left:25px}
 .experiment-setup>.text-link{margin-top:12px}.experiment-setup .wt-challenge{margin-top:18px}
-.arena-layout:has(>.experiment-setup){grid-template-columns:minmax(0,1fr)}
-@media(max-width:700px){.experiment-fields{grid-template-columns:1fr;gap:0}.arena-layout>.experiment-setup{padding:0 15px 18px}.experiment-fields .map-options{grid-template-columns:1fr 1fr}}
+.arena-layout:has(>.experiment-disclosure){grid-template-columns:minmax(0,1fr)}
+@media(max-width:700px){.experiment-fields{grid-template-columns:1fr;gap:0}.experiment-disclosure>.experiment-setup{padding:0 15px 18px}.experiment-fields .map-options{grid-template-columns:1fr 1fr}}
+
+.experiment-disclosure{grid-column:1/-1;min-width:0}.experiment-disclosure>summary{cursor:pointer;padding:12px 16px;font-size:12px;color:var(--text-muted)}
+.experiment-disclosure>.experiment-setup{display:block}.experiment-disclosure[open]>summary{margin-bottom:8px}

@@ -10,7 +10,15 @@ import {sceneThemes} from './shared/theme'
 import {colors} from './types'
 import {Habitat} from './features/arena/Habitat'
 import {ArenaObstacles,arenaBounds} from './features/arena/obstacleGeometry'
-import {sceneFraming,sceneGrid} from './features/arena/followCamera'
+import {sceneFraming,sceneGrid,recordedCameraTarget,replayLabelOpacity} from './features/arena/followCamera'
+
+function ReplayLabel({fly,slot,frame,next,alpha,selected,identity,follow}:{fly:Scene['flies'][number];slot:number;frame:Frame;next?:Frame;alpha:number;selected:boolean;identity?:string;follow:boolean}){
+ const label=useRef<HTMLDivElement>(null),point=useMemo(()=>new THREE.Vector3(),[])
+ const position=recordedCameraTarget(frame,next,alpha,slot)
+ useFrame(({camera})=>{if(label.current&&position)label.current.style.opacity=String(replayLabelOpacity(camera.position.distanceTo(point.set(...position)),follow))})
+ if(!position)return null
+ return <Html position={position} style={{pointerEvents:'none'}}><div ref={label} className="replay-label-anchor"><ArenaWorldLabel fly={fly} slot={slot} selected={selected} identity={identity} compact/></div></Html>
+}
 
 function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;frame:Frame;next?:Frame;alpha:number;color:string;slot?:number}){
   const {resolved}=useI18n();const tokens=sceneThemes[resolved]
@@ -104,7 +112,7 @@ function ArenaScene({preview,scene,frame,next,alpha=0,color='mint',design=false,
         <mesh position={[0,0,-.14]} rotation={[Math.PI/2,0,0]} receiveShadow><cylinderGeometry args={[4.8,5,.18,96]} /><meshStandardMaterial color={tokens.platform} roughness={.93}/></mesh>
         <Grid args={[15,15]} rotation={[Math.PI/2,0,0]} position={[0,0,-.2]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={15} cellThickness={.35}/>
       </>}
-      {scene?.flies.map((fly,i)=>{const p=shown.positions?.[i],n=next?.positions?.[i]||p;if(!p)return null;return <Html key={'label-'+i} position={[p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,(p[2]||0)+(scene.task?(i===0?2.2:3.8):1.6)]} center style={{pointerEvents:'none'}}><ArenaWorldLabel fly={fly} slot={i} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]} compact={!!scene.task}/></Html>})}
+      {scene?.flies.map((fly,i)=><ReplayLabel key={'label-'+i} fly={fly} slot={i} frame={shown} next={next} alpha={alpha} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]} follow={followSelected}/>)}
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
     {scene?.task&&shown&&frames.length>0&&<RecordedTrails frames={frames} time={shown.time} scene={scene}/>}

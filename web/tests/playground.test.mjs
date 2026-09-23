@@ -1143,7 +1143,14 @@ test('research offspring retains kernel senses in playable unranked match setup'
  assert.equal(compatibleSensory(season,kernel,'legacy-touch'),false)
  const props={scene:null,frame:null,next:null,alpha:0,focused:'',preview:null,selectedFly:own,chosenMap:null,current:null,selected:own.id,identity:null,flies:[own,wt],frames:[],events:[],play:false,playtime:0,playbackSpeed:1,season,matches:[],maps:[{id:'enclosure',name:'围场',english:'Enclosure',modes:['forage','contest']}],mapId:'enclosure',mode:'contest',opponent:wt.id,duration:20,seed:42,busy:'',bridgeProfile:kernel,sensoryProfile:senses,replayStatus:'idle',replayError:'',startMatch:()=>submitted++}
  for(const key of ['setSelected','setSensoryProfile','setBridgeProfile','setPlay','setPlaytime','setPlaybackSpeed','setFocused','setMapId','setMode','setOpponent','setDuration','setSeed','startSeries'])props[key]=noop
+ await mount(ArenaFeature,{...props,focused:'historical-match',replayStatus:'loading'})
+ assert.equal(document.querySelector('.experiment-disclosure').open,false)
+ assert.ok(document.querySelector('.arena-stage'))
+ assert.equal(document.querySelector('.experiment-disclosure summary').textContent,'New experiment · setup')
+ await act(async()=>document.querySelector('.experiment-disclosure summary').click())
+ assert.equal(document.querySelector('.experiment-disclosure').open,true)
  await mount(ArenaFeature,props)
+ assert.equal(document.querySelector('.experiment-disclosure').open,true)
  const select=document.querySelector('select[aria-label="Sensory input profile"]')
  assert.equal(select.disabled,false);assert.equal(select.value,senses)
  assert.deepEqual([...select.options].map(o=>o.value),['odor-only-v1',senses])

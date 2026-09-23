@@ -78,8 +78,9 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   const modelReady=!!chosenBridge&&bridgeModelCompatible(chosenBridge)
   const needed=evaluationCount({population,generations,mode,conditions})
   const eligibleMaps=eligibleTrainingMaps(maps,bridgeProfile,mode)
-  const previewProblem=trainingEligibilityProblem(map,bridgeProfile,mode)
-  const problem=planProblem({population,generations,budget,duration,seed,circuits,name,mode,founder,opponent,strategy,conditions,map_id:map,bridge_profile:bridgeProfile})
+  const previewProblem=trainingEligibilityProblem(map,bridgeProfile,mode,maps.find(m=>m.id===map)?.metadata)
+  const metadataProblem=conditions.map(c=>trainingEligibilityProblem(c.map_id,bridgeProfile,mode,maps.find(m=>m.id===c.map_id)?.metadata)).find(Boolean)
+  const problem=previewProblem||metadataProblem||planProblem({population,generations,budget,duration,seed,circuits,name,mode,founder,opponent,strategy,conditions,map_id:map,bridge_profile:bridgeProfile})
   const visibleRuns=loadedOwner===identity?.id?runs:[]
   const current=visibleRuns.find(r=>r.id===focus)
   const shownGeneration=generation??Math.max(0,...(current?.members.map(m=>m.generation)||[]))

@@ -72,3 +72,21 @@ def test_guidance_changes_do_not_change_scene_hashes(monkeypatch):
     before = arena_scene("labyrinth", 42)
     monkeypatch.setitem(MAP_METADATA["labyrinth"], "purpose", "Updated observation guidance")
     assert arena_scene("labyrinth", 42) == before
+
+
+def test_frontend_admission_fallback_equals_backend_flags():
+    source = (Path(__file__).parents[1] / 'web/src/types.ts').read_text()
+    fallback = json.loads(source.split('export const mapEligibilityDefaults = ')[1].split(' as const')[0])
+    assert fallback == {map_id: {key: metadata[key] for key in
+                               ['training_eligible', 'competition_eligible']}
+                        for map_id, metadata in MAP_METADATA.items()}
+    for map_id in ['maze', 'switchback', 'labyrinth']:
+        assert fallback[map_id] == {'training_eligible': False, 'competition_eligible': False}
+    assert fallback['blank'] == {'training_eligible': True, 'competition_eligible': False}
+
+
+def test_catalog_tolerates_missing_optional_metadata(tmp_path, monkeypatch):
+    monkeypatch.delitem(MAP_METADATA, 'orchard')
+    with TestClient(create_app(with_worker=False, store=Store(tmp_path), auth_config=AuthConfig())) as client:
+        assert next(m for m in client.get('/api/v1/maps').json() if m['id'] == 'orchard')['metadata'] == {}
+        assert client.get('/api/v1/maps/orchard/preview').json()['metadata'] == {}

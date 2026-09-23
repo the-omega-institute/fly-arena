@@ -1,5 +1,5 @@
 import type {ArenaMap,Fly,Season} from '../../types'
-import {compatibleSensory,playableProfile} from '../../types'
+import {compatibleSensory,playableProfile,mapEligibility} from '../../types'
 
 export type ExperimentIntent='forage'|'contest'|'contact'
 export type ExperimentMode='forage'|'contest'|'sumo'|'duel'
@@ -8,6 +8,7 @@ export type ExperimentRequest={sandbox:true;bridge_profile:string;sensory_profil
 export type ExperimentPlan={setup:ExperimentSetup;seeds:number[];matches:ExperimentRequest[];submissions:({endpoint:'/matches';body:ExperimentRequest}|{endpoint:'/tournaments';body:Omit<ExperimentRequest,'seed'|'mode'>&{mode:'contest'|'sumo';seeds:number[];name:string}})[]}
 export function experimentIntent(mode:string):ExperimentIntent{return mode==='sumo'||mode==='duel'?'contact':mode==='forage'?'forage':'contest'}
 export function intentMode(intent:ExperimentIntent,map:ArenaMap):ExperimentMode|undefined{
+ if(intent!=='forage'&&!mapEligibility(map).competition_eligible)return undefined
  if(intent==='contact')return map.id==='duel'&&map.modes.includes('duel')?'duel':map.id==='ring'&&map.modes.includes('sumo')?'sumo':undefined
  return map.id!=='duel'&&map.modes.includes(intent)?intent:undefined
 }
@@ -25,7 +26,8 @@ export function opponentReason(subject:Fly|undefined,opponent:Fly,bridge:string)
  if(bridge==='sensorimotor-research-v2'&&opponent.spec.model_profile!=='malecns-lif-cpu-v1')return 'Research v2 supports LIF designs only. Choose Legacy v1 for rate designs.'
 }
 export function opponentGroup(fly:Fly,owner?:string){return fly.reference_kind==='wildtype'?'WT reference':fly.reference_kind==='official'?'Official reference':owner&&fly.owner===owner?'Your other saved designs':'Public designs'}
-export function experimentScore(mode:string,mapId:string){
+export function experimentScore(mode:string,mapId:string,metadata?:ArenaMap['metadata']){
+ if(mapId!=='blank'&&!mapEligibility({id:mapId,metadata}).competition_eligible)return 'Observation only — arrival time is not a scored outcome yet (#82). Failure to arrive stays visible; there is no competitive winner.'
  return mode==='duel'?'Score: seconds of exclusive center occupancy. Contested occupancy earns neither fly points. Contact is measured separately; no attack or injury actions are modeled.':mode==='sumo'?'Score: ring exit decides the winner. Simultaneous exits or no exit before the limit are a draw; food is not the winning metric.':mapId==='labyrinth'?'Observation: first physical contact with the goal food and the exploration path. Failure to arrive stays visible; there is no opponent or competitive winner.':mapId==='blank'?'Observation: unstimulated movement and recorded neural activity. There is no food, opponent or competitive winner.':mode==='forage'?'Score: finite food actually consumed by this fly. This is a solo observation, with no competitive winner.':'Score: finite food actually consumed. More food wins; equal consumption is a draw. Movement alone does not score.'
 }
 export function buildExperimentPlan(setup:ExperimentSetup,flies:Fly[],maps:ArenaMap[],season:Season|null):{plan:ExperimentPlan|null;errors:string[]}{

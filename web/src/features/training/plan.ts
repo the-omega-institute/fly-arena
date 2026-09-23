@@ -17,6 +17,7 @@ export function planProblem(p:PlanLimits):string|null{
     if(p.conditions.some(c=>!Number.isInteger(c.seed)||c.seed<0||c.seed>2147483647))return 'Use a valid map and whole-number seed for every condition.'
     if(new Set(p.conditions.map(c=>c.map_id+':'+c.seed)).size!==p.conditions.length)return 'Choose distinct map/seed conditions.'
   }
+  if(p.map_id){const problem=trainingEligibilityProblem(p.map_id,p.bridge_profile,p.mode);if(problem)return problem}
   for(const condition of p.conditions??[{map_id:p.map_id??'orchard',seed:p.seed}]){
     const problem=trainingEligibilityProblem(condition.map_id,p.bridge_profile,p.mode)
     if(problem)return problem

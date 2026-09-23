@@ -98,6 +98,12 @@ class MatchRequest(StrictModel):
     seed: int = Field(default=42, ge=0, le=2**31 - 1)
     duration_seconds: int = Field(default=5, ge=1, le=300)
 
+    def validate_admission(self):
+        """Current creation policy; parsing historical requests stays supported."""
+        from .scenarios import MAP_METADATA
+        if self.mode != "forage" and not MAP_METADATA.get(self.map_id, {}).get("competition_eligible", False):
+            raise ValueError(f"{self.map_id} is observation only: competition is unavailable; arrival time is not a scored outcome yet (#82)")
+
     @model_validator(mode="after")
     def slots(self):
         from .experiments.embodied_sensor import validate_profile
@@ -134,6 +140,10 @@ class TournamentRequest(StrictModel):
     mode: Literal["contest", "sumo"] = "contest"
     seeds: list[int] = Field(default_factory=lambda: [42], min_length=1, max_length=3)
     duration_seconds: int = Field(default=5, ge=1, le=30)
+
+    def validate_admission(self):
+        MatchRequest(fly_ids=self.fly_ids[:2], map_id=self.map_id, mode=self.mode,
+                     sandbox=self.sandbox).validate_admission()
 
     @model_validator(mode="after")
     def valid_entries(self):

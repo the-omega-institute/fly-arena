@@ -5,3 +5,8 @@
 .arena-task-report .replay-camera-controls{padding:10px 0;border:0;flex-wrap:wrap}
 
 .fly-world-label.compact{padding:3px 6px;font-size:10px;border-radius:12px;opacity:.85}
+
+.replay-label-anchor{transform:translate(18px,-54px);opacity:.18;transition:opacity .15s;position:relative}
+.replay-label-anchor:before{content:'';position:absolute;left:-1px;top:100%;width:1px;height:36px;background:currentColor;opacity:.65;transform:rotate(28deg);transform-origin:top}
+.replay-label-anchor .fly-world-label.compact{padding:2px 5px;font-size:9px;max-width:145px;opacity:1}
+.replay-label-anchor .fly-world-label b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

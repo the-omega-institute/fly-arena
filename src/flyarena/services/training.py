@@ -43,6 +43,11 @@ class EvaluationCondition(StrictModel):
     map_id: Literal['orchard','maze','scarcity','ring','terrarium','enclosure','canopy','switchback','blank']
     seed: int = Field(ge=0, le=2**31-1, strict=True)
 
+    def validate_admission(self):
+        from ..scenarios import MAP_METADATA
+        if not MAP_METADATA.get(self.map_id, {}).get("training_eligible", False):
+            raise ValueError(f"{self.map_id} is observation only: training optimization is unavailable (#82)")
+
 
 class TrainingSpec(StrictModel):
     name: str = Field(default='My evolution', min_length=1, max_length=64)
@@ -63,6 +68,14 @@ class TrainingSpec(StrictModel):
     evaluation_conditions: list[EvaluationCondition] | None = Field(default=None,min_length=1,max_length=4)
     bridge_profile: Literal['legacy-v1','sensorimotor-research-v2'] = 'legacy-v1'
     sensory_profile: SensoryProfile = 'odor-only-v1'
+
+    def validate_admission(self):
+        # Check the primary map even when explicit evaluation conditions override it.
+        if self.mode == 'contest' and self.map_id == 'blank':
+            raise ValueError('Blank control is a single-fly observation')
+        EvaluationCondition(map_id=self.map_id, seed=self.seed).validate_admission()
+        for condition in self.conditions:
+            condition.validate_admission()
 
     @property
     def positions_per_condition(self):
@@ -182,6 +195,7 @@ class TrainingService:
                     if TrainingSpec.model_validate_json(prior['spec']).model_dump()!=spec.model_dump():
                         raise ValueError('Idempotency key already used for another training plan')
                     return self.get(prior['run_id'])
+            spec.validate_admission()
             for fly_id in [spec.founder_id]+([spec.opponent_id] if spec.mode=='contest' else []):
                 row=db.execute('SELECT spec FROM flies WHERE id=?',(fly_id,)).fetchone()
                 if row is None:raise ValueError('Starting fly or opponent does not exist')

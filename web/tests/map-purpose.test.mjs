@@ -12,7 +12,7 @@ import {JSDOM} from 'jsdom'
 const web=new URL('../',import.meta.url).pathname,out=fs.mkdtempSync(path.join(os.tmpdir(),'map-purpose-'))
 fs.writeFileSync(path.join(out,'package.json'),'{"type":"commonjs"}')
 fs.symlinkSync(fs.realpathSync(path.join(web,'node_modules')),path.join(out,'node_modules'))
-for(const relative of ['src/api.ts','src/shared/i18n.tsx','src/shared/messages.ts','src/features/arena/mapPurpose.ts','src/features/arena/MapPreview.tsx',...fs.readdirSync(path.join(web,'src/shared/messages')).filter(f=>f.endsWith('.ts')).map(f=>'src/shared/messages/'+f)]){
+for(const relative of ['src/types.ts','src/api.ts','src/shared/i18n.tsx','src/shared/messages.ts','src/features/arena/mapPurpose.ts','src/features/arena/MapPreview.tsx',...fs.readdirSync(path.join(web,'src/shared/messages')).filter(f=>f.endsWith('.ts')).map(f=>'src/shared/messages/'+f)]){
  const result=ts.transpileModule(fs.readFileSync(path.join(web,relative),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}})
  const dest=path.join(out,relative.replace(/\.tsx?$/,'.js'));fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,result.outputText)
 }
@@ -48,7 +48,7 @@ test('legend uses returned geometry rather than map identity or active contestan
 })
 
 test('old or incomplete responses preserve unknowns and never imply qualification',()=>{
- const legacy=mapPurpose({size:28,food:[],obstacles:[],modes:['contest']})
+ const legacy=mapPurpose({id:'orchard',size:28,food:[],obstacles:[],modes:['contest']})
  assert.equal(legacy.foodCount,0);assert.equal(legacy.obstacleCount,0);assert.equal(legacy.spawnSlots,null)
  assert.deepEqual(legacy.modes,['Two-fly food competition']);assert.equal(legacy.status,'Scientific status unavailable');assert.equal(legacy.horizon,null)
  assert.equal(mapPurpose({}).foodCount,null);assert.equal(mapPurpose({size:NaN}).sizeMm,null)
@@ -57,7 +57,7 @@ test('old or incomplete responses preserve unknowns and never imply qualificatio
 })
 
 test('mode labels keep ring contests distinct from contact territory',()=>{
- const legend=mapPurpose({...layout,metadata:{...layout.metadata,supported_modes:['forage','contest','sumo','duel','future-mode']}})
+ const legend=mapPurpose({...layout,id:'ring',metadata:{...layout.metadata,supported_modes:['forage','contest','sumo','duel','future-mode']}})
  assert.deepEqual(legend.modes,['Solo forage','Two-fly food competition','Contact ring contest','Contact / territory','future-mode'])
 })
 
@@ -111,4 +111,10 @@ test('preview request failures remain visible instead of showing stale suitabili
  await mount(MapPreview,props)
  assert.match(text(),/Map preview unavailable/);assert.match(text(),/Preview service unavailable/)
  assert.equal(document.querySelector('[data-scientific-status]'),null)
+})
+
+test('navigation preview legends never advertise competitive modes',()=>{
+ for(const id of ['maze','switchback','labyrinth']){
+  assert.deepEqual(mapPurpose({...layout,id,modes:['forage','contest'],metadata:{...layout.metadata,supported_modes:['forage','contest'],competition_eligible:false}}).modes,['Solo forage'])
+ }
 })

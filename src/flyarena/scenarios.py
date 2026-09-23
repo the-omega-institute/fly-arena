@@ -195,6 +195,8 @@ MODEL_LIMITATION = (
 def _map_metadata(map_id: str, purpose: str, horizon: tuple[int, int], reason: str) -> dict:
     return {
         "supported_modes": list(MAPS[map_id]["modes"]),
+        "training_eligible": reason != MAZE_LIMITATION and map_id != "duel",
+        "competition_eligible": reason != MAZE_LIMITATION and map_id != "blank",
         "recommended_horizon_seconds": {"min": horizon[0], "max": horizon[1]},
         "purpose": purpose,
         "scientific_status": "observation-only",

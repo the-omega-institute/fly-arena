@@ -67,10 +67,6 @@ export const mapsMessages = {
     "en": "Scientific status unavailable",
     "zh-CN": "科学状态不可用"
   },
-  "Unavailable": {
-    "en": "Unavailable",
-    "zh-CN": "不可用"
-  },
   "Map purpose unavailable": {
     "en": "Map purpose unavailable",
     "zh-CN": "地图用途不可用"

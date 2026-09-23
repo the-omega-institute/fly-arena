@@ -13,11 +13,12 @@ function moduleUrl(url){
 }
 const moduleAt=path=>import(moduleUrl(new URL(path,import.meta.url)))
 const eligibility=await moduleAt('../src/features/training/trainingEligibility.ts')
+const {mapEligibility}=await moduleAt('../src/types.ts')
 const {trainingMapIds,trainingBridgeProfiles,trainingEligibilityProblem,eligibleTrainingMaps}=eligibility
 const plan=await moduleAt('../src/features/training/plan.ts')
 const {trainingMessages}=await moduleAt('../src/shared/messages/training.ts')
 const base={population:2,generations:1,budget:16,duration:1,seed:42,circuits:['olfactory'],name:'Contract test',mode:'forage',founder:'a'.repeat(32),opponent:'b'.repeat(32)}
-const maps=[...trainingMapIds,'labyrinth','duel','unknown'].map(id=>({id,name:id,english:id,description:'',task:id==='blank'?{}:undefined}))
+const maps=[...trainingMapIds,'maze','switchback','labyrinth','duel','unknown'].map(id=>({id,name:id,english:id,description:'',task:id==='blank'?{}:undefined}))
 
 test('frontend map and bridge lists exactly equal both backend training declarations',()=>{
  const source=fs.readFileSync(new URL('../../src/flyarena/services/training.py',import.meta.url),'utf8')
@@ -27,8 +28,8 @@ test('frontend map and bridge lists exactly equal both backend training declarat
   assert.ok(literal,`Missing ${className}.${name} contract`)
   return [...literal.matchAll(/['"]([^'"]+)['"]/g)].map(m=>m[1])
  }
- assert.deepEqual(trainingMapIds,field('TrainingSpec','map_id'))
- assert.deepEqual(trainingMapIds,field('EvaluationCondition','map_id'))
+ assert.deepEqual(trainingMapIds,field('TrainingSpec','map_id').filter(id=>mapEligibility({id}).training_eligible))
+ assert.deepEqual(trainingMapIds,field('EvaluationCondition','map_id').filter(id=>mapEligibility({id}).training_eligible))
  assert.deepEqual(trainingBridgeProfiles,field('TrainingSpec','bridge_profile'))
 })
 
@@ -90,13 +91,13 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
   await act(async()=>button('Add evaluation condition').click())
   const extra=document.querySelector('.extra-condition select')
   assert.deepEqual([...extra.options].map(o=>o.value),trainingMapIds)
-  await change(extra,'switchback')
+  await change(extra,'canopy')
   await change(extra,'blank')
   await change(select('Objective'),'contest')
   assert.equal(extra.value,'blank')
   assert.equal(extra.selectedOptions[0].disabled,true)
   assert.ok(document.body.textContent.includes(t(trainingEligibilityProblem('blank','sensorimotor-research-v2','contest'))))
-  await change(extra,'switchback')
+  await change(extra,'canopy')
   await change(select('Objective'),'forage')
   await change(environment,'blank')
   await change(select('Objective'),'contest')
@@ -106,7 +107,7 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
   assert.equal(document.querySelector('[data-preview-map]'),null)
   assert.ok(document.body.textContent.includes(t(trainingEligibilityProblem('blank','sensorimotor-research-v2','contest'))))
   assert.equal(button('Start training').disabled,true)
-  await change(environment,'switchback')
+  await change(environment,'canopy')
   assert.equal(document.querySelector('[data-preview-bridge]').dataset.previewBridge,'sensorimotor-research-v2')
   await act(async()=>button('Remove condition 2').click())
   await change(select('Objective'),'forage')
@@ -115,4 +116,10 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
   await act(async()=>root.unmount());dom.window.close()
   for(const [key,descriptor]of Object.entries(originals)){if(descriptor)Object.defineProperty(globalThis,key,descriptor);else delete globalThis[key]}
  }
+})
+
+test('catalog flags can further restrict both training selectors and admission',()=>{
+ const metadata={training_eligible:false}
+ assert.deepEqual(eligibleTrainingMaps([{id:'orchard',metadata}]),[])
+ assert.ok(trainingEligibilityProblem('orchard','legacy-v1','forage',metadata))
 })
