@@ -1,3 +1,4 @@
+import {serviceUrl} from '../../api'
 import type {NeuralGraph} from '../../types'
 
 export type Anatomy={schema:'connectome-anatomy/v1';connectome_sha256:string;neuron_count:number;position_count:number;missing_position_count:number;positions:number[]}
@@ -26,7 +27,7 @@ export function validateAnatomy(value:Anatomy,expected:string):Anatomy{
 export async function loadAnatomy(expected:string,signal:AbortSignal):Promise<Anatomy>{
   if(!/^[a-f0-9]{64}$/.test(expected))throw Error('Connectome identity unavailable')
   const saved=cache.get(expected);if(saved)return saved
-  for(const path of ['/api/v1/connectome/anatomy','/examples/anatomy/'+expected+'.json']){
+  for(const path of [serviceUrl('/api/v1/connectome/anatomy'),'/examples/anatomy/'+expected+'.json']){
     try{
       const response=await fetch(path,{signal,credentials:'same-origin'})
       if(!response.ok)throw Error('Anatomical coordinates unavailable')

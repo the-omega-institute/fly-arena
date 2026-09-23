@@ -1,0 +1,46 @@
+name: Deploy public preview
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: npm test --prefix web
+      - run: npm run test:journeys --prefix web
+      - run: npm run build --prefix web
+      - name: Configure public API
+        env:
+          ARENA_PREVIEW_API: ${{ vars.ARENA_PREVIEW_API }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, html, urllib.parse
+          origin=os.environ['ARENA_PREVIEW_API'].rstrip('/')
+          url=urllib.parse.urlsplit(origin)
+          assert url.scheme=='https' and url.netloc and not any([url.path,url.query,url.fragment,url.username,url.password]), 'Configure ARENA_PREVIEW_API with an HTTPS origin'
+          p=pathlib.Path('web/dist/index.html')
+          p.write_text(p.read_text().replace('name="arena-api-origin" content=""', 'name="arena-api-origin" content="'+html.escape(origin,quote=True)+'"'))
+          pathlib.Path('web/dist/CNAME').write_text('fly.omega.gift\n')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+      - uses: actions/deploy-pages@v4
+        id: deployment

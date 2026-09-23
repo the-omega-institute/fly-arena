@@ -13,6 +13,7 @@ from pathlib import Path
 import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Query
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import HTTPBearer
@@ -81,6 +82,15 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     app.state.training = training
     ledger = LifeLedger(store)
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    # Optional static frontend, using Arena bearer tokens. Cookie/OIDC mode stays same-origin.
+    web_origin = os.environ.get('ARENA_WEB_ORIGIN', '')
+    if web_origin:
+        AuthConfig.safe_url(web_origin)
+        if auth.config.mode != 'local':
+            raise ValueError('Static frontend preview currently requires local token authentication')
+        app.add_middleware(CORSMiddleware, allow_origins=[web_origin],
+                           allow_methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+                           allow_headers=['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Invite-Code'])
     app.include_router(auth.router())
 
     @app.middleware("http")

@@ -167,3 +167,17 @@ test('submission keys work on LAN HTTP without crypto.randomUUID',()=>{
  Object.defineProperty(globalThis,'crypto',{configurable:true,value:{getRandomValues(bytes){bytes.fill(++sequence);return bytes}}})
  try{const a=newRequestKey(),b=newRequestKey();assert.match(a,/^[0-9a-f]{32}$/);assert.notEqual(a,b)}finally{if(original)Object.defineProperty(globalThis,'crypto',original);else delete globalThis.crypto}
 });
+
+test('static hosting routes API calls to the configured service without sending cross-site cookies',async()=>{
+ const priorFetch=globalThis.fetch,priorDocument=globalThis.document;let request;
+ try{
+  globalThis.document={querySelector:()=>({content:'https://compute.example/'})};
+  globalThis.fetch=async(url,options)=>{request={url,options};return {ok:true,json:async()=>({})}};
+  const {api,serviceUrl}=await moduleAt('../src/api.ts');
+  await api('/matches',{method:'POST'},{id:'owner',name:'Visitor',token:'arena-token'});
+  assert.equal(request.url,'https://compute.example/api/v1/matches');
+  assert.equal(request.options.credentials,'same-origin');
+  assert.equal(request.options.headers.Authorization,'Bearer arena-token');
+  assert.equal(serviceUrl('/docs'),'https://compute.example/docs');
+ }finally{globalThis.fetch=priorFetch;if(priorDocument===undefined)delete globalThis.document;else globalThis.document=priorDocument}
+});

@@ -180,3 +180,28 @@ def test_one_designer_cannot_revoke_another_agent_key(oidc):
     second=c.get('/api/v1/auth/session').json()
     c.delete('/api/v1/auth/agent-tokens/'+key['id'],headers={'Origin':config.origin,'X-Arena-CSRF':second['csrf_token']})
     assert c.get('/api/v1/me',headers={'Authorization':'Bearer '+key['token']}).json()==first['user']
+
+
+def test_static_preview_allows_only_configured_origin_and_bearer_headers(tmp_path, monkeypatch):
+    monkeypatch.setenv('ARENA_WEB_ORIGIN', 'https://fly.omega.gift')
+    c = TestClient(create_app(with_worker=False, store=Store(tmp_path), auth_config=AuthConfig()))
+    headers = {'Origin': 'https://fly.omega.gift', 'Access-Control-Request-Method': 'POST',
+               'Access-Control-Request-Headers': 'authorization,content-type,idempotency-key,x-invite-code'}
+    r = c.options('/api/v1/matches', headers=headers)
+    assert r.status_code == 200
+    assert r.headers['access-control-allow-origin'] == 'https://fly.omega.gift'
+    assert 'access-control-allow-credentials' not in r.headers
+    r = c.options('/api/v1/matches', headers=headers | {'Origin': 'https://other.example'})
+    assert r.status_code == 400
+    assert 'access-control-allow-origin' not in r.headers
+    r = c.post('/api/v1/identities', headers={'Origin': 'https://fly.omega.gift'}, json={'name': 'Pages visitor'})
+    assert r.status_code == 201
+    identity = r.json()
+    assert c.get('/api/v1/me', headers={'Origin': 'https://fly.omega.gift', 'Authorization': 'Bearer '+identity['token']}).json()['id'] == identity['id']
+
+
+def test_static_preview_cannot_silently_enable_cross_site_oidc(oidc, monkeypatch):
+    _, store, config, _, _, _, provider = oidc
+    monkeypatch.setenv('ARENA_WEB_ORIGIN', 'https://fly.omega.gift')
+    with pytest.raises(ValueError, match='local token authentication'):
+        create_app(with_worker=False, store=store, auth_config=config, oidc_client=provider)

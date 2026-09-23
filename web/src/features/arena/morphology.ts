@@ -1,3 +1,4 @@
+import {serviceUrl} from '../../api'
 export type BrainRegion={id:number;name:string;color:string;segments:number}
 export type NeuronMorphology={id:string;type:string|null;class:string|null;superclass:string|null;side:string|null;positions:number[];radii:number[];edges:number[];edge_regions?:number[]}
 export type Morphology={schema:'connectome-morphology/v1';connectome_sha256:string;source:string;coordinate_unit_nm:number;neurons:NeuronMorphology[];missing_ids:string[];parcellation?:{source:string;scale:string;resolution_nm:number[];regions:BrainRegion[];unassigned_segments:number}}
@@ -21,7 +22,7 @@ export function regionColorMap(data:Morphology){return new Map(data.parcellation
 export function fiberRegionColor(neuron:NeuronMorphology,edge:number,palette:Map<number,string>){return palette.get(neuron.edge_regions?.[edge]??0)||'#526b78'}
 export async function loadMorphology(expected:string,signal:AbortSignal):Promise<Morphology>{
  const cached=cache.get(expected);if(cached)return cached
- const response=await fetch('/api/v1/connectome/morphology',{signal,credentials:'same-origin'})
+ const response=await fetch(serviceUrl('/api/v1/connectome/morphology'),{signal,credentials:'same-origin'})
  if(!response.ok)throw Error('Morphology unavailable')
  const data=validateMorphology(await response.json(),expected)
  if(signal.aborted)throw new DOMException('Aborted','AbortError')
