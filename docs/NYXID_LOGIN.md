@@ -1,6 +1,18 @@
 # NyxID 登录接口与后续对接说明
 
-本轮完成可测试的接口和前端入口，默认关闭 NyxID。没有注册真实 OAuth 客户端、连接真实账号、修改 NyxID、启用公网或切换远端认证模式。
+NyxID 使用服务端 OIDC 回调和 HttpOnly 会话。默认关闭，通过下述环境变量启用。
+
+## 无需 DNS 管理权限的试玩部署
+
+GitHub Pages 可以作为入口，但不能处理 OAuth 服务端回调。没有域名管理权限时，将完整前端和 API 一起放在服务器现有的 HTTPS 地址：
+
+1. 在 NyxID 应用中登记 **服务器 HTTPS 地址** 加 `/api/v1/auth/nyxid/callback`，`ARENA_PUBLIC_ORIGIN` 设为该地址。
+2. 服务器启用 NyxID，并移除 `ARENA_WEB_ORIGIN`；网页和 API 同源，会话无需跨站 cookie。
+3. GitHub Actions 仓库变量 `ARENA_APP_ORIGIN` 设为服务器 HTTPS origin，运行 `pages.yml`。Pages 会进入完整应用，保留比赛回放的 hash 链接，不转发查询参数或凭据。页面同时提供手动进入链接。
+
+清空 `ARENA_APP_ORIGIN` 后重新部署，Pages 恢复独立前端模式；该模式仅支持现有的本地 bearer 身份，不能承载 NyxID cookie 登录。回滚时也应恢复后端认证模式。
+
+Cloudflare quick tunnel 可用于这类试玩，但地址在隧道重建后可能变化。届时必须同步更新 NyxID 回调、服务器 origin 和 Pages 仓库变量。正式发布应使用可管理的稳定域名或托管平台的固定 HTTPS 地址。这里只依赖现有隧道，不需要 Cloudflare 域名账号。
 
 ## 用户体验
 
@@ -83,7 +95,7 @@ https://<Arena 域名>/api/v1/auth/nyxid/callback
 
 Arena 不会自动读取 `.env`；由实际进程环境注入。当前 launchd 安装脚本也不会自动传递这些配置，后续接入时需在对应服务环境显式配置后重启。缺少必需配置时，`nyxid` 模式启动失败，不会静默降级成本地注册。
 
-所有真实 client ID/secret、域名、授权页面与首次真实用户联调由你后续提供和接入。本轮测试使用临时 RSA 密钥和 `httpx.MockTransport`，不请求真实 NyxID。
+真实 client secret 只保存在服务器私有配置中，不进入 GitHub、前端构建或日志。下述自动化测试使用临时 RSA 密钥和 `httpx.MockTransport`，不请求真实 NyxID；实际部署还需验证真实 provider 换码及网页会话。
 
 ## 会话与运维边界
 
