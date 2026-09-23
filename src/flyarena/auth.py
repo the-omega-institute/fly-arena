@@ -108,7 +108,7 @@ class NyxIDClient:
             AuthConfig.safe_url(m[key])
         if ('RS256' not in m.get('id_token_signing_alg_values_supported', []) or
             'S256' not in m.get('code_challenge_methods_supported', []) or
-            'client_secret_basic' not in m.get('token_endpoint_auth_methods_supported', [])):
+            not {'client_secret_basic', 'client_secret_post'}.intersection(m.get('token_endpoint_auth_methods_supported', []))):
             raise ValueError('NyxID discovery lacks the required OIDC profile')
         self.cached_metadata, self.metadata_until = m, time.time() + 300
         return m
@@ -124,9 +124,17 @@ class NyxIDClient:
 
     def exchange(self, code: str, flow: dict):
         m = self.metadata()
-        tokens = self.http.post(m['token_endpoint'], auth=(quote(self.config.client_id, safe=''), quote(self.config.client_secret, safe='')),
-            data={'grant_type': 'authorization_code', 'code': code, 'redirect_uri': self.config.callback,
-                  'code_verifier': flow['verifier']}).raise_for_status().json()
+        data = {'grant_type': 'authorization_code', 'code': code,
+                'redirect_uri': self.config.callback, 'code_verifier': flow['verifier']}
+        # NyxID's authorization-code endpoint currently reads credentials from
+        # the form even when discovery also advertises Basic. Use its advertised
+        # POST method; retain Basic for providers that only advertise Basic.
+        auth = None
+        if 'client_secret_post' in m['token_endpoint_auth_methods_supported']:
+            data.update(client_id=self.config.client_id, client_secret=self.config.client_secret)
+        else:
+            auth = (quote(self.config.client_id, safe=''), quote(self.config.client_secret, safe=''))
+        tokens = self.http.post(m['token_endpoint'], auth=auth, data=data).raise_for_status().json()
         token = tokens['id_token']
         header = jwt.get_unverified_header(token)
         if header.get('alg') != 'RS256' or not header.get('kid'):
@@ -314,4 +322,3 @@ class AuthBoundary:
             return {'revoked': True}
 
         return router
-

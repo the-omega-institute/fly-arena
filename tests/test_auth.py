@@ -22,6 +22,7 @@ def oidc(tmp_path):
     config = AuthConfig(mode='nyxid',base_url='https://nyx.example',issuer='nyxid-test',client_id='arena-test',client_secret='test-only-secret',origin='https://arena.example')
     state = {'overrides':{}, 'calls':[], 'private':private}
     metadata = {'issuer':config.issuer,'authorization_endpoint':config.base_url+'/oauth/authorize','token_endpoint':config.base_url+'/oauth/token','jwks_uri':config.base_url+'/.well-known/jwks.json','id_token_signing_alg_values_supported':['RS256'],'code_challenge_methods_supported':['S256'],'token_endpoint_auth_methods_supported':['client_secret_basic']}
+    state['metadata'] = metadata
     def respond(request):
         state['calls'].append(request.url.path)
         if request.url.path=='/.well-known/openid-configuration': return httpx.Response(200,json=metadata)
@@ -30,7 +31,12 @@ def oidc(tmp_path):
             body=parse_qs(request.content.decode())
             assert body['redirect_uri']==[config.callback]
             assert challenge(body['code_verifier'][0])==state['authorization']['code_challenge'][0]
-            assert request.headers['Authorization']=='Basic '+base64.b64encode(b'arena-test:test-only-secret').decode()
+            if 'client_secret_post' in metadata['token_endpoint_auth_methods_supported']:
+                assert 'Authorization' not in request.headers
+                assert body['client_id']==['arena-test'] and body['client_secret']==['test-only-secret']
+            else:
+                assert request.headers['Authorization']=='Basic '+base64.b64encode(b'arena-test:test-only-secret').decode()
+                assert 'client_secret' not in body
             claims={'iss':config.issuer,'sub':'user-1','aud':config.client_id,'iat':int(time.time()),'exp':int(time.time())+3600,'nonce':state['authorization']['nonce'][0],'name':'Test Designer','email':'same@example.test'}|state['overrides']
             token=jwt.encode(claims,state['private'],algorithm='RS256',headers={'kid':'test-key'})
             return httpx.Response(200,json={'id_token':token,'access_token':'never-stored','refresh_token':'never-stored-either'})
@@ -55,6 +61,22 @@ def test_disabled_mode_preserves_existing_mvp(tmp_path):
     u=c.post('/api/v1/identities',json={'name':'Legacy'}).json()
     assert c.get('/api/v1/me',headers={'Authorization':'Bearer '+u['token']}).json()['id']==u['id']
     assert c.get('/api/v1/auth/session').json()['authenticated'] is False
+
+
+@pytest.mark.parametrize('methods', [['client_secret_post'], ['client_secret_basic', 'client_secret_post', 'none']])
+def test_nyxid_advertised_post_credentials_complete_login(oidc, methods):
+    c,_,_,state,begin,finish,_=oidc
+    state['metadata']['token_endpoint_auth_methods_supported']=methods
+    params,_=begin()
+    assert 'client_secret' not in params
+    assert finish().headers['location']=='/'
+    assert c.get('/api/v1/auth/session').json()['authenticated']
+
+
+def test_provider_without_confidential_client_auth_is_rejected(oidc):
+    c,_,_,state,_,_,_=oidc
+    state['metadata']['token_endpoint_auth_methods_supported']=['none']
+    assert c.get('/api/v1/auth/nyxid/start').status_code==503
 
 
 def test_pkce_session_restore_and_single_consent_request(oidc):

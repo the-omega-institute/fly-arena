@@ -2,6 +2,8 @@
 
 NyxID 使用服务端 OIDC 回调和 HttpOnly 会话。默认关闭，通过下述环境变量启用。
 
+客户端换码优先使用 discovery 声明的 `client_secret_post`；仅声明 `client_secret_basic` 的 provider 使用 Basic。2026-09-24 真实联调发现 NyxID 同时声明两者，但 authorization-code 实现从表单读取凭据，Basic 请求会返回 `Missing client_id parameter`。两种发送方式互斥，secret 始终只通过服务端 HTTPS 发送。
+
 ## 无需 DNS 管理权限的试玩部署
 
 GitHub Pages 可以作为入口，但不能处理 OAuth 服务端回调。没有域名管理权限时，将完整前端和 API 一起放在服务器现有的 HTTPS 地址：
@@ -74,7 +76,7 @@ sequenceDiagram
 
 ## 你之后需要配置的内容
 
-在 NyxID 注册一个 **confidential web client**，支持 `authorization_code`、PKCE S256 和 `client_secret_basic`，授权范围 `openid profile`。注册准确回调 URI：
+在 NyxID 注册一个 **confidential web client**，支持 `authorization_code`、PKCE S256 和 `client_secret_post`，授权范围 `openid profile`。注册准确回调 URI：
 
 ```text
 https://<Arena 域名>/api/v1/auth/nyxid/callback
