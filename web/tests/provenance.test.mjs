@@ -109,7 +109,7 @@ const flies = [legacy, wt, official, fly('clone001-full-id', {reference_kind:'us
 function arena(identity, extra={}) {
   return render(ArenaFeature, {replayStatus:'idle', replayError:'', bridgeProfile:'', scene:null, focused:'', preview:null,
     selected:legacy.id, identity, flies, frames:[], play:false, playtime:0, playbackSpeed:1, season:null, matches:[], maps:[],
-    mapId:'orchard', mode:'contest', opponent:wt.id, duration:5, seed:42, busy:'', ...extra})
+    mapId:'orchard', mode:'contest', opponent:wt.id, duration:5, seedText:'42', busy:'', ...extra})
 }
 const options = html => [...html.matchAll(/<option\b[^>]*value="([^"]+)"[^>]*>(.*?)<\/option>/g)]
 const textOnly = html => html.replace(/<[^>]*>/g, '')

@@ -54,7 +54,7 @@ const noop=()=>{}
 const button=label=>{const el=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===label||b.getAttribute('aria-label')===label);assert.ok(el,`Missing button: ${label}`);return el}
 async function click(label){await act(async()=>button(label).click())}
 async function mount(Component,props){await act(async()=>root.render(React.createElement(I18nProvider,null,React.createElement(Preferences),React.createElement(Component,props))))}
-test.afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'));localStorage.clear()})
+test.afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'));localStorage.clear();sessionStorage.clear()})
 test.after(async()=>{await act(async()=>root.unmount());dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
 
 test('a novice can clone, edit, train, compare and open AI help without launching work',async()=>{
@@ -515,8 +515,8 @@ test('observing the opponent switches body and brain together without changing t
  const {ArenaFeature}=require('./src/features/arena/ArenaFeature.js')
  const designs=[];const scene={flies:[own,wt],food:[{id:'food-0',initial:2}],body:{geoms:[]}}
  const frame={time:0,tick:0,poses:[],positions:[[0,0,1],[1,0,1]],scores:[0,0],food:[2],traces:[{},{}]}
- const props={scene,frame,next:frame,alpha:0,focused:'match',preview:null,selectedFly:own,chosenMap:null,current:{id:'match',request:{fly_ids:[own.id,wt.id],map_id:'scarcity',mode:'contest',seed:42,duration_seconds:4},result:null,participants:[own,wt]},selected:own.id,identity:null,flies:[own,wt],frames:[frame],events:[],play:false,playtime:0,playbackSpeed:1,season:{connectome:{circuits:[]}},matches:[],maps:[],mapId:'scarcity',mode:'contest',opponent:wt.id,duration:4,seed:42,busy:'',bridgeProfile:'legacy-v1',sensoryProfile:'engineered-contact-context-v1',replayStatus:'ready',replayError:'',setSelected:id=>designs.push(id)}
- for(const key of ['setSensoryProfile','setBridgeProfile','setPlay','setPlaytime','setPlaybackSpeed','setFocused','setMapId','setMode','setOpponent','setDuration','setSeed','startMatch','startSeries'])props[key]=noop
+ const props={scene,frame,next:frame,alpha:0,focused:'match',preview:null,selectedFly:own,chosenMap:null,current:{id:'match',request:{fly_ids:[own.id,wt.id],map_id:'scarcity',mode:'contest',seed:42,duration_seconds:4},result:null,participants:[own,wt]},selected:own.id,identity:null,flies:[own,wt],frames:[frame],events:[],play:false,playtime:0,playbackSpeed:1,season:{connectome:{circuits:[]}},matches:[],maps:[],mapId:'scarcity',mode:'contest',opponent:wt.id,duration:4,seedText:'42',busy:'',bridgeProfile:'legacy-v1',sensoryProfile:'engineered-contact-context-v1',replayStatus:'ready',replayError:'',setSelected:id=>designs.push(id)}
+ for(const key of ['setSensoryProfile','setBridgeProfile','setPlay','setPlaytime','setPlaybackSpeed','setFocused','setMapId','setMode','setOpponent','setDuration','setSeedText','startMatch','startSeries'])props[key]=noop
  globalThis.fetch=async()=>({ok:true,json:async()=>({neurons:[],edges:[]})})
  await mount(ArenaFeature,props)
  assert.equal(document.querySelector('[data-observed-body]').getAttribute('data-observed-body'),own.id)
@@ -1141,8 +1141,8 @@ test('research offspring retains kernel senses in playable unranked match setup'
  assert.equal(defaultMatchProfile(season),kernel)
  assert.equal(compatibleSensory(season,kernel,senses),true)
  assert.equal(compatibleSensory(season,kernel,'legacy-touch'),false)
- const props={scene:null,frame:null,next:null,alpha:0,focused:'',preview:null,selectedFly:own,chosenMap:null,current:null,selected:own.id,identity:null,flies:[own,wt],frames:[],events:[],play:false,playtime:0,playbackSpeed:1,season,matches:[],maps:[{id:'enclosure',name:'围场',english:'Enclosure',modes:['forage','contest']}],mapId:'enclosure',mode:'contest',opponent:wt.id,duration:20,seed:42,busy:'',bridgeProfile:kernel,sensoryProfile:senses,replayStatus:'idle',replayError:'',startMatch:()=>submitted++}
- for(const key of ['setSelected','setSensoryProfile','setBridgeProfile','setPlay','setPlaytime','setPlaybackSpeed','setFocused','setMapId','setMode','setOpponent','setDuration','setSeed','startSeries'])props[key]=noop
+ const props={scene:null,frame:null,next:null,alpha:0,focused:'',preview:null,selectedFly:own,chosenMap:null,current:null,selected:own.id,identity:null,flies:[own,wt],frames:[],events:[],play:false,playtime:0,playbackSpeed:1,season,matches:[],maps:[{id:'enclosure',name:'围场',english:'Enclosure',modes:['forage','contest']}],mapId:'enclosure',mode:'contest',opponent:wt.id,duration:20,seedText:'42',busy:'',bridgeProfile:kernel,sensoryProfile:senses,replayStatus:'idle',replayError:'',startMatch:()=>submitted++}
+ for(const key of ['setSelected','setSensoryProfile','setBridgeProfile','setPlay','setPlaytime','setPlaybackSpeed','setFocused','setMapId','setMode','setOpponent','setDuration','setSeedText','startSeries'])props[key]=noop
  await mount(ArenaFeature,{...props,focused:'historical-match',replayStatus:'loading'})
  assert.equal(document.querySelector('.experiment-disclosure').open,false)
  assert.ok(document.querySelector('.arena-stage'))
@@ -1312,8 +1312,8 @@ test('unified setup prepares WT in the single opponent selector and submits the 
  const maps=[{id:'orchard',name:'果园',english:'Orchard',modes:['forage','contest']},{id:'duel',name:'领地场',english:'Closed Contact Arena',modes:['duel']}]
  const season={match_profiles:[{id:'legacy-v1',ready:true}]}
  function Harness(){
-  const [selected,setSelected]=React.useState(own.id),[opponent,setOpponent]=React.useState(''),[mode,setMode]=React.useState('forage'),[mapId,setMapId]=React.useState('orchard'),[seed,setSeed]=React.useState(7),[duration,setDuration]=React.useState(20),[bridgeProfile,setBridgeProfile]=React.useState('legacy-v1'),[sensoryProfile,setSensoryProfile]=React.useState('odor-only-v1')
-  return React.createElement(ExperimentSetup,{flies:[wt,own],identity:null,season,maps,selected,setSelected,opponent,setOpponent,mode,setMode,mapId,setMapId,seed,setSeed,duration,setDuration,bridgeProfile,setBridgeProfile,sensoryProfile,setSensoryProfile,busy:'',startMatch:async plan=>plans.push(plan),onPreview:noop})
+  const [selected,setSelected]=React.useState(own.id),[opponent,setOpponent]=React.useState(''),[mode,setMode]=React.useState('forage'),[mapId,setMapId]=React.useState('orchard'),[seedText,setSeedText]=React.useState('7'),[duration,setDuration]=React.useState(20),[bridgeProfile,setBridgeProfile]=React.useState('legacy-v1'),[sensoryProfile,setSensoryProfile]=React.useState('odor-only-v1')
+  return React.createElement(ExperimentSetup,{flies:[wt,own],identity:null,season,maps,selected,setSelected,opponent,setOpponent,mode,setMode,mapId,setMapId,seedText,setSeedText,duration,setDuration,bridgeProfile,setBridgeProfile,sensoryProfile,setSensoryProfile,busy:'',startMatch:async plan=>plans.push(plan),onPreview:noop})
  }
  await mount(Harness,{})
  assert.equal(document.querySelectorAll('select[aria-label="Opponent"]').length,0)
@@ -1398,4 +1398,69 @@ test('multi-seed contact retries preserve the draft, complete plan and keys acro
  assert.deepEqual(writes.slice(4).map(w=>w.body.fly_ids),[[wt.id,own.id],[own.id,wt.id],[wt.id,own.id],[own.id,wt.id]])
  assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
  assert.equal(seeds.value,'42,43')
+})
+
+for(const retryLogin of [false,true])test(`NyxID restores every seed and submission key before a partial contact run; retry ${retryLogin?'after another login':'in the same session'}`,async()=>{
+ const canvasFile=require.resolve('./src/ArenaCanvas.js');require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:()=>null}}
+ const replayFile=require.resolve('./src/features/arena/useReplay.js');require.cache[replayFile]={id:replayFile,filename:replayFile,loaded:true,exports:{useReplay:()=>({scene:null,frames:[],events:[],status:'idle',error:''})}}
+ history.replaceState(null,'','#tab=arena');localStorage.clear();sessionStorage.clear()
+ const owner={id:'visitor',name:'Explorer'},writes=[],accepted=new Map();let authenticated=false
+ const maps=[{id:'orchard',name:'果园',english:'Orchard',modes:['forage','contest'],food:[],obstacles:[],size:28},{id:'duel',name:'领地场',english:'Closed Contact Arena',modes:['duel'],food:[],obstacles:[],size:18}]
+ const season={connectome:{sha256:spec.connectome_sha256,neuron_count:100,edge_count:1000,circuits:[]},budget:{points:100},match_profiles:[{id:'legacy-v1',ready:true}],default_bridge_profile:'legacy-v1'}
+ globalThis.fetch=async(url,options={})=>{
+  const path=String(url).replace('/api/v1','')
+  if(options.method==='POST'){
+   assert.equal(path,'/matches');assert.equal(options.headers['X-Arena-CSRF'],'test-csrf')
+   assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43','Restore the visible draft before resuming submission')
+   const body=JSON.parse(options.body),key=options.headers['Idempotency-Key'];writes.push({body,key})
+   if(writes.length===4)throw Error('NyxID restoration test failure')
+   if(!accepted.has(key))accepted.set(key,{id:'nyx-contact-'+accepted.size,status:'queued',progress:0,request:body})
+   return {ok:true,json:async()=>accepted.get(key)}
+  }
+  // A hash-only login URL lets JSDOM exercise real draft persistence without external navigation.
+  const data=path==='/auth/config'?{mode:'nyxid',login_url:'#tab=arena'}:path==='/auth/session'?{authenticated,user:authenticated?owner:null,csrf_token:authenticated?'test-csrf':null}:path==='/season'?season:path==='/flies'?[{...wt,color:'mint'},{...own,color:'amber'}]:path==='/maps'?maps:path==='/matches'?[...accepted.values()]:path==='/preview'?{}:[]
+  return {ok:true,json:async()=>data}
+ }
+ delete require.cache[require.resolve('./src/App.js')];const App=require('./src/App.js').default
+ async function returnFromLogin(){
+  await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'))
+  authenticated=true;history.replaceState(null,'','#tab=arena');await mount(App,{})
+  assert.equal(sessionStorage.getItem('flyarena.pendingDesign'),null)
+ }
+ await mount(App,{})
+ const intent=document.querySelector('select[aria-label="Match mode"]')
+ await act(async()=>{intent.value='contact';intent.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ await click('Closed Contact Arena')
+ const seeds=document.querySelector('input[aria-label="Seeds (1–3)"]')
+ await act(async()=>{const props=Object.keys(seeds).find(k=>k.startsWith('__reactProps'));seeds[props].onChange({target:{value:'42,43'}})})
+ await click('Create paired match series');assert.equal(writes.length,0)
+ await click('Sign in with NyxID')
+ const pending=JSON.parse(sessionStorage.getItem('flyarena.pendingDesign'))
+ assert.equal(pending.setup.seedText,'42,43');assert.equal(pending.setup.seed,undefined)
+ assert.deepEqual(pending.setup,pending.experiment.setup)
+ assert.deepEqual(pending.experiment.seeds,[42,43]);assert.equal(pending.experiment.matches.length,4)
+ const keys=pending.experimentAttempt.keys
+ assert.equal(new Set(keys).size,4);assert.ok(keys.every(key=>/^[0-9a-f]{32}$/.test(key)))
+ await returnFromLogin()
+ assert.equal(writes.length,4);assert.equal(accepted.size,3)
+ assert.deepEqual(writes.map(w=>w.key),keys)
+ assert.match(document.body.textContent,/Confirmed matches: 3\/4/)
+ assert.match(document.body.textContent,/NyxID restoration test failure/)
+ assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43')
+ assert.match(document.querySelector('.experiment-plan').textContent,/Seeds: 42, 43/)
+ if(retryLogin){
+  authenticated=false;await act(async()=>window.dispatchEvent(new dom.window.Event('arena:session-expired')))
+  await click('Create paired match series');assert.equal(writes.length,4)
+  await click('Sign in with NyxID')
+  const retry=JSON.parse(sessionStorage.getItem('flyarena.pendingDesign'))
+  assert.deepEqual(retry.experiment,pending.experiment);assert.deepEqual(retry.experimentAttempt,pending.experimentAttempt)
+  await returnFromLogin()
+ }else await click('Create paired match series')
+ assert.equal(writes.length,8);assert.equal(accepted.size,4)
+ assert.deepEqual(writes.slice(4),writes.slice(0,4))
+ assert.deepEqual(writes.slice(4).map(w=>w.body),pending.experiment.submissions.map(s=>s.body))
+ assert.deepEqual(writes.slice(4).map(w=>w.body.seed),[42,42,43,43])
+ assert.deepEqual(writes.slice(4).map(w=>w.body.fly_ids),[[wt.id,own.id],[own.id,wt.id],[wt.id,own.id],[own.id,wt.id]])
+ assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
+ assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43')
 })

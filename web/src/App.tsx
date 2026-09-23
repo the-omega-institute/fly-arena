@@ -64,6 +64,7 @@ export default function App(){
   const [freshToken,setFreshToken]=useState('')
   const [agentTokens,setAgentTokens]=useState<{id:string;expires:number}[]>([])
   const [login,setLogin]=useState(false)
+  const [setupRestored,setSetupRestored]=useState(false)
   const pendingExperiment=useRef<ExperimentPlan|null>(null)
   const experimentAttempt=useRef<{fingerprint:string;keys:string[]}|null>(null)
   const experimentSubmitting=useRef(false)
@@ -78,7 +79,7 @@ export default function App(){
   const [mode,setMode]=useState('forage')
   const [opponent,setOpponent]=useState('')
   const [duration,setDuration]=useState(2)
-  const [seed,setSeed]=useState(42)
+  const [seedText,setSeedText]=useState('42')
   const [focused,setFocusedState]=useState<string>(readRoute(location.hash).match)
   const [play,setPlay]=useState(false)
   const [playtime,setPlaytime]=useState(0)
@@ -141,10 +142,11 @@ export default function App(){
     return()=>window.removeEventListener('arena:session-expired',expired)
   },[])
   useEffect(()=>{
-    if(!season)return
+    if(!season||setupRestored)return
     const pending=sessionStorage.getItem('flyarena.pendingDesign')
-    if(pending){try{const draft=JSON.parse(pending);loadSpec(draft.spec||draft);if(draft.jsonEditor!==undefined)setJsonEditor(draft.jsonEditor);if(draft.tab)setTab(draft.tab);if(draft.intent)pendingIntent.current=draft.intent;if(draft.experiment)pendingExperiment.current=draft.experiment;if(draft.setup){setSelected(draft.setup.selected);setMapId(draft.setup.mapId);setMode(draft.setup.mode);setOpponent(draft.setup.opponent);setDuration(draft.setup.duration);setSeed(draft.setup.seed);setBridgeProfile(draft.setup.bridgeProfile);setSensoryProfile(draft.setup.sensoryProfile)}if(draft.replayOrigin){setReplayOrigin(draft.replayOrigin);setSelected('')}sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
-  },[authSettings?.mode,season])
+    if(pending){try{const draft=JSON.parse(pending);loadSpec(draft.spec||draft);if(draft.jsonEditor!==undefined)setJsonEditor(draft.jsonEditor);if(draft.tab)setTab(draft.tab);if(draft.intent)pendingIntent.current=draft.intent;if(draft.experiment)pendingExperiment.current=draft.experiment;if(draft.experimentAttempt)experimentAttempt.current=draft.experimentAttempt;const setup=draft.intent==='match'&&draft.experiment?draft.experiment.setup:draft.setup;if(setup){setSelected(setup.selected);setMapId(setup.mapId);setMode(setup.mode);setOpponent(setup.opponent);setDuration(setup.duration);setSeedText(setup.seedText??String(setup.seed??42));setBridgeProfile(setup.bridgeProfile);setSensoryProfile(setup.sensoryProfile)}if(draft.replayOrigin){setReplayOrigin(draft.replayOrigin);setSelected('')}sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
+    setSetupRestored(true)
+  },[season,setupRestored])
   useEffect(()=>{
     if(showToken&&authSettings?.mode==='nyxid'&&identity&&!identity.token)api<{id:string;expires:number}[]>('/auth/agent-tokens').then(setAgentTokens).catch(e=>setError(e.message))
     if(!showToken)setFreshToken('')
@@ -182,7 +184,7 @@ export default function App(){
 
   function clone(fly:Fly){setReplayOrigin(null);setParentId(fly.id);setBaseSpec(fly.spec);setInterventions(fly.spec.interventions||[]);setSelected(fly.id);setName(fly.name.split(' / ')[0]+' 02');setColor(fly.color);const values:Record<string,number>=defaultScales();for(const m of fly.spec.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(fly.spec.neuron_parameters.tau_scale);setThreshold(fly.spec.neuron_parameters.threshold_shift_mv);setEdgeDeltas(fly.spec.edge_deltas);setReport(null)}
   async function action(label:string,fn:()=>Promise<void>){setBusy(label);setError('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
-  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify({spec,jsonEditor,tab,replayOrigin,intent:pendingIntent.current,experiment:pendingExperiment.current,setup:{selected,mapId,mode,opponent,duration,seed,bridgeProfile,sensoryProfile}}));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
+  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify({spec,jsonEditor,tab,replayOrigin,intent:pendingIntent.current,experiment:pendingExperiment.current,experimentAttempt:experimentAttempt.current,setup:{selected,mapId,mode,opponent,duration,seedText,bridgeProfile,sensoryProfile}}));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
   async function createAgentToken(){await action('agent-token',async()=>{const key=await api<{token:string}>('/auth/agent-tokens',{method:'POST'});setFreshToken(key.token);setAgentTokens(await api('/auth/agent-tokens'))})}
   async function logout(){await action('logout',async()=>{if(authSettings?.mode==='nyxid'&&!identity?.token)await api('/auth/logout',{method:'POST'});setIdentity(null);setCsrfToken(null);setFreshToken('');if(authSettings?.mode==='local')localStorage.removeItem('flyarena.identity');setShowToken(false)})}
   async function register(){await action('identity',async()=>{const user=await api<Identity>('/identities',{method:'POST',body:JSON.stringify({name:identityName||'Explorer'}),headers:{'X-Invite-Code':invite}});setIdentity(user);localStorage.setItem('flyarena.identity',JSON.stringify(user));setLogin(false);setToast(t("设计师身份已创建，现在可以保存与参赛。"))})}
@@ -199,7 +201,7 @@ export default function App(){
       const fly=await api<Fly>('/flies',{method:'POST',body:JSON.stringify(spec)},identity)
       await refresh();setSelected(fly.id);setReport(fly.report);setBaseSpec(fly.spec);setParentId(fly.id);setReplayOrigin(null)
       if(destination==='arena'){
-        setMapId('orchard');setMode('forage');setDuration(2);setSeed(42)
+        setMapId('orchard');setMode('forage');setDuration(2);setSeedText('42')
         await submitMatch(identity,[fly.id],{map_id:'orchard',mode:'forage',duration_seconds:2,seed:42})
       }else{setTab('train');setToast(t('Design saved. Choose a strategy and budget to start training.'))}
     })
@@ -209,9 +211,10 @@ export default function App(){
     const checked=buildExperimentPlan(requested.setup,availableFlies,maps,season)
     if(!checked.plan){setError(checked.errors.map(t).join(' '));return}
     const plan=checked.plan
-    if(!identity){pendingExperiment.current=plan;pendingIntent.current='match';setLogin(true);return}
     const fingerprint=JSON.stringify(plan.submissions)
     if(experimentAttempt.current?.fingerprint!==fingerprint)experimentAttempt.current={fingerprint,keys:plan.submissions.map(()=>newRequestKey())}
+    pendingExperiment.current=plan
+    if(!identity){pendingIntent.current='match';setLogin(true);return}
     const keys=experimentAttempt.current.keys
     experimentSubmitting.current=true
     await action('match',async()=>{
@@ -224,7 +227,7 @@ export default function App(){
           setMatches(old=>[...accepted,...old.filter(m=>!accepted.some(a=>a.id===m.id))])
           if(accepted[0])setFocused(accepted[0].id)
         }
-        experimentAttempt.current=null
+        experimentAttempt.current=null;pendingExperiment.current=null
         setToast(t('Experiment submitted. Recorded results will appear as each match finishes.'))
       }catch(e){throw Error(`${t('Experiment submission incomplete. Confirmed matches')}: ${submitted}/${plan.matches.length}. ${t('Accepted matches remain in the log. Retry the unchanged plan in this session to reuse submission keys; do not treat a partial pair as complete.')} ${e instanceof Error?e.message:String(e)}`)}
       finally{experimentSubmitting.current=false}
@@ -232,11 +235,11 @@ export default function App(){
   }
   useEffect(()=>{
     if(!identity){if(!login&&authSettings?.mode==='local'){pendingIntent.current=null;pendingExperiment.current=null}return}
-    if(!season)return
+    if(!season||!setupRestored)return
     const intent=pendingIntent.current;pendingIntent.current=null
-    if(intent==='match'){const plan=pendingExperiment.current;pendingExperiment.current=null;if(plan)void startMatch(plan)}
+    if(intent==='match'){const plan=pendingExperiment.current;if(plan)void startMatch(plan)}
     else if(intent)void publish(intent==='save-arena'?'arena':'train')
-  },[identity,login,season])
+  },[identity,login,season,setupRestored])
   function loadSpec(value:Spec){assertSpec(value);setReplayOrigin(null);setParentId(value.parent_id||null);setBaseSpec(value);setInterventions(value.interventions||[]);setName(value.name);setColor(value.color);setSelected(value.parent_id||'');const values:Record<string,number>=defaultScales();for(const m of value.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(value.neuron_parameters?.tau_scale??1);setThreshold(value.neuron_parameters?.threshold_shift_mv??0);setEdgeDeltas(value.edge_deltas||[]);setReport(null);setTab('design');setToast(t("设计已导入；保存时将再次通过服务端验证。"))}
   function designFromReplay(draft:Spec,origin:ReplayDesignOrigin){loadSpec(draft);setReplayOrigin(origin);setSelected('');setNeuralPreview(null);setPlay(false)}
   const estimated=useMemo(()=>{
@@ -300,9 +303,9 @@ export default function App(){
         <button className="text-link" onClick={()=>{setFocused('');setPlay(false)}}>{t('guide.arenaLink')}<ArrowUpRight size={16}/></button>
       </>}
 
-      {tab==='arena'&&<ArenaFeature onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy} startMatch={startMatch}/>}
+      {tab==='arena'&&<ArenaFeature onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seedText={seedText} setSeedText={setSeedText} busy={busy} startMatch={startMatch}/>}
 
-      {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeed(setup.seed);setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
+      {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeedText(String(setup.seed));setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
       {tab==='life'&&<LifeLedger identity={identity} selected={selected} onBranch={fly=>{setBranchFly(fly);setSelected(fly.id);setTab('train')}} onCompete={fly=>{setBranchFly(fly);setSelected(fly.id);const wt=matchingWildType(flies,fly);if(wt)setOpponent(wt.id);setMode('contest');setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
