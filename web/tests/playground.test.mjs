@@ -1341,7 +1341,7 @@ test('unified setup prepares WT in the single opponent selector and submits the 
  assert.match(document.querySelector('.experiment-plan').textContent,/相同种子和条件/)
 })
 
-test('contact submissions preserve both slots and reuse keys after a visible partial failure',async t=>{
+test('multi-seed contact retries preserve the draft, complete plan and keys across replay focus changes',async t=>{
  const focus=dom.window.HTMLElement.prototype.focus;dom.window.HTMLElement.prototype.focus=()=>{};t.after(()=>{dom.window.HTMLElement.prototype.focus=focus})
  const canvasFile=require.resolve('./src/ArenaCanvas.js');require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:()=>null}}
  const replayFile=require.resolve('./src/features/arena/useReplay.js');require.cache[replayFile]={id:replayFile,filename:replayFile,loaded:true,exports:{useReplay:()=>({scene:null,frames:[],events:[],status:'idle',error:''})}}
@@ -1354,7 +1354,7 @@ test('contact submissions preserve both slots and reuse keys after a visible par
   if(options.method==='POST'){
    if(path==='/identities')return {ok:true,json:async()=>owner}
    assert.equal(path,'/matches');const body=JSON.parse(options.body),key=options.headers['Idempotency-Key'];writes.push({body,key})
-   if(writes.length===2&&fail){fail=false;throw Error('Measured test failure')}
+   if(writes.length===4&&fail){fail=false;throw Error('Measured test failure')}
    if(!accepted.has(key))accepted.set(key,{id:'contact-'+accepted.size,status:'queued',progress:0,request:body})
    return {ok:true,json:async()=>accepted.get(key)}
   }
@@ -1365,14 +1365,37 @@ test('contact submissions preserve both slots and reuse keys after a visible par
  await mount(App,{})
  const intent=document.querySelector('select[aria-label="Match mode"]')
  await act(async()=>{intent.value='contact';intent.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
- await click('Closed Contact Arena');await click('Create paired match series');assert.equal(writes.length,0)
+ await click('Closed Contact Arena')
+ const seeds=document.querySelector('input[aria-label="Seeds (1–3)"]')
+ await act(async()=>{const props=Object.keys(seeds).find(k=>k.startsWith('__reactProps'));seeds[props].onChange({target:{value:'42,43'}})})
+ assert.equal(seeds.value,'42,43')
+ assert.match(document.querySelector('.experiment-plan').textContent,/4 matches · 2 simulated seconds per match · 8 simulated seconds total/)
+ await click('Create paired match series');assert.equal(writes.length,0)
  await click('Create identity')
- assert.equal(writes.length,2);assert.equal(accepted.size,1)
- assert.match(document.body.textContent,/Confirmed matches: 1\/2/)
+ assert.equal(writes.length,4);assert.equal(accepted.size,3)
+ assert.match(document.body.textContent,/Confirmed matches: 3\/4/)
  assert.match(document.body.textContent,/Measured test failure/)
+ assert.ok(document.querySelector('input[aria-label="Seeds (1–3)"]')===seeds,'Seed input must stay mounted across replay focus changes')
+ assert.equal(seeds.value,'42,43')
+ assert.match(location.hash,/match=contact-2/)
+ const disclosure=document.querySelector('.experiment-disclosure')
+ assert.equal(disclosure.open,true)
+ await act(async()=>{disclosure.querySelector('summary').click();disclosure.dispatchEvent(new dom.window.Event('toggle'))})
+ assert.equal(disclosure.open,false)
+ await act(async()=>document.querySelectorAll('.recent-matches .match-row')[2].click())
+ assert.match(location.hash,/match=contact-0/)
+ assert.equal(disclosure.open,false)
+ await act(async()=>{disclosure.querySelector('summary').click();disclosure.dispatchEvent(new dom.window.Event('toggle'))})
+ assert.equal(disclosure.open,true)
+ assert.ok(document.querySelector('input[aria-label="Seeds (1–3)"]')===seeds,'Seed input must stay mounted across replay focus changes')
+ assert.equal(seeds.value,'42,43')
+ assert.match(document.querySelector('.experiment-plan').textContent,/Seeds: 42, 43/)
  await click('Create paired match series')
- assert.equal(writes.length,4);assert.equal(accepted.size,2)
- assert.equal(writes[0].key,writes[2].key);assert.equal(writes[1].key,writes[3].key)
- assert.deepEqual(writes[0].body.fly_ids,[wt.id,own.id]);assert.deepEqual(writes[1].body.fly_ids,[own.id,wt.id])
- assert.ok(writes.every(w=>w.body.seed===42&&w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
+ assert.equal(writes.length,8);assert.equal(accepted.size,4)
+ assert.deepEqual(writes.slice(4),writes.slice(0,4))
+ assert.equal(new Set(writes.slice(0,4).map(w=>w.key)).size,4)
+ assert.deepEqual(writes.slice(4).map(w=>w.body.seed),[42,42,43,43])
+ assert.deepEqual(writes.slice(4).map(w=>w.body.fly_ids),[[wt.id,own.id],[own.id,wt.id],[wt.id,own.id],[own.id,wt.id]])
+ assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
+ assert.equal(seeds.value,'42,43')
 })

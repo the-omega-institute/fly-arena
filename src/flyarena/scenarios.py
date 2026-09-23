@@ -192,11 +192,12 @@ MODEL_LIMITATION = (
 )
 
 
-def _map_metadata(map_id: str, purpose: str, horizon: tuple[int, int], reason: str) -> dict:
+def _map_metadata(map_id: str, purpose: str, horizon: tuple[int, int], reason: str, *,
+                  training_eligible: bool, competition_eligible: bool) -> dict:
     return {
         "supported_modes": list(MAPS[map_id]["modes"]),
-        "training_eligible": reason != MAZE_LIMITATION and map_id != "duel",
-        "competition_eligible": reason != MAZE_LIMITATION and map_id != "blank",
+        "training_eligible": training_eligible,
+        "competition_eligible": competition_eligible,
         "recommended_horizon_seconds": {"min": horizon[0], "max": horizon[1]},
         "purpose": purpose,
         "scientific_status": "observation-only",
@@ -205,20 +206,31 @@ def _map_metadata(map_id: str, purpose: str, horizon: tuple[int, int], reason: s
 
 
 MAP_METADATA = {
-    "orchard": _map_metadata("orchard", "Open-ground foraging and shared food consumption.", (2, 10), MODEL_LIMITATION),
-    "maze": _map_metadata("maze", "Navigation around barriers and food contact along alternate routes.", (5, 30), MAZE_LIMITATION),
-    "scarcity": _map_metadata("scarcity", "Resource competition for one finite shared food patch.", (2, 10), MODEL_LIMITATION),
+    "orchard": _map_metadata("orchard", "Open-ground foraging and shared food consumption.", (2, 10), MODEL_LIMITATION,
+                             training_eligible=True, competition_eligible=True),
+    "maze": _map_metadata("maze", "Navigation around barriers and food contact along alternate routes.", (5, 30), MAZE_LIMITATION,
+                          training_eligible=False, competition_eligible=False),
+    "scarcity": _map_metadata("scarcity", "Resource competition for one finite shared food patch.", (2, 10), MODEL_LIMITATION,
+                              training_eligible=True, competition_eligible=True),
     "ring": _map_metadata("ring", "Physical pushing, ring exits and shared food consumption.", (2, 10),
-                          "Contact and ring exits are modeled contests; natural aggression is not qualified."),
-    "terrarium": _map_metadata("terrarium", "Locomotion over ramps and a leaf bridge with dispersed food.", (5, 30), MODEL_LIMITATION),
-    "enclosure": _map_metadata("enclosure", "Foraging and wall contact within a physical perimeter.", (5, 30), MODEL_LIMITATION),
-    "canopy": _map_metadata("canopy", "Resource competition across a raised platform and ground detours.", (5, 30), MODEL_LIMITATION),
-    "switchback": _map_metadata("switchback", "Navigation around staggered barriers and depletion of small food patches.", (5, 30), MAZE_LIMITATION),
+                          "Contact and ring exits are modeled contests; natural aggression is not qualified.",
+                          training_eligible=True, competition_eligible=True),
+    "terrarium": _map_metadata("terrarium", "Locomotion over ramps and a leaf bridge with dispersed food.", (5, 30), MODEL_LIMITATION,
+                               training_eligible=True, competition_eligible=True),
+    "enclosure": _map_metadata("enclosure", "Foraging and wall contact within a physical perimeter.", (5, 30), MODEL_LIMITATION,
+                               training_eligible=True, competition_eligible=True),
+    "canopy": _map_metadata("canopy", "Resource competition across a raised platform and ground detours.", (5, 30), MODEL_LIMITATION,
+                            training_eligible=True, competition_eligible=True),
+    "switchback": _map_metadata("switchback", "Navigation around staggered barriers and depletion of small food patches.", (5, 30), MAZE_LIMITATION,
+                                training_eligible=False, competition_eligible=False),
     "blank": _map_metadata("blank", "Spontaneous model activity and locomotion without food input.", (2, 10),
-                           "No food is present; this control cannot establish foraging performance."),
-    "labyrinth": _map_metadata("labyrinth", "Exploratory maze traversal and first physical mouth contact with the goal food.", (30, 180), MAZE_LIMITATION),
+                           "No food is present; this control cannot establish foraging performance.",
+                           training_eligible=True, competition_eligible=False),
+    "labyrinth": _map_metadata("labyrinth", "Exploratory maze traversal and first physical mouth contact with the goal food.", (30, 180), MAZE_LIMITATION,
+                               training_eligible=False, competition_eligible=False),
     "duel": _map_metadata("duel", "Body contact and exclusive center occupancy in a shared enclosed arena.", (10, 60),
-                          "Contact and territory are locomotion observations; attack, grappling and injury actions are not modeled."),
+                          "Contact and territory are locomotion observations; attack, grappling and injury actions are not modeled.",
+                          training_eligible=False, competition_eligible=True),
 }
 
 

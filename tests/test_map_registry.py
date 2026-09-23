@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from flyarena.api import create_app
 from flyarena.auth import AuthConfig
 from flyarena.common import digest
-from flyarena.scenarios import MAPS, MAP_METADATA, arena_scene
+from flyarena.scenarios import MAPS, MAP_METADATA, MAZE_LIMITATION, _map_metadata, arena_scene
 from flyarena.store import Store
 
 
@@ -72,6 +72,18 @@ def test_guidance_changes_do_not_change_scene_hashes(monkeypatch):
     before = arena_scene("labyrinth", 42)
     monkeypatch.setitem(MAP_METADATA["labyrinth"], "purpose", "Updated observation guidance")
     assert arena_scene("labyrinth", 42) == before
+
+
+@pytest.mark.parametrize("map_id", list(MAPS))
+@pytest.mark.parametrize("reason", ["Revised scientific limitation copy.", MAZE_LIMITATION])
+def test_eligibility_is_explicit_and_independent_of_reason(map_id, reason):
+    metadata = MAP_METADATA[map_id]
+    updated = _map_metadata(map_id, metadata["purpose"], (2, 10), reason,
+                            training_eligible=metadata["training_eligible"],
+                            competition_eligible=metadata["competition_eligible"])
+    assert updated["status_reason"] == reason
+    for key in ["training_eligible", "competition_eligible"]:
+        assert updated[key] is metadata[key]
 
 
 def test_frontend_admission_fallback_equals_backend_flags():
