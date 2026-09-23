@@ -25,11 +25,16 @@ function compile(folder) {
       const dest = path.join(output, relative.replace(/\.tsx?$/, '.js'))
       fs.mkdirSync(path.dirname(dest), {recursive:true})
       fs.writeFileSync(dest, result.outputText)
+    } else if (entry.name.endsWith('.css')) {
+      const dest = path.join(output, relative)
+      fs.mkdirSync(path.dirname(dest), {recursive:true})
+      fs.writeFileSync(dest, '')
     }
   }
 }
 compile('src')
 const require = createRequire(path.join(output, 'package.json'))
+require.extensions['.css'] = () => {}
 const {SavedFlyCard} = require('./src/features/design/SavedFlyCard.js')
 const {ArenaFeature} = require('./src/features/arena/ArenaFeature.js')
 const {ArenaWorldLabel} = require('./src/features/arena/ArenaWorldLabel.js')
