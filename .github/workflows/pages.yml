@@ -28,6 +28,7 @@ jobs:
       - name: Configure public API
         env:
           ARENA_PREVIEW_API: ${{ vars.ARENA_PREVIEW_API }}
+          ARENA_APP_ORIGIN: ${{ vars.ARENA_APP_ORIGIN }}
         run: |
           python3 - <<'PY'
           import os, pathlib, html, urllib.parse
@@ -38,6 +39,7 @@ jobs:
           p.write_text(p.read_text().replace('name="arena-api-origin" content=""', 'name="arena-api-origin" content="'+html.escape(origin,quote=True)+'"'))
           pathlib.Path('web/dist/CNAME').write_text('fly.omega.gift\n')
           PY
+          python3 scripts/configure-pages-entry.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
