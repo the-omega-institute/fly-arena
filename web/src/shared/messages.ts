@@ -1,4 +1,11 @@
-export const catalog = {
+import {lab3dMessages} from './messages/lab3d'
+import {sceneMessages} from './messages/scene'
+import {trainingMessages} from './messages/training'
+import {guideMessages} from './messages/guide'
+import {mapsMessages} from './messages/maps'
+import {duelMessages} from './messages/duel'
+
+const baseCatalog = {
 "接触对抗 / 领地争夺":{"en": "Contact / territory contest", "zh-CN": "接触对抗 / 领地争夺"},
 "封闭折返通道与死胡同。单蝇寻找远端食物，以首次实际口部接触计到达；未到达显示未完成。到达后继续记录脑活动与探索。":{"en": "Closed switchback corridors and dead ends. One fly seeks the distant food; arrival requires physical mouth contact. Failure stays unfinished, and observation continues after arrival.", "zh-CN": "封闭折返通道与死胡同。单蝇寻找远端食物，以首次实际口部接触计到达；未到达显示未完成。到达后继续记录脑活动与探索。"},
 "两只果蝇在同一封闭物理世界接触、推挤并争夺中央区域。记录接触与独占中央时间；当前运动模型不含专门的攻击、抓抱或伤害动作。":{"en": "Two flies contact, push and contest the center of one enclosed physical world. Record contact and exclusive center occupancy; dedicated attack, grapple and injury actions are not implemented.", "zh-CN": "两只果蝇在同一封闭物理世界接触、推挤并争夺中央区域。记录接触与独占中央时间；当前运动模型不含专门的攻击、抓抱或伤害动作。"},
@@ -1509,4 +1516,13 @@ export const catalog = {
   ,"This preview runs the submitted FlySpec through the retained connectome. It has no body, score or ranking.":{"en":"This preview runs the submitted FlySpec through the retained connectome. It has no body, score or ranking.","zh-CN":"此预览将提交的 FlySpec 运行在保留连接组上；它没有身体、分数或排名。"}
   ,"Stimulus":{"en":"Stimulus","zh-CN":"刺激"}
   ,"50 neural steps per stimulus":{"en":"50 neural steps per stimulus","zh-CN":"每个刺激 50 个神经步"},"Experimental taste + lateral touch without foot support":{"en":"Experimental taste + lateral touch without foot support","zh-CN":"实验：味觉 + 区分足部支撑的左右触觉"}} as const
+export const catalog = {
+  ...baseCatalog,
+  ...lab3dMessages,
+  ...sceneMessages,
+  ...trainingMessages,
+  ...guideMessages,
+  ...mapsMessages,
+  ...duelMessages,
+} as const
 export type MessageKey=keyof typeof catalog

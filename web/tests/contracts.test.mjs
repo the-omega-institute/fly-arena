@@ -2,10 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import ts from 'typescript'
 import fs from 'node:fs'
-async function moduleAt(path){const source=fs.readFileSync(new URL(path,import.meta.url),'utf8');const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});return import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'))}
+function moduleUrl(url){
+ const source=fs.readFileSync(url,'utf8');
+ const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
+ const resolved=outputText.replace(/from (['"])(\.[^'"]+)\1/g,(_,quote,path)=>`from ${quote}${moduleUrl(new URL(/\.tsx?$/.test(path)?path:path+'.ts',url))}${quote}`);
+ return 'data:text/javascript;base64,'+Buffer.from(resolved).toString('base64');
+}
+async function moduleAt(path){return import(moduleUrl(new URL(path,import.meta.url)))}
 const {parseSeeds,alignment,sampleAt,metricUnit,validateHorizon,designRoleLabel,plotTransform}=await moduleAt('../src/shared/research.ts');
 const {assertSpec,composeSpec}=await moduleAt('../src/features/design/spec.ts');
 const {catalog}=await moduleAt('../src/shared/messages.ts');
+test('every composed catalog entry has nonempty English and Chinese translations',()=>{for(const [key,message] of Object.entries(catalog)){for(const locale of ['en','zh-CN']){assert.equal(typeof message[locale],'string',`${key}: ${locale}`);assert.ok(message[locale].trim(),`${key}: ${locale}`)}}});
 const subjects=['wildtype','official','design'].map((role,i)=>({role,fly_id:`f${i}`,artifact_id:`a${i}`}));
 const reports=subjects.map(s=>({...s,status:'complete',condition_key:'same-condition',receipt_sha256:'receipt',duration_seconds:3,trajectory:[{time:0,x:0,y:0,yaw:0},{time:3,x:6,y:3,yaw:0}]}));
 test('seed admission matches strict API limits: at most eight distinct nonnegative int32 seeds',()=>{assert.deepEqual(parseSeeds('0, 42 2147483647'),[0,42,2147483647]);assert.equal(parseSeeds('1,2,3,4,5,6,7,8').length,8);for(const v of ['', '-1','1.2','2147483648','42,42','1,2,3,4,5,6,7,8,9'])assert.throws(()=>parseSeeds(v))});
