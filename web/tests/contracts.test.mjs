@@ -2,10 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import ts from 'typescript'
 import fs from 'node:fs'
+import {createRequire} from 'node:module'
+import {pathToFileURL} from 'node:url'
+const require=createRequire(import.meta.url)
 function moduleUrl(url){
  const source=fs.readFileSync(url,'utf8');
  const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
- const resolved=outputText.replace(/from (['"])(\.[^'"]+)\1/g,(_,quote,path)=>`from ${quote}${moduleUrl(new URL(/\.tsx?$/.test(path)?path:path+'.ts',url))}${quote}`);
+ const resolved=outputText.replace(/from (['"])([^'"]+)\1/g,(_,quote,path)=>`from ${quote}${path.startsWith('.')?moduleUrl(new URL(/\.tsx?$/.test(path)?path:path+'.ts',url)):pathToFileURL(require.resolve(path)).href}${quote}`);
  return 'data:text/javascript;base64,'+Buffer.from(resolved).toString('base64');
 }
 async function moduleAt(path){return import(moduleUrl(new URL(path,import.meta.url)))}
