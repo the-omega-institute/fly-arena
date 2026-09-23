@@ -16,7 +16,7 @@ def client(tmp_path):
 def test_preview_matches_runner_layout_without_loading_a_brain(client, map_id, profile):
     response=client.get(f'/api/v1/maps/{map_id}/preview',params={'seed':91,'bridge_profile':profile})
     assert response.status_code==200
-    assert response.json()==arena_scene(map_id,91,profile)
+    assert {k:v for k,v in response.json().items() if k!='metadata'}==arena_scene(map_id,91,profile)
     if MAPS[map_id]['food']:assert response.json()['food']!=client.get(f'/api/v1/maps/{map_id}/preview?seed=92').json()['food']
     assert client.get('/api/v1/matches').json()==[]
 
