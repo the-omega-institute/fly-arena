@@ -179,6 +179,47 @@ MAPS.update({
     },
 })
 
+# Catalog guidance is deliberately separate from MAPS: it is not simulation
+# input and must not change seeded geometry or historical receipt hashes.
+# Horizons are suggested observation windows, not validated performance claims
+# or admission limits. Profile readiness remains independently enforced.
+MAZE_LIMITATION = (
+    "Long-horizon locomotion inversion remains unresolved (issue #82); "
+    "arrival time is not a valid optimization target yet."
+)
+MODEL_LIMITATION = (
+    "Engineered sensory and locomotion models; reliable navigation and biological behavior are not qualified."
+)
+
+
+def _map_metadata(map_id: str, purpose: str, horizon: tuple[int, int], reason: str) -> dict:
+    return {
+        "supported_modes": list(MAPS[map_id]["modes"]),
+        "recommended_horizon_seconds": {"min": horizon[0], "max": horizon[1]},
+        "purpose": purpose,
+        "scientific_status": "observation-only",
+        "status_reason": reason,
+    }
+
+
+MAP_METADATA = {
+    "orchard": _map_metadata("orchard", "Open-ground foraging and shared food consumption.", (2, 10), MODEL_LIMITATION),
+    "maze": _map_metadata("maze", "Navigation around barriers and food contact along alternate routes.", (5, 30), MAZE_LIMITATION),
+    "scarcity": _map_metadata("scarcity", "Resource competition for one finite shared food patch.", (2, 10), MODEL_LIMITATION),
+    "ring": _map_metadata("ring", "Physical pushing, ring exits and shared food consumption.", (2, 10),
+                          "Contact and ring exits are modeled contests; natural aggression is not qualified."),
+    "terrarium": _map_metadata("terrarium", "Locomotion over ramps and a leaf bridge with dispersed food.", (5, 30), MODEL_LIMITATION),
+    "enclosure": _map_metadata("enclosure", "Foraging and wall contact within a physical perimeter.", (5, 30), MODEL_LIMITATION),
+    "canopy": _map_metadata("canopy", "Resource competition across a raised platform and ground detours.", (5, 30), MODEL_LIMITATION),
+    "switchback": _map_metadata("switchback", "Navigation around staggered barriers and depletion of small food patches.", (5, 30), MAZE_LIMITATION),
+    "blank": _map_metadata("blank", "Spontaneous model activity and locomotion without food input.", (2, 10),
+                           "No food is present; this control cannot establish foraging performance."),
+    "labyrinth": _map_metadata("labyrinth", "Exploratory maze traversal and first physical mouth contact with the goal food.", (30, 180), MAZE_LIMITATION),
+    "duel": _map_metadata("duel", "Body contact and exclusive center occupancy in a shared enclosed arena.", (10, 60),
+                          "Contact and territory are locomotion observations; attack, grappling and injury actions are not modeled."),
+}
+
+
 RULES = {
     "id": "arena-ground-contact-v2", "physics_dt": .0001, "neural_dt_ms": .1,
     "sense_ticks": 100, "snapshot_ticks": 500, "food_initial_units": 10.0,
