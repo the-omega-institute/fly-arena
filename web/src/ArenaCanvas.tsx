@@ -1,7 +1,7 @@
 import {ReplayCamera} from './features/arena/ReplayCamera'
 import {ArenaWorldLabel} from './features/arena/ArenaWorldLabel'
 import {useEffect,useMemo,useRef} from 'react'
-import {Canvas,useFrame} from '@react-three/fiber'
+import {Canvas,useFrame,useThree} from '@react-three/fiber'
 import {OrbitControls,Grid,Html} from '@react-three/drei'
 import * as THREE from 'three'
 import type {ArenaLayout,BodyModel,Frame,Scene,Preview} from './types'
@@ -9,6 +9,8 @@ import {useI18n} from './shared/i18n'
 import {sceneThemes} from './shared/theme'
 import {colors} from './types'
 import {Habitat} from './features/arena/Habitat'
+import {ArenaObstacles,arenaBounds} from './features/arena/obstacleGeometry'
+import {sceneFraming,sceneGrid} from './features/arena/followCamera'
 
 function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;frame:Frame;next?:Frame;alpha:number;color:string;slot?:number}){
   const {resolved}=useI18n();const tokens=sceneThemes[resolved]
@@ -52,38 +54,43 @@ function RecordedTrails({frames,time,scene}:{frames:Frame[];time:number;scene:Sc
 }
 
 function World({scene,frame}:{scene:Scene|ArenaLayout;frame?:Frame}){
-  const {resolved,locale}=useI18n();const tokens=sceneThemes[resolved]
+  const {resolved,t}=useI18n();const tokens=sceneThemes[resolved],grid=sceneGrid(scene.size)
   const habitat=scene.habitat==='forest-floor'||('id' in scene&&scene.id==='terrarium')
   return <>
     {habitat?<Habitat size={scene.size} obstacles={scene.obstacles}/>:<>
       <mesh receiveShadow position={[0,0,-.1]}><boxGeometry args={[scene.size,scene.size,.2]}/><meshStandardMaterial color={tokens.floor} roughness={.95}/></mesh>
-      <Grid args={[scene.size,scene.size]} rotation={[Math.PI/2,0,0]} position={[0,0,.012]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={65} cellThickness={.35} sectionThickness={.6}/>
+      <Grid args={[scene.size,scene.size]} rotation={[Math.PI/2,0,0]} position={[0,0,.012]} cellSize={grid.cell} sectionSize={grid.section} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={grid.fade} cellThickness={.35} sectionThickness={.6}/>
     </>}
     {scene.task?.control_radius_mm&&<mesh position={[0,0,.035]}><ringGeometry args={[scene.task.control_radius_mm-.06,scene.task.control_radius_mm,96]}/><meshBasicMaterial color="#dfa576" side={THREE.DoubleSide}/></mesh>}
-    {scene.task?.goal_food&&scene.food.filter(f=>f.id===scene.task?.goal_food).map(food=><Html key={food.id} position={[food.position[0],food.position[1],1.8]} center style={{pointerEvents:'none'}}><span className="spawn-label">{locale==='zh-CN'?'终点 / 实际接触':'GOAL / physical contact'}</span></Html>)}
+    {scene.task?.goal_food&&scene.food.filter(f=>f.id===scene.task?.goal_food).map(food=><Html key={food.id} position={[food.position[0],food.position[1],1.8]} center style={{pointerEvents:'none'}}><span className="spawn-label">{t('scene.goal')}</span></Html>)}
     {scene.ring_radius&&<mesh position={[0,0,.02]}><ringGeometry args={[scene.ring_radius-.09,scene.ring_radius,96]}/><meshBasicMaterial color={tokens.ring} transparent opacity={.65} side={THREE.DoubleSide}/></mesh>}
-    {!habitat&&scene.obstacles.map((o,i)=><mesh key={i} position={o.position as [number,number,number]} castShadow receiveShadow><boxGeometry args={o.size as [number,number,number]}/><meshStandardMaterial color={tokens.obstacle} roughness={.8}/></mesh>)}
+    {!habitat&&<ArenaObstacles obstacles={scene.obstacles} color={tokens.obstacle}/>}
     {scene.food.map((food,i)=>{
       const left=frame?.food?.[i]??food.initial
       return left>.001&&<group key={food.id} position={[food.position[0],food.position[1],food.position[2]??.12]}>
-        <mesh castShadow receiveShadow><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={habitat?'#bd7440':tokens.food} emissive={habitat?'#572919':tokens.foodEmissive} emissiveIntensity={habitat?.1:.18} roughness={habitat?.52:.4}/></mesh>
-        <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={.3} side={THREE.DoubleSide}/></mesh>
+        <mesh castShadow receiveShadow><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={tokens.food} emissive={tokens.foodEmissive} emissiveIntensity={.16} roughness={.55}/></mesh>
+        <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={.55} side={THREE.DoubleSide}/></mesh>
       </group>
     })}
   </>
 }
 
-export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles,layout,participants=[],followSelected=false,frames=[]}:{frames?:Frame[];followSelected?:boolean;layout?:ArenaLayout;participants?:{name:string;color:string}[];preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
-  const {resolved,t}=useI18n();const tokens=sceneThemes[resolved]
+function ArenaScene({preview,scene,frame,next,alpha=0,color='mint',design=false,selectedId,subjectRoles,layout,participants=[],followSelected=false,frames=[]}:{frames?:Frame[];followSelected?:boolean;layout?:ArenaLayout;participants?:{name:string;color:string}[];preview?:Preview|null;scene?:Scene|null;frame?:Frame;next?:Frame;alpha?:number;color?:string;design?:boolean;selectedId?:string;subjectRoles?:Record<string,string>}){
+  const {resolved}=useI18n();const tokens=sceneThemes[resolved]
+  const {size:viewport}=useThree()
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
-  const habitat=scene?.habitat==='forest-floor'||layout?.habitat==='forest-floor'||layout?.id==='terrarium'
-  const cameraPosition:( [number,number,number])=design?[6,-9,5]:(scene?.task||layout?.task)?[16,-22,32]:habitat?[17,-25,12]:[22,-28,26]
-  return <Canvas shadows dpr={[1,1.7]} camera={{position:cameraPosition,up:[0,0,1],fov:design?33:habitat?43:40,near:.05,far:250}} gl={{antialias:true,alpha:true}}>
-    <ambientLight intensity={habitat?.65:.8}/><hemisphereLight args={[habitat?'#dbe8d0':tokens.sky,habitat?'#4b4034':tokens.ground,habitat?1.9:1.6]}/>
-    <directionalLight position={habitat?[7,-10,18]:[6,-5,12]} intensity={habitat?3.8:3.2} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-25} shadow-camera-right={25} shadow-camera-top={25} shadow-camera-bottom={-25} shadow-bias={-.0003}/>
-    <directionalLight position={[-7,5,3]} intensity={habitat?1.9:1.5} color={habitat?'#d9b98a':tokens.fill}/>
-    {habitat&&<pointLight position={[-5,4,7]} intensity={1.2} distance={35} color="#b6d29c"/>}
+  const world=scene||layout
+  const framing=useMemo(()=>sceneFraming(world?arenaBounds(world):{min:[-5,-5,-.25],max:[5,5,2]},viewport.width/Math.max(1,viewport.height),design?33:40,!!world?.task),[world,viewport.width,viewport.height,design])
+  const cameraPosition:[number,number,number]=design?[6,-9,5]:framing.position
+  const cameraTarget:[number,number,number]=design?[0,0,.8]:framing.target
+  const span=framing.span,shadowExtent=span*.8
+  return <>
+    <color attach="background" args={[tokens.background]}/>
+    <fog attach="fog" args={[tokens.background,framing.distance*2+span,framing.distance*3+span*3]}/>
+    <hemisphereLight args={[tokens.sky,tokens.ground,1.25]}/>
+    <directionalLight position={[span*.45,-span*.65,span*1.2]} color={tokens.sun} intensity={2.4} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-shadowExtent} shadow-camera-right={shadowExtent} shadow-camera-top={shadowExtent} shadow-camera-bottom={-shadowExtent} shadow-camera-near={.1} shadow-camera-far={span*4} shadow-normalBias={.025} shadow-bias={-.0001} shadow-radius={3}/>
+    <directionalLight position={[-span*.6,span*.3,span*.5]} intensity={.45} color={tokens.fill}/>
     {layout&&<>
       <World scene={layout}/>
       {layout.spawns.slice(0,participants.length).map((spawn,i)=><group key={i} position={[spawn[0],spawn[1],.08]} rotation={[0,0,spawn[2]]}>
@@ -101,7 +108,21 @@ export function ArenaCanvas({preview,scene,frame,next,alpha=0,color='mint',desig
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
     {scene?.task&&shown&&frames.length>0&&<RecordedTrails frames={frames} time={shown.time} scene={scene}/>}
-    {scene&&shown&&<ReplayCamera scene={scene} frame={shown} next={next} alpha={alpha} selectedId={selectedId} follow={followSelected} overview={cameraPosition}/>}
-    <OrbitControls makeDefault target={design?[0,0,.8]:habitat?[0,0,.25]:[0,0,0]} enablePan={!design&&!followSelected} minDistance={design||followSelected?4:habitat?7:10} maxDistance={design?18:75} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
+    <ReplayCamera scene={scene} frame={shown} next={next} alpha={alpha} selectedId={selectedId} follow={followSelected} overview={cameraPosition} overviewTarget={cameraTarget}/>
+    <OrbitControls makeDefault enablePan={!design&&!followSelected} minDistance={design||followSelected?4:Math.max(4,span*.15)} maxDistance={design?18:framing.distance*2.5} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
+    <CameraClipping far={framing.distance*4+span*4}/>
+  </>
+}
+
+function CameraClipping({far}:{far:number}){
+  const {camera}=useThree()
+  useEffect(()=>{camera.near=.05;camera.far=far;camera.updateProjectionMatrix()},[camera,far])
+  return null
+}
+
+export function ArenaCanvas(props:Parameters<typeof ArenaScene>[0]){
+  const {t}=useI18n()
+  return <Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:40,near:.05,far:1000}} gl={{antialias:true,alpha:false}} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
+    <ArenaScene {...props}/>
   </Canvas>
 }
