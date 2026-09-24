@@ -222,9 +222,11 @@ the candidate's counterfactual response nor a paired candidate evaluation.
 
 ## Preregistered phase-2 protocol
 
-The following protocol was written before the replay diagnosis became available
-and is retained here without retuning its seeds, horizon or success criteria.
-No phase-2 baseline/candidate pair was executed in this follow-up.
+The protocol predates the replay diagnosis. The decision rule below is clarified
+before any phase-2 run: later first inversion is favorable, censoring is explicit,
+and goal contact is descriptive rather than an acceptance criterion. The seeds,
+horizon and four-of-five threshold are retained. No phase-2 baseline/candidate
+pair was executed in this follow-up.
 
 | Item | Frozen value |
 |---|---|
@@ -253,14 +255,47 @@ Report for each run and for the paired five-seed set:
 5. first actual goal-food contact and censored/no-contact status; and
 6. XY path length and one-millimetre visited-cell coverage.
 
-The candidate counts as an improvement only if it has a predeclared paired
-improvement on the primary stability outcome (higher upright fraction **and**
-shorter or equal first inversion/recovery burden) without reducing recorded
-goal contact or coverage, and the direction is present in at least 4 of 5
-matched seeds. A result with fewer than 4 improved seeds, any unbounded drive
-or pose intervention, or a missing/failed paired run is null for the claim.
-A lower upright fraction, longer inversion burden, lower coverage/goal contact,
-or any failure that occurs only after selecting the candidate is negative for
-this candidate. These rules do not establish biological righting or competition
-fitness; they decide only whether this versioned engineering candidate merits a
-later study.
+Compare candidate **C** with baseline **B** separately within each seed
+42–46; never compare different seeds or use pooled means to override a pair.
+Use the same 20 Hz recording policy, initial-pose-relative upright definition,
+and sample-hold duration calculation for both runs. Compute comparisons from
+unrounded values; exact equality is a tie and never a strict improvement.
+
+| Metric | Favorable direction and paired comparison | Role in decision |
+|---|---|---|
+| Upright fraction U | Higher: U_C > U_B is improvement; equality is a tie; lower is worsening. | Required strict improvement in each improved seed. |
+| First sampled inversion latency L | Later is better when both runs invert: L_C > L_B improves, equality ties, earlier worsens. A complete run with no inversion through 180 s has L = null with an explicit right-censor flag; this is the best observed outcome. Candidate censored / baseline inverted improves; both censored ties; candidate inverted / baseline censored worsens, including an inversion at the 180 s endpoint. | Must improve or tie in each improved seed; never convert null to zero, a measured 180 s latency, or infinity. |
+| Total inversion duration / recovery burden D | Lower is better: D_C < D_B improves; equality ties; higher worsens. D is the sum of all inverted sample-hold intervals clipped to [0, 180 s]. Include the observed duration of an unrecovered episode through 180 s; retain its recovery latency as null/right-censored. No inversion gives D = 0. | Must improve or tie in each improved seed. D is the prespecified aggregate recovery burden, not the mean of only recovered episodes. |
+| Visited-cell coverage V | Higher is favorable; V_C >= V_B meets the guardrail; lower worsens. | Must not decrease in each improved seed. |
+| First actual goal-food contact | Report the recorded time and censor/no-contact status for both runs; no directional acceptance comparison. | Descriptive only; neither a criterion nor a veto. |
+| Episode count, individual recovery latencies, wall contact, drive statistics and XY path | Report both runs and available paired differences. Unrecovered latencies stay null/censored. No favorable direction is prespecified for these diagnostics; more path or fewer episodes alone does not establish better stability. | Descriptive only. |
+
+A seed is **improved** only when its complete, valid pair has strictly higher
+upright fraction, equal or better first-inversion outcome, no greater total
+inversion/recovery burden, and no lower coverage. A seed is **negative** if
+any of those four metrics worsens, even if another improves, or if the candidate
+fails while its matched baseline completes. All other complete pairs are
+**null** (including all ties and partial favorable changes that do not satisfy
+the strict upright-fraction requirement). Two inversion-free runs therefore
+tie on latency and burden; that tie cannot itself count as an improved seed.
+
+Apply the following set-level rule in order:
+
+1. Any unbounded drive or pose intervention invalidates the study for the claim:
+   report **null / protocol violation**, retain the evidence, and do not count
+   affected runs as improvements.
+2. Any negative seed makes the candidate verdict **negative**, with the seed and
+   adverse metric or candidate-only failure stated explicitly. A negative fifth
+   seed cannot be hidden by four improved seeds.
+3. Otherwise, any missing, failed, timed-out or incomplete paired run makes the
+   claim **null / incomplete**. Censoring is valid only for a complete 180 s
+   recording, never a substitute for a failed or missing recording. Do not drop
+   a seed, count missing evidence as a tie, or silently replace an attempt.
+4. With all five valid pairs and no negative seed, **improvement** requires at
+   least **4 of seeds 42–46** to be improved by the joint rule above; the remaining
+   seed may be null. Fewer than four improved seeds gives a **null** verdict.
+
+Report each seed's metric comparisons and classification, the improved/null/
+negative counts, and all incomplete or invalid attempts alongside the verdict.
+These rules decide only whether this versioned engineering candidate merits a
+later study; they do not establish biological righting or competition fitness.

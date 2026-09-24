@@ -1525,3 +1525,39 @@ for(const locale of ['en','zh-CN'])test(`life tree is the only relation view and
  }
  history.replaceState(null,'','/')
 })
+
+for(const locale of ['en','zh-CN'])test(`life tree renders structured parent/child changes and intervention multiplicity in ${locale}`,async()=>{
+ const {LifeLedger}=require('./src/features/life/LifeLedger.js')
+ localStorage.setItem('flyarena.locale',locale);history.replaceState(null,'','#tab=life&fly='+own.id)
+ const added={selector:{pre:{class:'olfactory'}},scale:1.25},removed={selector:{post:{ids:['123']}},scale:0}
+ let delta={code:'changed',changed:true,summary:'Untranslated API summary',changed_circuits:['olfactory'],changed_parameters:[],
+  design_changes:[{name:'model_profile',parent:'malecns-lif-cpu-v1',child:'malecns-rate-cpu-v1'},{name:'connectome_sha256',parent:null,child:'fixture-digest'}],
+  circuit_scales:[{selector:'olfactory',parent:2,child:4,parent_scales:[2],child_scales:[2,2]}],
+  edge_changes:{count:0,edges:[]},intervention_changes:{count:2,items:[{parent:added,child:added,parent_count:1,child_count:3},{parent:removed,child:null,parent_count:2,child_count:0}]}}
+ const record={fly:own,can_annotate:false,origin:null,ancestors:[],descendants:[],notes:[],experiences:[]}
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).endsWith('/lives')?[own]:record})
+ const props={identity:null,selected:own.id,onBranch:noop,onCompete:noop,onReplay:noop}
+ await mount(LifeLedger,props)
+ const detail=document.querySelector('.life-lineage-detail')
+ const row=field=>[...detail.querySelectorAll('p')].find(p=>p.querySelector('strong code')?.textContent===field)?.textContent
+ const parent=locale==='en'?'Parent value':'亲代值',child=locale==='en'?'Child value':'后代值'
+ assert.ok(row('model_profile').includes(`${parent}: "malecns-lif-cpu-v1" → ${child}: "malecns-rate-cpu-v1"`))
+ assert.ok(row('connectome_sha256').includes(`${parent}: null → ${child}: "fixture-digest"`))
+ assert.ok(row('olfactory').includes(`${parent}: [2] → ${child}: [2,2]`))
+ assert.ok(row('olfactory').includes(`${locale==='en'?'Cumulative multiplier':'累积倍率'}: ${parent} ×2 → ${child} ×4`))
+ const addedRow=[...detail.querySelectorAll('p')].find(p=>p.textContent.includes(locale==='en'?'Added intervention occurrences':'新增干预次数')).textContent
+ assert.ok(addedRow.includes(locale==='en'?'Added intervention occurrences: 2 · Parent count: 1 → Child count: 3':'新增干预次数: 2 · 亲代次数: 1 → 后代次数: 3'))
+ assert.ok(addedRow.includes(JSON.stringify(added)))
+ const removedRow=[...detail.querySelectorAll('p')].find(p=>p.textContent.includes(locale==='en'?'Removed intervention occurrences':'移除干预次数')).textContent
+ assert.ok(removedRow.includes(locale==='en'?'Removed intervention occurrences: 2 · Parent count: 2 → Child count: 0':'移除干预次数: 2 · 亲代次数: 2 → 后代次数: 0'))
+ assert.ok(removedRow.includes(JSON.stringify(removed)))
+ assert.doesNotMatch(detail.textContent,/Untranslated API summary/)
+ if(locale==='zh-CN')assert.doesNotMatch(detail.textContent,/Design field|Parent value|Child value|Circuit multipliers|Cumulative multiplier|intervention occurrences|Parent count|Child count/)
+ // A profile-only edit must remain inspectable even with no circuit/intervention edits.
+ delta={...delta,design_changes:delta.design_changes.slice(0,1),changed_circuits:[],circuit_scales:[],intervention_changes:{count:0,items:[]}}
+ await act(async()=>root.render(null));await mount(LifeLedger,props)
+ const profileOnly=document.querySelector('.life-lineage-detail').textContent
+ assert.ok(profileOnly.includes(`${parent}: "malecns-lif-cpu-v1" → ${child}: "malecns-rate-cpu-v1"`))
+ assert.doesNotMatch(profileOnly,/olfactory|intervention occurrences|干预次数|fixture-digest/)
+ history.replaceState(null,'','/')
+})
