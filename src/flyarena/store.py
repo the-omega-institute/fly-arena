@@ -272,8 +272,7 @@ class Store:
 
     def add_tournament(self, owner: str, spec: dict, runtime_hash: str, key: str | None = None) -> dict:
         """Admit the complete round robin atomically, including reversed slots."""
-        from itertools import combinations
-        from .contracts import MatchRequest
+        from .services.competition_protocol import expected_schedule
         ident, now = uuid.uuid4().hex, time.time()
         payload = digest({'tournament': spec})
         with self.db() as db:
@@ -291,16 +290,7 @@ class Store:
                 from .models import require_model_bridge
                 require_model_bridge(json.loads(row[1]).get('model_profile','malecns-lif-cpu-v1'),spec.get('bridge_profile','legacy-v1'))
                 artifacts[fly] = row[0]
-            schedule = []
-            for seed in spec['seeds']:
-                for a,b in combinations(spec['fly_ids'],2):
-                    for slots in [[a,b],[b,a]]:
-                        schedule.append(MatchRequest(
-                            fly_ids=slots, map_id=spec['map_id'], mode=spec['mode'], seed=seed,
-                            duration_seconds=spec['duration_seconds'],
-                            bridge_profile=spec.get('bridge_profile','legacy-v1'),
-                            sensory_profile=spec.get('sensory_profile','odor-only-v1'),
-                            sandbox=spec.get('sandbox',False)).model_dump())
+            schedule = expected_schedule(spec)
             pending = db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')",(owner,)).fetchone()[0]
             if pending+len(schedule)>12:
                 raise ValueError(f'Tournament needs {len(schedule)} matches; {12-pending} queue slots available. Use fewer entrants or seeds.')
@@ -317,11 +307,11 @@ class Store:
         if row is None: return None
         result = dict(row); result['spec'] = json.loads(result['spec'])
         matches = [self.match(i) for i in ids]
-        from .services.ranking import tournament_projection
-        result.update(matches=matches, **tournament_projection(matches,result['spec']['fly_ids']))
+        from .services.competition_protocol import competition_protocol
+        result.update(matches=matches, **competition_protocol(result, matches))
         return result
 
-    def tournaments(self) -> list[dict]:
+    def tournaments(self, owner: str | None = None) -> list[dict]:
         with self.db() as db:
-            ids = [r[0] for r in db.execute('SELECT id FROM tournaments ORDER BY created DESC LIMIT 30')]
+            ids = [r[0] for r in db.execute('SELECT id FROM tournaments WHERE (? IS NULL OR owner=?) ORDER BY created DESC LIMIT 30', (owner, owner))]
         return [self.tournament(i) for i in ids]

@@ -6,6 +6,12 @@ Implemented research preview: React/Three.js design workbench, immutable FlySpec
 
 The current graph retains **165,122 Traced neurons, 25,563,197 directed neuron-pair connections, and 124,025,046 synaptic contacts** from MaleCNS v1.0. Anatomical connectivity is real; weights/signs and neural dynamics follow a declared simplified model. The default input is bilateral odor current; opt-in experimental profiles add geometric visual observations and food/environment contact currents. The engineered descending-neuron readout and locomotion transfer are fixed across subjects within a selected profile. The body has two bilateral locomotion action channels. A biological retina, online plasticity, natural aggression, and a qualified GPU neural backend are not implemented.
 
+## Current shipped scope (rounds 1–2)
+
+The current product increment ships the first two rounds of the research preview: the Phenotype Lab has recorded 3D scene inspection; the map registry labels observation-only mazes and keeps them out of competitive/training eligibility; Arena setup is shared across preview and match flows; and the science guide explains what is modeled, recorded and still unavailable. Round 2 adds the recorded life lineage tree, receipt-backed replay inspection, the `arena-geometry-v1` geometry contract, and the issue-82 phase-1 maze diagnosis with the preregistered phase-2 study runner. The phase-2 harness has a verified short smoke run; the complete five-seed 180-second study remains an explicit queued study operation.
+
+These surfaces expose recorded evidence and modeled mechanisms separately. A replay or comparison can describe the supplied conditions and observations; it cannot by itself establish biological validity, causal effects or generalization.
+
 ![Design workbench](docs/screenshots/design.png)
 
 ## Run locally
@@ -57,7 +63,7 @@ uv run python scripts/ai_designer.py
 
 Advanced interventions support exact pre/post **class, type, side (`L`/`R`) and canonical neuron ID** selectors against pinned graph metadata. The editor offers real annotation suggestions, counts and the metadata digest; unsupported ROI, regex, unknown annotations and empty matches are rejected. Overlapping changes combine before final multiplier and budget checks. Preview reports distinguish structural and effective changes. A child's complete spec is absolute relative to the canonical graph; its parent records lineage, not another weight multiplier. Exploratory vision/memory/motor edits do not add sensory modalities, learning or action channels. See [UI_RESEARCH](docs/UI_RESEARCH.md) and [RESEARCH_API](docs/RESEARCH_API.md).
 
-The MVP workspace publishes designs, research reports and verified replays. Default local mode uses a designer bearer token; the optional NyxID adapter supports browser sessions or separate Arena agent tokens, but **no live NyxID integration has been activated for this research preview**. Optional local registration gating uses `ARENA_INVITE_CODE`. Per designer there are limits of 100 designs, 12 pending matches and 12 unfinished research experiments. These are beta controls, not a complete production anti-abuse system.
+The MVP workspace publishes designs, research reports and verified replays. Authentication ships with local designer bearer mode and a live NyxID OIDC mode, including the same-origin Pages entry added in PR #84; the selected deployment reports its active mode from `/auth/config`. Static Pages mode uses the local bearer flow when no same-origin application origin is configured. Optional local registration gating uses `ARENA_INVITE_CODE`. Per designer there are limits of 100 designs, 12 pending matches and 12 unfinished research experiments. These are beta controls, not a complete production anti-abuse system.
 
 ## Inspect your fly’s brain during replay
 
@@ -113,7 +119,7 @@ Python orchestrates the system; Numba compiles the sparse neural loop to native 
 - [Architecture and mechanisms](docs/ARCHITECTURE.md)
 - [Research, original sources and prior hardware observations](docs/RESEARCH.md)
 - [Acceptance gates and future work](docs/ROADMAP.md)
-- [NyxID login interface and later integration](docs/NYXID_LOGIN.md) — optional OIDC + server-side sessions, disabled until configured.
+- [NyxID login interface and deployment](docs/NYXID_LOGIN.md) — OIDC + server-side sessions, enabled when the deployment supplies its registered client configuration.
 - [Operations and deployment](docs/OPERATIONS.md)
 - [Validation evidence and limitations](docs/VALIDATION.md)
 - [MVP delivery audit](docs/MVP_ACCEPTANCE.md)

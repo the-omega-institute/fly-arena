@@ -202,7 +202,7 @@ test('life record inspects a zero result, prepares branches and appends correcti
    assert.ok(String(url).endsWith('/notes'));assert.ok(options.headers['Idempotency-Key'])
    const note=JSON.parse(options.body);record.notes.push({...note,id:String(record.notes.length+1).repeat(32),created:1});result={id:record.notes.at(-1).id}
   }else if(String(url).includes('/experiences/'))result={status:'recorded',observations:[{slot:0,food_consumed:0,sampled_path_mm:14.91,final_energy:98.44,total_spikes:1960853,first_intake_record_seconds:null,exit_seconds:null,final_neural_activity:{descending:12}}]}
-  else result=String(url).endsWith('/lives')?[{...own,can_annotate:true}]:structuredClone(record)
+  else result=String(url).includes('/lives/discover?')?{items:[{...own,can_annotate:true}],total:1,next_offset:null}:structuredClone(record)
   return {ok:true,json:async()=>result}
  }
  await mount(LifeLedger,{identity:{id:'owner',token:'test'},selected:own.id,onBranch:f=>branches.push(f),onCompete:f=>contests.push(f),onReplay:m=>replays.push(m)})
@@ -211,8 +211,8 @@ test('life record inspects a zero result, prepares branches and appends correcti
  assert.match(document.body.textContent,/No food consumed during this evaluation window/)
  await click('Inspect recorded observations');assert.match(document.body.textContent,/14.91 mm/)
  await click('Behavior and neural replay');assert.equal(replays[0].id,match.id)
- await click('Continue evolution');await click('Prepare a comparison')
- assert.equal(branches[0].id,own.id);assert.equal(contests[0].id,own.id)
+ assert.ok(document.querySelector(`.life-actions a[href="#tab=train&continue=${own.id}"]`));await click('Prepare a comparison')
+ assert.equal(branches.length,0);assert.equal(contests[0].id,own.id)
  assert.ok(requests.every(([,m])=>m==='GET'))
  // React loaded before JSDOM uses its change-event fallback; invoke its actual handler.
  async function explain(value){await act(async()=>{const area=document.querySelector('textarea');const props=Object.keys(area).find(k=>k.startsWith('__reactProps'));area[props].onChange({target:{value}})})}
@@ -369,7 +369,7 @@ test('portable life record links back to its public trajectory before training o
  const publicId='f'.repeat(32);const runId='c'.repeat(32);const actions=[];
  history.replaceState(null,'','#tab=life&fly='+publicId);
  const record={fly:{...own,id:publicId,source:{kind:'published-training',run_id:runId}},can_annotate:false,origin:null,ancestors:[],descendants:[],notes:[],experiences:[],learning:{within_match_plasticity:'none',acquired_state_inherited:false}};
- globalThis.fetch=async url=>({ok:true,json:async()=>String(url).endsWith('/lives')?[]:record});
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lives/discover?')?{items:[],total:0,next_offset:null}:record});
  await mount(LifeLedger,{identity:null,selected:publicId,onBranch:()=>actions.push('branch'),onCompete:()=>actions.push('compete'),onReplay:noop});
  assert.ok(document.querySelector(`.life-actions a[href="#tab=train&showcase=${runId}"]`));
  assert.ok(![...document.querySelectorAll('.life-actions button')].some(b=>/Continue evolution|Prepare a comparison/.test(b.textContent)));
@@ -821,7 +821,7 @@ test('lineage comparison keeps mismatched conditions and missing neural behavior
 test('synchronized life comparison seeks actual bodies and brains, shares scales, and rejects stale records',async()=>{
  const canvasFile=require.resolve('./src/ArenaCanvas.js'),replayFile=require.resolve('./src/features/arena/useReplay.js')
  const oldCanvas=require.cache[canvasFile],oldReplay=require.cache[replayFile]
- require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:p=>React.createElement('div',{'data-paired-body':p.selectedId,'data-sample':p.frame?.time,'data-alpha':p.alpha})}}
+ require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:p=>React.createElement('div',{'data-paired-body':p.selectedId,'data-sample':p.frame?.time,'data-alpha':p.alpha,'data-recorded-frames':JSON.stringify(p.frames)})}}
  delete require.cache[replayFile];delete require.cache[require.resolve('./src/features/arena/ReplayComparison.js')]
  const {ReplayComparison,comparisonWindow,comparisonActivityScales}=require('./src/features/arena/ReplayComparison.js')
  const participant=id=>({...own,id,name:id,artifact_id:id,spec,brain_graph:{schema:'brain-neighborhood/v1',artifact_id:id,connectome_sha256:spec.connectome_sha256,circuits:{olfactory:{neurons:[],edges:[]}}}})
@@ -845,6 +845,7 @@ test('synchronized life comparison seeks actual bodies and brains, shares scales
   assert.deepEqual(comparisonWindow(left,right),{start:0,end:.2});assert.equal(comparisonWindow(left,[]),null);assert.equal(comparisonWindow(left,frames([1,2],1)),null)
   assert.deepEqual(comparisonActivityScales([left,right]),{region:20,node:40})
   assert.equal(document.querySelectorAll('[data-paired-body]').length,2)
+  assert.deepEqual([...document.querySelectorAll('[data-paired-body]')].map(e=>JSON.parse(e.dataset.recordedFrames)),[left,right])
   assert.ok([...document.querySelectorAll('.brain-overview-legend')].every(e=>e.textContent.includes('0–20.00 Hz')))
   const priorRAF=globalThis.requestAnimationFrame,priorCancel=globalThis.cancelAnimationFrame
   let tick,cancelled=0
@@ -1510,7 +1511,7 @@ for(const locale of ['en','zh-CN'])test(`life tree is the only relation view and
  localStorage.setItem('flyarena.locale',locale);history.replaceState(null,'','#tab=life&fly='+own.id)
  let delta={code:'founder',changed:false,changed_circuits:[],changed_parameters:[],edge_changes:{count:0,edges:[]},intervention_changes:{count:0,items:[]},summary:'API prose must not appear'}
  const record={fly:own,can_annotate:false,origin:null,ancestors:[wt],descendants:[{...wt,id:'child'}],notes:[],experiences:[]}
- globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).endsWith('/lives')?[own]:record})
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).includes('/lives/discover?')?{items:[own],total:1,next_offset:null}:record})
  const expected=locale==='en'?['Founder design; no parent design was recorded.','Recorded changes relative to the parent FlySpec.','No design change relative to the parent FlySpec was recorded.','Parent design is private; the relative delta is unavailable.']:['创始设计；未记录亲代设计。','已记录相对亲代 FlySpec 的设计变化。','未记录相对亲代 FlySpec 的设计变化。','亲代设计为私有；无法查看相对差分。']
  for(const [i,code] of ['founder','changed','unchanged','parent_unavailable'].entries()){
   delta={...delta,code,changed:code==='changed'?true:code==='parent_unavailable'?null:false}
@@ -1535,7 +1536,7 @@ for(const locale of ['en','zh-CN'])test(`life tree renders structured parent/chi
   circuit_scales:[{selector:'olfactory',parent:2,child:4,parent_scales:[2],child_scales:[2,2]}],
   edge_changes:{count:0,edges:[]},intervention_changes:{count:2,items:[{parent:added,child:added,parent_count:1,child_count:3},{parent:removed,child:null,parent_count:2,child_count:0}]}}
  const record={fly:own,can_annotate:false,origin:null,ancestors:[],descendants:[],notes:[],experiences:[]}
- globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).endsWith('/lives')?[own]:record})
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).includes('/lives/discover?')?{items:[own],total:1,next_offset:null}:record})
  const props={identity:null,selected:own.id,onBranch:noop,onCompete:noop,onReplay:noop}
  await mount(LifeLedger,props)
  const detail=document.querySelector('.life-lineage-detail')
