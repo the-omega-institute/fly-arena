@@ -1,11 +1,13 @@
 import {useEffect,useMemo,useState} from 'react'
 import {ArenaCanvas} from '../../ArenaCanvas'
 import type {Frame,Match,ReplayEvent,Scene,Season} from '../../types'
+import {api} from '../../api'
 import {useI18n} from '../../shared/i18n'
 import {useReplay} from './useReplay'
 import {selectReplayFrames} from './replayFrames'
 import {BrainTheater} from './MatchObservations'
 import {thoraxTilt} from './behaviorSummary'
+import {replayComparisonContext,type ReplayReceipt} from './replayComparisonContext'
 
 export function comparisonWindow(left:Frame[],right:Frame[]){
  if(!left.length||!right.length)return null
@@ -28,12 +30,22 @@ export function comparisonActivityScales(groups:Frame[][]){
 export function ReplayComparison({match,scene,frames,events,matches,season,selectedId}:{
  match:Match;scene:Scene;frames:Frame[];events:ReplayEvent[];matches:Match[];season:Season|null;selectedId:string;
 }){
- const {locale}=useI18n(),zh=locale==='zh-CN'
+ const {locale,t}=useI18n(),zh=locale==='zh-CN'
  const choices=matches.filter(m=>m.status==='verified'&&m.id!==match.id)
  const preferred=match.source?.comparison_links?.find(l=>choices.some(m=>m.id===l.match_id))?.match_id||match.source?.comparison_match
  const [otherId,setOtherId]=useState(preferred||choices[0]?.id||'')
  const other=choices.find(m=>m.id===otherId)||choices[0]
  const replay=useReplay(other?.id||'',other?.status)
+ const [receipts,setReceipts]=useState<{left:ReplayReceipt|null;right:ReplayReceipt|null}>({left:null,right:null})
+ useEffect(()=>{
+  let active=true;setReceipts({left:null,right:null})
+  if(!other?.id)return()=>{active=false}
+  Promise.allSettled([api<ReplayReceipt>('/matches/'+encodeURIComponent(match.id)+'/receipt'),api<ReplayReceipt>('/matches/'+encodeURIComponent(other.id)+'/receipt')]).then(results=>{
+   if(!active)return
+   setReceipts({left:results[0].status==='fulfilled'?results[0].value:null,right:results[1].status==='fulfilled'?results[1].value:null})
+  })
+  return()=>{active=false}
+ },[match.id,other?.id])
  const [leftId,setLeftId]=useState(selectedId),[rightId,setRightId]=useState('')
  const [time,setTime]=useState(0),[playing,setPlaying]=useState(false),[speed,setSpeed]=useState(.5)
  const [follow,setFollow]=useState(true)
@@ -41,6 +53,7 @@ export function ReplayComparison({match,scene,frames,events,matches,season,selec
  const scales=useMemo(()=>comparisonActivityScales([frames,replay.frames]),[frames,replay.frames])
  const start=range?.start??0,end=range?.end??0,ready=replay.status==='ready'&&!!range
  const shownTime=Math.max(start,Math.min(end,time))
+ const context=useMemo(()=>replayComparisonContext({match,receipt:receipts.left},{match:other,receipt:receipts.right}),[match,other,receipts])
  useEffect(()=>{
   if(!playing||!ready)return
   let handle=0;const initial=shownTime,started=performance.now()
@@ -67,11 +80,15 @@ export function ReplayComparison({match,scene,frames,events,matches,season,selec
    <BrainTheater playback={{playing,onToggle:()=>{if(shownTime>=end)setTime(start);setPlaying(!playing)}}} matchId={record.id} key={`${record.id}:${body?.id}`} frame={frame} frames={samples} season={season} fly={fly} slot={slot} events={ledger} onSeek={seek} activityScale={scales.region} nodeScale={scales.node}/>
   </article>
  }
+ const contextLabels:Record<string,string>={map:'Map',seed:'Seed',horizon:'Horizon',bridgeReadout:'Bridge / readout',sensoryProfile:'Sensory profile',motorProfile:'Motor profile',runtimeSource:'Runtime / source identity',recordingPolicy:'Recording policy'}
+ const contextStatement=context.hasDifferences?'Comparison receipts differ; this supports descriptive observations only and cannot attribute an observed difference to the design.':context.hasUnavailable?'Some receipt conditions are unavailable, so this comparison cannot establish an effect; keep the interpretation descriptive.':'The recorded conditions agree, supporting a descriptive comparison under this protocol. The receipts do not by themselves establish causality, generalization, or biological validity.'
+ function conditionTable(){return <section className="replay-comparison-conditions" aria-label={t('Comparison conditions')}><h3>{t('Comparison conditions')}</h3><table><thead><tr><th>{t('Condition')}</th><th>{t('Current replay')}</th><th>{t('Comparison replay')}</th><th>{t('Status')}</th></tr></thead><tbody>{context.conditions.map(condition=><tr key={condition.id} className={'condition-'+condition.status}><th scope="row">{t(contextLabels[condition.id])}</th><td><code>{condition.left??t('Unavailable')}</code></td><td><code>{condition.right??t('Unavailable')}</code></td><td><span className={'condition-status '+condition.status}>{t(condition.status==='agree'?'Agree':condition.status==='differ'?'Differ':'Unavailable')}</span></td></tr>)}</tbody></table><p className="training-hint">{t(contextStatement)}</p></section>}
  return <section className="replay-comparison panel" aria-label={zh?'同步生命回放对照':'Synchronized life replays'}>
   <h2>{zh?'同一时刻，两份生命记录':'One moment, two life records'}</h2>
   <p>{zh?'一起观察身体、感觉和脑活动。点击任一侧的事件，两侧都会跳到同一仿真时刻。':'Watch bodies, senses and brain activity together. Select an event on either side to seek both recordings to the same simulation time.'}</p>
   <label className="replay-comparison-picker">{zh?'选择另一份回放':'Choose the other replay'}<select value={other?.id||''} onChange={e=>{setPlaying(false);setTime(0);setOtherId(e.target.value);setRightId('')}} disabled={!choices.length}>{choices.map(m=><option key={m.id} value={m.id}>{name(m)}</option>)}</select></label>
   {!choices.length?<p>{zh?'还没有另一份已完成回放。':'No other completed replay is available.'}</p>:!ready?<p role={replay.status==='error'?'alert':'status'}>{replay.status==='error'?replay.error:replay.status==='ready'?(zh?'两份记录没有共同的时间范围。':'These records have no overlapping time range.'):(zh?'正在载入另一份身体与神经记录…':'Loading the other body and neural record…')}</p>:<>
+   {conditionTable()}
    <div className="replay-comparison-controls"><button onClick={()=>{if(shownTime>=end)setTime(start);setPlaying(!playing)}}>{playing?(zh?'暂停同步回放':'Pause both replays'):(zh?'播放同步回放':'Play both replays')}</button><output>{shownTime.toFixed(2)} s</output>
     <input aria-label={zh?'同步回放时间':'Shared replay time'} type="range" min={start} max={end} step=".01" value={shownTime} onChange={e=>seek(Number(e.target.value))}/><span>{end.toFixed(2)} s</span>
     <select aria-label={zh?'同步播放速度':'Shared playback speed'} value={speed} onChange={e=>setSpeed(Number(e.target.value))}>{[.25,.5,1,2].map(s=><option key={s} value={s}>{s}×</option>)}</select>
