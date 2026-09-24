@@ -3,3 +3,8 @@
 .probe-scene-viewport{height:clamp(300px,48vw,540px);position:relative;overflow:hidden;border:1px solid var(--border,#405248);border-radius:12px;background:var(--bg,#17251e);touch-action:none}
 .probe-scene-label{pointer-events:none;white-space:nowrap;font-size:11px;background:#17251edb;color:#f1f5ef;border-radius:4px;padding:2px 5px;user-select:none}
 .probe-scene-status{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;margin:10px 0}
+.probe-scene,.probe-scene-viewport{min-width:0;max-width:100%;box-sizing:border-box}
+.probe-scene>.scene-availability{height:auto}
+.probe-scene-toolbar{order:-1;flex-wrap:wrap}
+.probe-scene-status{overflow-wrap:anywhere;min-width:0}
+@media(max-width:600px){.probe-scene-viewport{height:300px}.probe-scene-toolbar button{min-height:36px}}
