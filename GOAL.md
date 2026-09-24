@@ -1,6 +1,8 @@
 # Fly Arena Goal：生命体回放与神经剧场
 
-更新时间：2026-09-20。状态：进行中，沿用当前 active Goal，不重复创建任务。
+更新时间：2026-09-24。状态：进行中，沿用当前 active Goal，不重复创建任务。
+
+当前状态：rounds 1–2 已接入网页，包括 3D Phenotype Lab 场景、地图注册与 observation-only 迷宫、统一 Arena 设置、科学指引、生命谱系树、凭据支持的回放检查和 `arena-geometry-v1`。Issue #82 phase-1 诊断已记录，phase-2 预注册研究运行器已可执行并保留短程 smoke 证据；完整五种子长程研究仍按协议运行。NyxID OIDC 登录与同源 Pages 入口已由 PR #84 接入，实际部署是否启用由 `/auth/config` 报告。
 
 ## 1. 最终目标
 

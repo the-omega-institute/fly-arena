@@ -1,6 +1,10 @@
 # 产品路线与当前进度
 
-更新：2026-09-18。当前部署版本见 `/api/v1/health` 和 GitHub Releases。本文按已上线功能和剩余工作组织；历史实现与研究结果分别见 Git 历史和对应实验记录。
+更新：2026-09-24。当前部署版本见 `/api/v1/health` 和 GitHub Releases。本文按已上线功能和剩余工作组织；历史实现与研究结果分别见 Git 历史和对应实验记录。
+
+## 当前已交付：rounds 1–2
+
+Round 1 ships the 3D Phenotype Lab scene view, the map registry with explicit observation-only maze status, a unified Arena setup, and the science guide. Round 2 ships the life lineage tree, receipt-backed replay inspection, the `arena-geometry-v1` geometry contract, and the issue-82 phase-1 diagnosis with its preregistered phase-2 study runner. The phase-2 implementation has a verified short smoke run; the complete five-seed 180-second run remains a separately scheduled study. These surfaces keep modeled behavior, recorded observations and unavailable evidence labeled separately.
 
 ## 已上线的用户闭环
 
@@ -20,7 +24,7 @@
 | 计算 | 可选 NyxID 远端执行；当前4060主机使用CPU/Numba，节点重任务串行排队；重连附着原任务 |
 | 发布 | 有效 CI、增量 PR、及时合并和版本部署；本地与 Mac Studio 保留已有数据 |
 
-使用方法见 [README](../README.md)、[TRAINING](TRAINING.md) 和 [COMPUTE](COMPUTE.md)。NyxID 用户登录接口见 [NYXID_LOGIN](NYXID_LOGIN.md)，真实登录联调仍按用户安排另行进行。
+使用方法见 [README](../README.md)、[TRAINING](TRAINING.md) 和 [COMPUTE](COMPUTE.md)。NyxID 用户登录接口与同源 Pages 入口见 [NYXID_LOGIN](NYXID_LOGIN.md)；部署的 `/auth/config` 报告当前是否启用。
 
 ## 已有真实运行记录
 
@@ -38,7 +42,7 @@
 2. **已加入首张立体地形：腐果林地。** 低坡连接抬高叶片通道，果壳/石块形成路线选择；尺寸与四元数共用于物理和网页，回放增加身体高度。地面食物、双侧解析气味和现有步态保持明确，尚未实现障碍阻挡气味、视觉输入、自由飞行或可学习攀爬。下一步继续改善环境复杂度与感觉反馈，不把一张地图视为完成所有自然场景。
 3. **用户可选大脑运行方式与学习算法。** 已提供进化/随机搜索/CEM/自定义优化器、外部模型插件和三组真实演化示例；神经运行时现可选 LIF 或实验性连续发放率模型，并提供全图反向传播 + Adam 神经响应训练器（见 [RATE_MODEL](RATE_MODEL.md)）。教学响应损失和真实竞技场得分分开记录。后续根据接口与算力实测接入环境奖励驱动的强化学习。比赛内可塑性和脉冲替代梯度明确列为后续能力，不放未实现按钮。
 4. **社区竞争和演化。** 生命档案现已串起出生、算法、亲缘、实际经历、回放和追加研究笔记，可从公开后代继续分叉或准备对战。见 [LIFE_LEDGER](LIFE_LEDGER.md)。继续完善社区发现、挑战赛和赛后差异说明。开放比赛允许不同模型，科学比较明确显示模型和训练条件差异。
-5. **计算与登录。** 复用 Python/FastAPI、SQLite 和当前串行 worker；优先4060可用资源，按实际瓶颈选择内核。NyxID 用户登录仍按用户之后的联调安排，平台身份服务不进入神经或物理过程。
+5. **计算与登录。** 复用 Python/FastAPI、SQLite 和当前串行 worker；优先4060可用资源，按实际瓶颈选择内核。NyxID OIDC 登录已提供服务端会话与独立 Arena agent token；平台身份服务仍独立于神经、物理和评分过程，是否启用由部署配置决定。
 
 当前浏览器控制工具认证报错只限制本机自动视觉/点击检查。独立 DOM 交互、API、构建、CI 与部署照常推进，不把浏览器工具问题变成项目阻塞。
 
