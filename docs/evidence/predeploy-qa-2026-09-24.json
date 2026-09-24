@@ -99,7 +99,7 @@
   },
   "changes": "QA evidence report only; no application or scientific source changes. Initial port restrictions resolved; browser acceptance remains incomplete.",
   "python_tests": "Follow-up: 909 passed, 11 skipped, 3 deselected; complete non-integration suite.",
-  "cleanup": "Follow-up local backend and Vite were stopped after HTTP checks; Mac Studio study left running under its original handle.",
+  "cleanup": "Follow-up local backend and Vite stopped after HTTP checks. Original Mac Studio study subsequently completed all ten runs.",
   "log_ref": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/log-qa.jsonl",
   "follow_up": {
     "checked_at_utc": "2026-09-24T10:38:05.549669+00:00",
@@ -321,6 +321,54 @@
     "evidence_directory": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924",
     "browser_status": "not run: control connection authentication failed",
     "screenshots": [],
-    "deployment": "not performed: study still active and real browser acceptance incomplete"
+    "deployment": "not performed: real browser acceptance incomplete; #82 study has finished"
+  },
+  "completion_follow_up": {
+    "checked_at_utc": "2026-09-24T13:38:14.081109+00:00",
+    "study": {
+      "status": "complete",
+      "verdict": "negative",
+      "improved_seeds": [
+        43,
+        44
+      ],
+      "negative_seeds": [
+        42,
+        45,
+        46
+      ],
+      "runs_verified": 10,
+      "receipt_bound_files_reverified": 60,
+      "wall_seconds": 21892.84,
+      "study_sha256": "93659137407be6a093d51842adebc738ac0e4a2166050b99620a69fd5d10394b"
+    },
+    "backup": {
+      "created_at_utc": "20260924T133626Z",
+      "backup_directory": "/Users/macstudio/fly-arena-backups/pre-rounds34-20260924T133626Z",
+      "scope": "Preparation snapshot while service remains live. Refresh SQLite backup in the final maintenance window before deployment.",
+      "sqlite_integrity_check": "ok",
+      "sqlite_sha256": "b06c960f4a5dac50e76dd25467f26e5c80bbc7653fca582a000ff9c1a06f9377",
+      "archive_sha256": "af3f7c9786266f23c55a3fb3be222869b859397b9ac78bbaa0ec3baf4f717d36",
+      "archive_bytes": 607864884,
+      "queue_states": {
+        "matches": [
+          [
+            "verified",
+            35
+          ]
+        ],
+        "experiments": [],
+        "training_runs": [
+          [
+            "complete",
+            4
+          ]
+        ]
+      },
+      "service_stopped": false,
+      "deployment_performed": false,
+      "verified_file_count": 556
+    },
+    "remaining_gate": "Real-browser acceptance at 1440/390 in en/zh-CN, including forced WebGL failure. Browser connection rejects current authentication method. No screenshot evidence exists."
   }
 }
