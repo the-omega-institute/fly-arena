@@ -109,10 +109,11 @@ test('question controls only prefill editable conditions and never submit withou
  }
  await render(Harness,{})
  const click=async label=>act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent===label).click())
- await click('Does my fly win scarce food against WT?')
+ const question=async id=>act(async()=>document.querySelector('[aria-labelledby="preset-'+id+'"] button').click())
+ await question('scarcity')
  assert.equal(submitted.length,0);assert.equal(document.querySelector('#experiment-opponent').value,wt.id)
  assert.match(document.querySelector('.experiment-plan').textContent,/4 matches · 5 simulated seconds per match/)
- await click('How does my fly explore the maze?')
+ await question('maze')
  assert.equal(submitted.length,0);assert.equal(document.querySelector('#experiment-intent').value,'forage')
  assert.equal(document.querySelector('#experiment-opponent'),null)
  const duration=document.querySelector('select[aria-label="Duration"]')

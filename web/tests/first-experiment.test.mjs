@@ -46,6 +46,7 @@ const maps=[{id:'orchard',name:'果园',english:'Orchard',modes:['forage','conte
 const season={connectome:{sha256:spec.connectome_sha256,circuits:[]},match_profiles:[{id:'legacy-v1',ready:true}]}
 const first={id:'first',status:'verified',request:{fly_ids:[fly.id,wt.id],map_id:'orchard',mode:'contest',seed:42,duration_seconds:2},result:{receipt_sha256:'receipt',scores:[0,0]}}
 const second={...first,id:'second',request:{...first.request,fly_ids:[wt.id,fly.id]}}
+const evidence={fly,origin:null,experiences:[],wt_comparison:{series_id:'series',protocol_id:'paired-series/v1',status:'complete',reference_id:wt.id,match:first}}
 const noop=()=>{}
 const {FirstExperimentGuide}=require('./src/features/training/FirstExperimentGuide.js')
 const {trainingMessages}=require('./src/shared/messages/training.js')
@@ -74,10 +75,10 @@ for(const locale of ['en','zh-CN'])test(`selected fly offers baseline or finite 
 }))
 test('a complete WT comparison opens recorded replay; failed/partial evidence prepares a new plan',async()=>withDOM('',async(dom,mount)=>{
  const opened=[],plans=[]
- await mount(FirstExperimentGuide,{...props,matches:[first,second],onReplay:m=>opened.push(m),onCompare:p=>plans.push(p)})
+ await mount(FirstExperimentGuide,{...props,evidence,onReplay:m=>opened.push(m),onCompare:p=>plans.push(p)})
  assert.equal(button().textContent,'Inspect recorded WT comparison')
  await act(async()=>button().click());assert.deepEqual(opened,[first]);assert.deepEqual(plans,[])
- await mount(FirstExperimentGuide,{...props,matches:[first,{...second,status:'failed'}],onReplay:m=>opened.push(m),onCompare:p=>plans.push(p)})
+ await mount(FirstExperimentGuide,{...props,evidence:{...evidence,wt_comparison:null},matches:[first,second],onReplay:m=>opened.push(m),onCompare:p=>plans.push(p)})
  assert.equal(button().textContent,'Prepare WT comparison')
  await act(async()=>button().click());assert.equal(plans.length,1);assert.equal(opened.length,1)
 }))

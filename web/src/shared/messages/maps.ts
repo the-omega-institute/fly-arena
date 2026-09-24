@@ -1,4 +1,6 @@
 export const mapsMessages = {
+  "presets.use": {"en": "Use this question", "zh-CN": "使用这个问题"},
+  "presets.selected": {"en": "Selected", "zh-CN": "已选择"},
   "presets.title": {"en": "Start with a question", "zh-CN": "从一个问题开始"},
   "presets.editable": {"en": "Presets only fill an editable plan. Review participants, profiles, seeds and duration before submitting; no computation starts here.", "zh-CN": "预设仅填写可编辑计划。提交前检查参与者、方案、种子与时长；此处不会启动计算。"},
   "presets.unavailable": {"en": "This map is unavailable for this question on this deployment.", "zh-CN": "此部署没有适合此问题的地图。"},

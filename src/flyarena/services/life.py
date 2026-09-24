@@ -109,7 +109,7 @@ class LifeLedger:
             children=[r[0] for r in db.execute("SELECT id FROM flies WHERE json_extract(spec,'$.parent_id')=? ORDER BY created LIMIT 100",(ident,))]
             notes=[dict(r) for r in db.execute('SELECT id,action,reason,match_id,supersedes,created FROM life_notes WHERE fly_id=? ORDER BY created,id',(ident,))]
             if origin and origin['owner']!=owner and not db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(origin['id'],)).fetchone():origin=None
-        from .training import TrainingService
+        from .training import TrainingService, TrainingSpec
         training=TrainingService(self.store,None)
         public_matches={m['id']:m for m in training.gallery_matches()+training.bundled_replay_matches()
                         if ident in m.get('request',{}).get('fly_ids',[])}
@@ -173,10 +173,33 @@ class LifeLedger:
                 'continuation':{'conditions':conditions,'requires_copy':fly.get('source',{}).get('kind')=='published-training'},
                 'descendants':[self.card(c,owner) for c in children if self.visible(c,owner)],
                 'experiences':experiences,'notes':notes,
+                'wt_comparison':self.wt_comparison(fly,owner),
+                'training_strategies':TrainingSpec.model_json_schema()['properties']['strategy']['enum'],
                 'limits':{'experiences':100,'descendants':100,'ancestors':24},
                 'learning':{'birth_spec':True,'within_match_plasticity':fly['spec']['plasticity'],
                             'acquired_state_inherited':False},
                 'interpretation':'Scores apply only to their recorded conditions. Notes are researcher statements, not automatic qualification.'}
+
+    def wt_comparison(self,fly,owner=None):
+        """Only a complete server-validated paired series establishes WT comparison."""
+        with self.store.db() as db:
+            ids=[r[0] for r in db.execute("""SELECT id FROM tournaments
+                WHERE json_extract(spec,'$.mode')='contest'
+                AND EXISTS(SELECT 1 FROM json_each(spec,'$.fly_ids') WHERE value=?)
+                ORDER BY created DESC""",(fly['id'],))]
+        for ident in ids:
+            series=self.store.tournament(ident)
+            if series['status']!='complete' or len(series['spec']['fly_ids'])!=2:continue
+            rival_id=next((fid for fid in series['spec']['fly_ids'] if fid!=fly['id']),None)
+            if not rival_id or not self.visible(rival_id,owner):continue
+            rival=self.store.fly(rival_id)
+            if rival['reference_kind']!='wildtype' or any(
+                rival['spec'].get(key)!=fly['spec'].get(key) for key in ('connectome_sha256','model_profile')):continue
+            if not all(self.visible_match(match,owner) for match in series['matches']):continue
+            match=dict(series['matches'][0]);match.pop('owner',None)
+            return {'series_id':ident,'protocol_id':series['protocol_id'],'status':series['status'],
+                    'reference_id':rival_id,'match':match}
+        return None
 
     def _lineage_children(self, ident, offset=0, exclude=None):
         """Return child ids from the immutable FlySpec parent links.

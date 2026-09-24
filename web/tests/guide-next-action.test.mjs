@@ -53,7 +53,7 @@ const {PlaygroundGuide}=require('./src/features/guide/PlaygroundGuide.js')
 const {guideMessages}=require('./src/shared/messages/guide.js')
 
 test('next action advances only with saved designs and recorded comparison/evolution evidence',()=>{
- for(const [state,id] of [[{},'clone'],[{hasCompared:true,hasEvolved:true},'clone'],[{hasSavedDesign:true},'compare'],[{hasSavedDesign:true,hasCompared:true},'evolve'],[{hasSavedDesign:true,hasEvolved:true},'compete']])assert.equal(nextGuideStep(state).id,id)
+ for(const [state,id] of [[{},'clone'],[{hasCompared:true,hasEvolved:true},'clone'],[{hasSavedDesign:true},'compare'],[{hasSavedDesign:true,hasCompared:true},'evolve'],[{hasSavedDesign:true,hasCompared:true,hasEvolved:true},'compete']])assert.equal(nextGuideStep(state).id,id)
  assert.equal(guideSubject([wt,fly],wt.id,'me'),fly)
  assert.equal(guideSubject([wt,fly],fly.id,'other'),undefined)
  assert.equal(guideSubject([wt,fly],fly.id),undefined)
@@ -72,26 +72,35 @@ test('WT preparation uses a compatible server reference and the exact Arena pair
  assert.equal(guideComparisonPlan([fly,wt],fly.id,[{id:'orchard'}],season),null)
  assert.equal(guideComparisonPlan([fly,wt],fly.id,maps,{...season,match_profiles:[{id:'legacy-v1',ready:false}]}),null)
 })
-test('failed, unpaired, missing-receipt and mismatched runs do not advance; verified zero effects do',()=>{
- const compare=matches=>baselineComparison([fly,wt],fly,matches)
- assert.deepEqual(compare([first,second]),[first,second])
- for(const patch of [{status:'failed'},{status:'running'},{result:null},{result:{receipt_sha256:''}},{request:{...second.request,seed:43}},{request:{...second.request,map_id:'ring'}},{request:{...second.request,duration_seconds:3}},{request:{...second.request,sensory_profile:'other'}},{request:{...second.request,bridge_profile:'other'}},{request:first.request}])assert.equal(compare([first,{...second,...patch}]),null)
- assert.equal(compare([first]),null);assert.equal(compare([]),null)
- assert.equal(baselineComparison([fly,{...wt,reference_kind:'user'}],fly,[first,second]),null)
+const training_strategies=['evolution','random_search','cross_entropy','external']
+const evidence={fly,origin:null,experiences:[{match:first},{match:second}],training_strategies,wt_comparison:{series_id:'series',protocol_id:'paired-series/v1',status:'complete',reference_id:wt.id,match:first}}
+test('only server-validated complete WT series advance, never loose verified matches',()=>{
+ assert.equal(baselineComparison([fly,wt],fly,evidence),evidence.wt_comparison)
+ for(const record of [null,{...evidence,wt_comparison:null},{...evidence,fly:wt},...['running','incomplete'].map(status=>({...evidence,wt_comparison:{...evidence.wt_comparison,status}})),{...evidence,wt_comparison:{...evidence.wt_comparison,protocol_id:'unknown'}}]){
+  assert.equal(baselineComparison([fly,wt],fly,record),null)
+  assert.equal(nextGuideStep({hasSavedDesign:true,hasCompared:!!baselineComparison([fly,wt],fly,record),hasEvolved:true}).id,'compare')
+ }
+ assert.equal(baselineComparison([fly,{...wt,reference_kind:'user'}],fly,evidence),null)
+ // Runtime/artifact validity is decided by the server. Loose legs cannot substitute for its evidence.
+ for(const patch of [{runtime_hash:'runtime-B'},{artifacts:['different']},{runtime_hash:null},{status:'running'},{}]){
+  assert.equal(baselineComparison([fly,wt],fly,{...evidence,wt_comparison:null,experiences:[{match:first},{match:{...second,...patch}}]}),null)
+ }
 })
-test('a parent pointer or saved unscored training baseline is not completed evolution',()=>{
+test('recorded evolution uses every backend-declared strategy, including cross_entropy',()=>{
  const origin={strategy:'evolution',round:1,slot:1,fitness:0,saved:true}
- assert.equal(hasRecordedEvolution({fly,origin,experiences:[]},fly),true)
- for(const patch of [{fitness:null},{fitness:NaN},{saved:false},{strategy:'unknown'},{slot:0}])assert.equal(hasRecordedEvolution({fly,origin:{...origin,...patch},experiences:[]},fly),false)
+ for(const strategy of training_strategies)assert.equal(hasRecordedEvolution({...evidence,origin:{...origin,strategy}},fly),true)
+ assert.equal(hasRecordedEvolution({...evidence,training_strategies:['future_strategy'],origin:{...origin,strategy:'future_strategy'}},fly),true)
+ for(const patch of [{fitness:null},{fitness:NaN},{saved:false},{strategy:'unknown'},{slot:0}])assert.equal(hasRecordedEvolution({...evidence,origin:{...origin,...patch}},fly),false)
+ assert.equal(hasRecordedEvolution({...evidence,origin,training_strategies:undefined},fly),false)
  assert.equal(hasRecordedEvolution(null,fly),false)
- assert.equal(hasRecordedEvolution({fly:wt,origin,experiences:[]},fly),false)
+ assert.equal(hasRecordedEvolution({...evidence,fly:wt,origin},fly),false)
 })
 for(const locale of ['en','zh-CN'])test(`next action leads, science is disclosed, collapse retains the action in ${locale}`,async()=>withDOM('',async(dom,mount)=>{
  localStorage.setItem('flyarena.locale',locale)
  globalThis.fetch=()=>{throw Error('Guide must not submit work')}
  const calls=[]
  const props={canCloneWT:true,canCompare:true,hasSavedDesign:false,onCloneWT:()=>calls.push('clone'),onCompare:()=>calls.push('compare'),onTrain:()=>calls.push('train'),onArena:()=>calls.push('compete'),onDesign:noop,onAI:noop}
- for(const [state,id] of [[{},'clone'],[{hasSavedDesign:true},'compare'],[{hasSavedDesign:true,hasCompared:true},'evolve'],[{hasSavedDesign:true,hasEvolved:true},'compete']]){
+ for(const [state,id] of [[{},'clone'],[{hasSavedDesign:true},'compare'],[{hasSavedDesign:true,hasCompared:true},'evolve'],[{hasSavedDesign:true,hasCompared:true,hasEvolved:true},'compete']]){
   await mount(PlaygroundGuide,{...props,...state})
   const next=document.querySelector('[data-guide-next]')
   assert.equal(next.dataset.guideNext,id)

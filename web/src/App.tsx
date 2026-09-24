@@ -98,7 +98,6 @@ export default function App(){
   const guideFly=guideSubject(availableFlies,selected,identity?.id)
   const guideEvidence=useGuideEvidence(tab==='design'?guideFly:undefined,identity)
   const guidePlan=guideComparisonPlan(availableFlies,guideFly?.id||'',maps,season)
-  const guideMatches=[...matches,...(guideEvidence.record?.experiences?.map(e=>e.match)||[])]
   function prepareGuideComparison(plan:ExperimentPlan){const setup=plan.setup;setSelected(setup.selected);setOpponent(setup.opponent);setMode(setup.mode);setMapId(setup.mapId);setSeedText(setup.seedText);setDuration(setup.duration);setBridgeProfile(setup.bridgeProfile);setSensoryProfile(setup.sensoryProfile);navigate('arena',experimentId,'','');setPlay(false)}
   const [archivedMatch,setArchivedMatch]=useState<Match|null>(null)
   const [archiveError,setArchiveError]=useState<{id:string;message:string}|null>(null)
@@ -277,7 +276,7 @@ export default function App(){
         {replayOrigin&&<section className="panel replay-design-origin" aria-label={locale==='zh-CN'?'回放设计来源':'Replay design source'}><div><strong>{locale==='zh-CN'?'从这份参赛大脑继续设计：':'Designing from this recorded brain: '}{replayOrigin.name}</strong><p>{locale==='zh-CN'?'当前是未保存的后代草稿。修改、预览并保存后，选择算法训练或与 WT 竞技。':'This is an unsaved child draft. Edit, preview and save it, then select training or compete with WT.'}</p></div><button className="text-link" aria-label={locale==='zh-CN'?'回看亲代这场表现':'Revisit the parent’s match'} onClick={()=>setFocused(replayOrigin.matchId)}>{locale==='zh-CN'?'回看亲代这场表现':'Revisit the parent’s match'} →</button></section>}
 
         <PlaygroundGuide neuronCount={season?.connectome.neuron_count}
-          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!guideFly} subjectName={guideFly?.name} canCompare={!!guidePlan} hasCompared={!!baselineComparison(availableFlies,guideFly,guideMatches)} hasEvolved={hasRecordedEvolution(guideEvidence.record,guideFly)} evidenceError={guideEvidence.error}
+          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!guideFly} subjectName={guideFly?.name} canCompare={!!guidePlan} hasCompared={!!baselineComparison(availableFlies,guideFly,guideEvidence.record)} hasEvolved={hasRecordedEvolution(guideEvidence.record,guideFly)} evidenceError={guideEvidence.error}
           onCompare={()=>{if(guidePlan)prepareGuideComparison(guidePlan)}}
           onDesign={()=>{document.getElementById('fly-name')?.scrollIntoView({block:'center',behavior:'smooth'});document.getElementById('fly-name')?.focus({preventScroll:true})}}
           onCloneWT={()=>{const wt=matchingWildType(flies);if(wt){clone(wt);setToast(locale==='zh-CN'?'已复制 WT 为草稿。修改并保存后，再训练或挑战。':'WT copied into a draft. Edit and save it before training or competing.');document.getElementById('fly-name')?.focus()}}}

@@ -16,20 +16,17 @@ export function guideComparisonPlan(flies:Fly[],selected:string,maps:ArenaMap[],
  return buildExperimentPlan({selected:preset.subject.id,opponent:preset.reference.id,mapId:preset.map_id,mode:preset.mode,seedText:String(preset.seed),duration:preset.duration_seconds,bridgeProfile:'legacy-v1',sensoryProfile:'odor-only-v1'},flies,maps,season).plan
 }
 
-/** A failed, partial or unmatched pair cannot advance onboarding. Zero effects can. */
-export function baselineComparison(flies:Fly[],subject:Fly|undefined,matches:Match[]){
- if(!subject)return null
- const reference=wildTypeChallenge(flies,subject.id)?.reference
- if(!reference)return null
- const eligible=matches.filter(m=>m.status==='verified'&&!!m.result?.receipt_sha256&&m.request.mode==='contest'&&m.request.fly_ids.length===2&&m.request.fly_ids.includes(subject.id)&&m.request.fly_ids.includes(reference.id))
- const conditions=(m:Match)=>JSON.stringify([m.request.map_id,m.request.mode,m.request.seed,m.request.duration_seconds,m.request.bridge_profile||'legacy-v1',m.request.sensory_profile||'odor-only-v1'])
- for(const first of eligible){const second=eligible.find(m=>m.id!==first.id&&conditions(m)===conditions(first)&&m.request.fly_ids[0]===first.request.fly_ids[1]);if(second)return [first,second]}
- return null
+/** Completion is server-owned paired-series evidence, never inferred from loose matches. */
+export function baselineComparison(flies:Fly[],subject:Fly|undefined,record:GuideRecord|null){
+ if(!subject||record?.fly?.id!==subject.id)return null
+ const comparison=record.wt_comparison
+ const reference=flies.find(f=>f.id===comparison?.reference_id&&f.reference_kind==='wildtype'&&f.spec.model_profile===subject.spec.model_profile&&f.spec.connectome_sha256===subject.spec.connectome_sha256)
+ return reference&&comparison?.protocol_id==='paired-series/v1'&&comparison.status==='complete'&&comparison.series_id?comparison:null
 }
 
-type GuideRecord={fly:Fly;origin:null|{strategy:string;round:number;slot:number;fitness:number|null;saved:boolean};experiences:{match:Match}[]}
+export type GuideRecord={fly:Fly;origin:null|{strategy:string;round:number;slot:number;fitness:number|null;saved:boolean};experiences:{match:Match}[];training_strategies?:string[];wt_comparison?:null|{series_id:string;protocol_id:string;status:string;reference_id:string;match:Match}}
 export function hasRecordedEvolution(record:GuideRecord|null,subject?:Fly){
- return !!subject&&record?.fly.id===subject.id&&!!record.origin&&['evolution','random_search','external'].includes(record.origin.strategy)&&(record.origin.round>1||record.origin.slot>0)&&record.origin.saved&&typeof record.origin.fitness==='number'&&Number.isFinite(record.origin.fitness)&&!!subject.spec.parent_id
+ return !!subject&&record?.fly?.id===subject.id&&!!record.origin&&!!record.training_strategies?.includes(record.origin.strategy)&&(record.origin.round>1||record.origin.slot>0)&&record.origin.saved&&typeof record.origin.fitness==='number'&&Number.isFinite(record.origin.fitness)&&!!subject.spec.parent_id
 }
 export function useGuideEvidence(subject:Fly|undefined,identity:Identity|null){
  const [state,setState]=useState<{id:string;record:GuideRecord|null;error:string}>({id:'',record:null,error:''})

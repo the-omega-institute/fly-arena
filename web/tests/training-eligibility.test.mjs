@@ -67,6 +67,7 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
   '../life/navigation':{lifeHash:()=>'',continuationFocus:()=>''},'../../api':{api:()=>{throw Error('Unexpected training request')},newRequestKey:()=>''},
   '../../shared/i18n':{useI18n:()=>({t,locale})},
   '../arena/MapPreview':{MapPreview:props=>React.createElement('div',{'data-preview-map':props.mapId,'data-preview-bridge':props.bridgeProfile})},
+  '../guide/nextAction':{useGuideEvidence:()=>({record:null,error:''})},
   './FirstExperimentGuide':{FirstExperimentGuide:noop},'./AlgorithmPicker':{AlgorithmPicker:noop},'./TrainingShowcase':{TrainingShowcase:noop},'./algorithms':{algorithmName:id=>id},
   './TrainingComparison':{TrainingComparison:noop},'./TrainingWorkload':{TrainingWorkload:noop},'./ConditionResults':{ConditionResults:noop},'./comparison':{evaluationConditions:spec=>spec.evaluation_conditions||[{map_id:spec.map_id,seed:spec.seed}]}
  }

@@ -119,3 +119,49 @@ def test_deployed_replay_appears_in_life_history_and_observations(lab):
     assert observation['sampled_path_mm']==5
     assert observation['total_spikes']==1000
     assert observation['food_consumed']==0
+
+
+@pytest.mark.parametrize('fault', [None, 'runtime_mismatch', 'artifact_mismatch', 'missing_runtime',
+                                   'missing_artifacts', 'slot_artifacts', 'incomplete', 'running', 'failed', 'loose', 'spoofed_wt'])
+def test_guide_requires_complete_validated_wt_series(lab, fault):
+    """Synthetic bookkeeping evidence only; these zero scores are not simulation results."""
+    from flyarena.contracts import TournamentRequest
+    store,service,user,parent=lab
+    reference=store.add_fly(user['id'],parent['spec'] | {'name':'WT fixture'},parent['report'] | {'artifact_id':'b'*64})
+    with store.db() as db:
+        if fault!='spoofed_wt':
+            db.execute("UPDATE fly_provenance SET reference_kind='wildtype' WHERE fly_id=?",(reference['id'],))
+    series=store.add_tournament(user['id'],TournamentRequest(name='Guide fixture',fly_ids=[parent['id'],reference['id']],
+                               seeds=[42,43],duration_seconds=2,sandbox=True).model_dump(),'runtime-A')
+    with store.db() as db:
+        db.execute("UPDATE matches SET status='verified',result=? WHERE tournament=?",
+                   (json.dumps({'winner_slot':None,'scores':[0,0],'receipt_sha256':'synthetic-fixture'}),series['id']))
+        last=series['matches'][-1]['id']
+        if fault=='runtime_mismatch':db.execute('UPDATE matches SET runtime_hash=? WHERE id=?',('runtime-B',last))
+        if fault=='artifact_mismatch':db.execute('UPDATE matches SET artifacts=? WHERE id=?',(json.dumps(['different']*2),last))
+        if fault=='slot_artifacts':db.execute('UPDATE matches SET artifacts=? WHERE id=?',(json.dumps(series['matches'][0]['artifacts']),last))
+        if fault=='failed':db.execute("UPDATE matches SET status='failed',result=NULL,error='fixture failure' WHERE id=?",(last,))
+        if fault=='missing_runtime':db.execute("UPDATE matches SET runtime_hash='' WHERE tournament=?",(series['id'],))
+        if fault=='missing_artifacts':db.execute("UPDATE matches SET artifacts='[]' WHERE id=?",(last,))
+        if fault=='incomplete':db.execute('DELETE FROM matches WHERE id=?',(last,))
+        if fault=='running':db.execute("UPDATE matches SET status='running',result=NULL WHERE id=?",(last,))
+        if fault=='loose':db.execute('UPDATE matches SET tournament=NULL WHERE tournament=?',(series['id'],))
+    with TestClient(create_app(with_worker=False,store=store,auth_config=AuthConfig())) as client:
+        record=client.get('/api/v1/lives/'+parent['id']).json()
+    if fault is not None:
+        assert record['wt_comparison'] is None
+    else:
+        evidence=record['wt_comparison']
+        assert evidence['series_id']==series['id'] and evidence['protocol_id']=='paired-series/v1'
+        assert evidence['status']=='complete' and evidence['reference_id']==reference['id']
+        assert evidence['match']['id']==series['matches'][0]['id']
+        assert evidence['match']['result']['scores']==[0,0]
+        assert 'owner' not in evidence['match']
+
+
+def test_guide_strategy_list_is_derived_from_training_spec(lab):
+    from flyarena.services.training import TrainingSpec
+    store,service,user,parent=lab
+    record=LifeLedger(store).get(parent['id'],user['id'])
+    assert record['training_strategies']==TrainingSpec.model_json_schema()['properties']['strategy']['enum']
+    assert 'cross_entropy' in record['training_strategies']
