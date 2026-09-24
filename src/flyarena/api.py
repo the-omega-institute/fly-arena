@@ -196,6 +196,13 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if result is None:raise HTTPException(404,'Experience not found')
         return result
 
+    @app.get('/api/v1/life/{ident}/lineage')
+    @app.get('/api/v1/lives/{ident}/lineage')
+    def life_lineage(ident: str, depth: int = Query(default=3, ge=0, le=6), owner=Depends(optional_identity)):
+        result=ledger.lineage(ident,owner,depth)
+        if result is None:raise HTTPException(404,'Life record not found')
+        return result
+
     @app.post('/api/v1/lives/{ident}/notes',status_code=201)
     def life_note(ident: str, body: LifeNote, owner: dict = Depends(identity),
                   idempotency_key: str | None = Header(default=None)):
