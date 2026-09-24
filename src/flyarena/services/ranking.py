@@ -41,12 +41,13 @@ def rank(flies, matches, *, runtime_hash=None, scenario_id=None, mode=None, seas
     return sorted(rows.values(),key=lambda r:(-r['points'],-r['food'],r['fly']['id']))
 
 
-def tournament_projection(matches, fly_ids):
+def tournament_projection(matches, fly_ids, *, scope_checked=False):
+    """Reuse totals after schedule_report checks every condition and runtime, including duel."""
     standings = {f:{'fly_id':f,'points':0,'played':0,'wins':0,'draws':0,'losses':0} for f in fly_ids}
     sandbox = bool(matches) and all(m['request'].get('sandbox',False) for m in matches)
     sensory_qualified = sandbox or all(m['request'].get('sensory_profile', 'odor-only-v1') == 'odor-only-v1'
                             for m in matches)
-    compatible = sensory_qualified and len({(scope(m), m["request"].get("sandbox",False), m["request"].get("sensory_profile","odor-only-v1")) for m in matches}) <= 1
+    compatible = sensory_qualified and (scope_checked or len({(scope(m), m["request"].get("sandbox",False), m["request"].get("sensory_profile","odor-only-v1")) for m in matches}) <= 1)
     for match in matches if compatible else []:
         if match['status'] != 'verified':
             continue

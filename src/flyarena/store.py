@@ -33,6 +33,8 @@ class Store:
             initialize(db)
             from .services.training import initialize as initialize_training
             initialize_training(db)
+            from .services.observation_series import initialize as initialize_observations
+            initialize_observations(db)
 
     @contextmanager
     def db(self):
@@ -272,7 +274,7 @@ class Store:
 
     def add_tournament(self, owner: str, spec: dict, runtime_hash: str, key: str | None = None) -> dict:
         """Admit the complete round robin atomically, including reversed slots."""
-        from .services.competition_protocol import expected_schedule
+        from .services.competition_protocol import expected_schedule, admit_schedule
         ident, now = uuid.uuid4().hex, time.time()
         payload = digest({'tournament': spec})
         with self.db() as db:
@@ -283,20 +285,9 @@ class Store:
                     return self.prior_submission(owner, key, spec, tournament=True)
             from .contracts import TournamentRequest
             TournamentRequest.model_validate(spec).validate_admission()
-            artifacts = {}
-            for fly in spec['fly_ids']:
-                row = db.execute('SELECT artifact_id,spec FROM flies WHERE id=?',(fly,)).fetchone()
-                if not row: raise ValueError('Tournament contestant does not exist')
-                from .models import require_model_bridge
-                require_model_bridge(json.loads(row[1]).get('model_profile','malecns-lif-cpu-v1'),spec.get('bridge_profile','legacy-v1'))
-                artifacts[fly] = row[0]
             schedule = expected_schedule(spec)
-            pending = db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')",(owner,)).fetchone()[0]
-            if pending+len(schedule)>12:
-                raise ValueError(f'Tournament needs {len(schedule)} matches; {12-pending} queue slots available. Use fewer entrants or seeds.')
             db.execute('INSERT INTO tournaments VALUES(?,?,?,?)',(ident,owner,canonical(spec).decode(),now))
-            for ordinal,request in enumerate(schedule):
-                db.execute("INSERT INTO matches(id,owner,request,artifacts,runtime_hash,status,created,updated,tournament) VALUES(?,?,?,?,?,'queued',?,?,?)",(uuid.uuid4().hex,owner,canonical(request).decode(),canonical([artifacts[f] for f in request['fly_ids']]).decode(),runtime_hash,now+ordinal*.000001,now,ident))
+            admit_schedule(db, owner, spec, schedule, runtime_hash, now, tournament=ident)
             if key: db.execute('INSERT INTO idempotency VALUES(?,?,?,?)',(owner,key,payload,ident))
         return self.tournament(ident)
 

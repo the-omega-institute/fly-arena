@@ -39,6 +39,8 @@ from .research import ExperimentSpec
 from .services.research_service import ResearchService
 from .services.life import LifeLedger, LifeNote
 from .services.training import TrainingService, TrainingSpec, ProposedCandidate
+from .services import observation_series
+from .services.observation_series import ObservationSeriesRequest
 
 
 def create_app(*, with_worker: bool = True, store: Store | None = None, auth_config: AuthConfig | None = None, oidc_client: NyxIDClient | None = None, research_service: ResearchService | None = None) -> FastAPI:
@@ -484,6 +486,30 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         result = store.tournament(ident)
         if result is None:
             raise HTTPException(404, "Tournament not found")
+        return result
+
+    @app.post("/api/v1/observation-series", status_code=202)
+    def observation_create(body: ObservationSeriesRequest, owner: dict = Depends(identity),
+                           idempotency_key: str | None = Header(default=None)):
+        if idempotency_key and len(idempotency_key) > 128:
+            raise ValueError("Idempotency key too long")
+        spec = body.model_dump()
+        prior = observation_series.prior_submission(store, owner["id"], idempotency_key, spec)
+        if prior is not None:
+            return prior
+        require_training_bridge(body.bridge_profile)
+        return observation_series.create_series(store, owner["id"], spec,
+                                                digest(match_runtime(body.bridge_profile, body.sensory_profile)), idempotency_key)
+
+    @app.get("/api/v1/observation-series")
+    def observations(owner: str | None = None):
+        return observation_series.list_series(store, owner)
+
+    @app.get("/api/v1/observation-series/{ident}")
+    def observation_get(ident: str):
+        result = observation_series.get_series(store, ident)
+        if result is None:
+            raise HTTPException(404, "Observation series not found")
         return result
 
     @app.get("/api/v1/leaderboard")

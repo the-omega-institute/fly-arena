@@ -5,7 +5,7 @@ export type ExperimentIntent='forage'|'contest'|'contact'
 export type ExperimentMode='forage'|'contest'|'sumo'|'duel'
 export type ExperimentSetup={selected:string;opponent:string;mapId:string;mode:string;seedText:string;duration:number;bridgeProfile:string;sensoryProfile:string}
 export type ExperimentRequest={sandbox:true;bridge_profile:string;sensory_profile:string;fly_ids:string[];map_id:string;mode:ExperimentMode;seed:number;duration_seconds:number}
-export type ExperimentPlan={setup:ExperimentSetup;seeds:number[];matches:ExperimentRequest[];submissions:({endpoint:'/matches';body:ExperimentRequest}|{endpoint:'/tournaments';body:Omit<ExperimentRequest,'seed'|'mode'>&{mode:'contest'|'sumo';seeds:number[];name:string}})[]}
+export type ExperimentPlan={setup:ExperimentSetup;seeds:number[];matches:ExperimentRequest[];submissions:({endpoint:'/matches';body:ExperimentRequest}|{endpoint:'/observation-series';body:Omit<ExperimentRequest,'seed'|'mode'>&{mode:'forage'|'duel';seeds:number[];name:string}}|{endpoint:'/tournaments';body:Omit<ExperimentRequest,'seed'|'mode'>&{mode:'contest'|'sumo';seeds:number[];name:string}})[]}
 export function experimentIntent(mode:string):ExperimentIntent{return mode==='sumo'||mode==='duel'?'contact':mode==='forage'?'forage':'contest'}
 export function intentMode(intent:ExperimentIntent,map:ArenaMap):ExperimentMode|undefined{
  if(intent!=='forage'&&!mapEligibility(map).competition_eligible)return undefined
@@ -50,6 +50,6 @@ export function buildExperimentPlan(setup:ExperimentSetup,flies:Fly[],maps:Arena
  const base={sandbox:true as const,bridge_profile:setup.bridgeProfile,sensory_profile:setup.sensoryProfile,map_id:setup.mapId,mode:setup.mode as ExperimentMode,duration_seconds:setup.duration}
  const slots=setup.mode==='forage'?[[setup.selected]]:[[setup.selected,setup.opponent],[setup.opponent,setup.selected]]
  const matches=seeds.flatMap(seed=>slots.map(fly_ids=>({...base,fly_ids,seed})))
- const submissions:ExperimentPlan['submissions']=tournament?[{endpoint:'/tournaments',body:{...base,mode:setup.mode as 'contest'|'sumo',fly_ids:slots[0],seeds,name:`Arena ${setup.mode} · ${setup.selected.slice(0,8)}`}}]:matches.map(body=>({endpoint:'/matches',body}))
+ const submissions:ExperimentPlan['submissions']=tournament?[{endpoint:'/tournaments',body:{...base,mode:setup.mode as 'contest'|'sumo',fly_ids:slots[0],seeds,name:`Arena ${setup.mode} · ${setup.selected.slice(0,8)}`}}]:setup.mode==='duel'||seeds.length>1?[{endpoint:'/observation-series',body:{...base,mode:setup.mode as 'forage'|'duel',fly_ids:slots[0],seeds,name:`Arena ${setup.mode} · ${setup.selected.slice(0,8)}`}}]:matches.map(body=>({endpoint:'/matches',body}))
  return {plan:{setup:{...setup},seeds,matches,submissions},errors:[]}
 }
