@@ -64,7 +64,7 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
  const dependencies={
   'react':React,'react/jsx-runtime':await import('react/jsx-runtime'),'lucide-react':icons,
   './trainingEligibility':eligibility,'./plan':plan,
-  '../life/navigation':{lifeHash:()=>''},'../../api':{api:()=>{throw Error('Unexpected training request')},newRequestKey:()=>''},
+  '../life/navigation':{lifeHash:()=>'',continuationFocus:()=>''},'../../api':{api:()=>{throw Error('Unexpected training request')},newRequestKey:()=>''},
   '../../shared/i18n':{useI18n:()=>({t,locale})},
   '../arena/MapPreview':{MapPreview:props=>React.createElement('div',{'data-preview-map':props.mapId,'data-preview-bridge':props.bridgeProfile})},
   './AlgorithmPicker':{AlgorithmPicker:noop},'./TrainingShowcase':{TrainingShowcase:noop},'./algorithms':{algorithmName:id=>id},
