@@ -1,4 +1,12 @@
 export const duelMessages = {
+  "observation.title": {"en": "Observation series report", "zh-CN": "观察系列报告"},
+  "observation.recent": {"en": "Your recent observation series", "zh-CN": "你最近的观察系列"},
+  "observation.scope": {"en": "Recorded evidence under a frozen plan. Neural dynamics, senses and motor readout are modeled. Solo observations have no ranking; duel scores describe exclusive center occupancy only, not natural aggression or general superiority.", "zh-CN": "冻结计划下的实际记录证据。神经动力学、感觉与运动读出均为模型。单蝇观察不排名；领地得分仅表示独占中央区域，不能证明自然攻击或普遍优势。"},
+  "observation.durable": {"en": "One durable series saves every expected seed and spawn order. Recover the report by its link; pending, failed and missing legs remain visible.", "zh-CN": "一个持久系列保存所有计划种子与出生顺序。可通过链接恢复报告；排队、失败与缺失场次均保持可见。"},
+  "observation.complete": {"en": "Every scheduled observation is verified. Completion records available evidence; it does not imply successful arrival or learned navigation.", "zh-CN": "所有计划观察均已验证。完成表示记录证据可用，不代表成功到达或学会导航。"},
+  "observation.partial": {"en": "The observation plan is incomplete. Inspect each pending, failed or missing leg; no successful series conclusion is available.", "zh-CN": "观察计划尚未完整完成。请检查每个待完成、失败或缺失场次；目前无成功的系列结论。"},
+  "observation.noScoring": {"en": "Observation only: no scores, winner or standings. Arrival and exploration remain recorded observations (#82).", "zh-CN": "仅供观察：无得分、胜者或排名。到达与探索仍为记录的观察（#82）。"},
+
   "series.title": {"en": "Paired series results", "zh-CN": "配对系列结果"},
   "series.scope": {"en": "Recorded outcomes of modeled competition, under these conditions only. Scores use the selected mode; this report is not a global ranking.", "zh-CN": "这些条件下的模型竞技记录结果。得分依所选模式计算；此报告不是全局排名。"},
   "series.partial": {"en": "No series conclusion yet: a first-leg win remains a first-leg result. Every scheduled seed and swapped spawn order must be verified.", "zh-CN": "尚无系列结论：首局获胜仍只是首局结果。每个计划种子与交换出生位置的场次都必须验证完成。"},

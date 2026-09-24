@@ -6,6 +6,9 @@ import {api,newRequestKey} from '../../api'
 import type {ArenaMap,Fly,Identity,Match,Season,TrainingBridge} from '../../types'
 import {useI18n} from '../../shared/i18n'
 import {MapPreview} from '../arena/MapPreview'
+import {useGuideEvidence} from '../guide/nextAction'
+import {FirstExperimentGuide} from './FirstExperimentGuide'
+import type {ExperimentPlan} from '../arena/experimentSetup'
 import {AlgorithmPicker} from './AlgorithmPicker'
 import {TrainingShowcase} from './TrainingShowcase'
 import {algorithmName} from './algorithms'
@@ -22,11 +25,11 @@ type Plan={evaluation_conditions?:EvaluationCondition[]|null;name:string;founder
 type Member={condition_results?:ConditionResult[];generation:number;slot:number;fly_id:string;saved:number;fitness:number|null;fly:Fly;matches:Match[]}
 type Training={id:string;evaluation_context?:string;spec:Plan;status:string;control:string;error:string|null;members:Member[];evaluations_total:number;evaluations_started:number;evaluations_completed:number;progress:number;best_fly_id:string|null;baseline_fitness:number|null;proposal_generation:number|null;open_slots:number[]}
 type CompetitionSetup={map_id:string;seed:number;duration_seconds:number;opponent_id?:string|null;bridge_profile:string;sensory_profile:string}
-type Props={flies:Fly[];identity:Identity|null;selected:string;season:Season|null;maps:ArenaMap[];onLogin:()=>void;onSaved:(fly:Fly)=>Promise<void>;onCompete:(fly:Fly,setup?:CompetitionSetup,reference?:Fly)=>void;onReplay:(match:Match)=>void}
+type Props={matches?:Match[];onCompareWT?:(plan:ExperimentPlan)=>void;flies:Fly[];identity:Identity|null;selected:string;season:Season|null;maps:ArenaMap[];onLogin:()=>void;onSaved:(fly:Fly)=>Promise<void>;onCompete:(fly:Fly,setup?:CompetitionSetup,reference?:Fly)=>void;onReplay:(match:Match)=>void}
 const terminal=(status:string)=>['complete','failed','stopped'].includes(status)
 const statusKey:Record<string,string>={awaiting_candidates:'Waiting for your optimizer',queued:'Queued',running:'Training',paused:'Paused',pausing:'Pausing after evaluation',stopping:'Stopping after evaluation',stopped:'Stopped',complete:'Complete',failed:'Failed'}
 
-export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onSaved,onCompete,onReplay}:Props){
+export function TrainingSandbox({onCompareWT,flies,identity,selected,season,maps,onLogin,onSaved,onCompete,onReplay}:Props){
   const {t,locale}=useI18n()
   const [continuationId,setContinuationId]=useState(()=>continuationFocus(location.hash))
   const [continuation,setContinuation]=useState<ReturnType<typeof continuationPlan>|null>(null)
@@ -90,6 +93,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   const problem=previewProblem||metadataProblem||planProblem({population,generations,budget,duration,seed,circuits,name,mode,founder,opponent,strategy,conditions,map_id:map,bridge_profile:bridgeProfile})
   const visibleRuns=loadedOwner===identity?.id?runs:[]
   const current=visibleRuns.find(r=>r.id===focus)
+  const guideEvidence=useGuideEvidence(!current?selectedFly:undefined,identity)
   const shownGeneration=generation??Math.max(0,...(current?.members.map(m=>m.generation)||[]))
   const members=current?.members.filter(m=>m.generation===shownGeneration)||[]
   useEffect(()=>{setContinuationFlies([]);setExampleFounder(null)},[identity?.id])
@@ -189,6 +193,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   }):[]
   const best=current?.members.find(m=>m.fly_id===current.best_fly_id)?.fitness
   return <div className={"training-layout "+(current?"has-session":"new-session")}>
+    {!current&&<FirstExperimentGuide fly={selectedFly} flies={availableFlies} maps={maps} season={season} evidence={guideEvidence.record} evidenceError={guideEvidence.error} budget={budget} needed={needed} duration={duration} disabled={continuationPending||!!busy} onCompare={plan=>{if(onCompareWT)onCompareWT(plan);else if(selectedFly)onCompete(selectedFly,{map_id:plan.setup.mapId,seed:plan.seeds[0],duration_seconds:plan.setup.duration,bridge_profile:plan.setup.bridgeProfile,sensory_profile:plan.setup.sensoryProfile},availableFlies.find(f=>f.id===plan.setup.opponent))}} onReplay={onReplay} onConfigure={()=>{setup.current?.scrollIntoView({block:'start',behavior:'smooth'});document.getElementById('training-fitness-objective')?.focus({preventScroll:true})}}/>}
     <aside ref={setup} className="panel training-setup">
       <div className="panel-heading"><span><Dna size={17}/>{t('Start a training session')}</span><span className="tiny-label">SANDBOX</span></div>
       {continuationId&&<section aria-label={t('Review lineage continuation')}><h3>{t('Review lineage continuation')}</h3><a href={lifeHash(continuationId)}>{continuationId}</a><p>{t('Only accessible recorded evaluations are reused. Missing fields need a new choice; editable budget and search settings are new, not inherited. No computation starts until Start training.')}</p>{!continuationLoaded&&!error&&<p role="status">{t('Loading recorded conditions…')}</p>}{continuation&&<><p>{t('Retained conditions')} · {continuation.conditions.length} / {continuation.reviews.length}</p>{!continuation.conditions.length&&<p>{t('No eligible recorded conditions. Choose a new setup before starting.')}</p>}{continuation.environment&&!continuation.environment.fitness_objective&&<p>{t('Selection objective was not recorded; choose a new objective.')}</p>}{continuation.environment&&!continuation.environment.sensory_profile&&<p>{t('Sensory input was not recorded; choose a new input.')}</p>}<details><summary>{t('Retained and dropped conditions')}</summary>{continuation.reviews.map((review,index)=><div key={index}><strong>{t(review.retained?'Retained':'Dropped')}</strong><p>{t(review.reason)}</p><code>{JSON.stringify(review.record)}</code></div>)}</details></>}{requiresCopy&&<><p>{t('This published snapshot needs a local copy linked to the recorded individual before training.')}</p><button className="secondary" disabled={!!busy||!season?.gallery_copy_available} onClick={copyContinuation}>{t('Save a copy and prepare training')}</button></>}</section>}

@@ -14,3 +14,6 @@
 .experiment-guide-inputs{font-size:13px;line-height:1.7}
 .experiment-guide-inputs small{display:block;color:var(--muted);overflow-wrap:anywhere}
 @media(max-width:750px){.experiment-guide{padding:14px}.experiment-guide-heading{flex-direction:column;gap:12px}.experiment-guide-actions{width:100%;grid-template-columns:1fr 1fr}.experiment-guide-facts{grid-template-columns:1fr}.experiment-guide h3{font-size:20px}}
+
+.first-experiment-guide{grid-column:1/-1;padding:18px}.first-experiment-guide h2{font-size:18px}.first-experiment-guide h3{font-size:14px;margin:12px 0 6px}.first-experiment-guide p{font-size:12px;line-height:1.6;color:var(--text-muted);margin:8px 0}.first-experiment-guide .training-pair{gap:20px}
+@media(max-width:560px){.first-experiment-guide .training-pair{grid-template-columns:1fr;gap:4px}}

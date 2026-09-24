@@ -56,18 +56,19 @@ test('food series uses the existing tournament request and exactly reverses slot
  for(let i=0;i<6;i+=2){assert.deepEqual(plan.matches[i+1],{...plan.matches[i],fly_ids:[wt.id,subject.id]})}
  assert.equal(setup.seedText,'42');assert.equal(setup.mode,'contest')
 })
-test('contact territory uses explicit reversed match requests without substituting contest or using unsupported tournament mode',()=>{
+test('contact territory saves one durable plan without substituting contest or using unsupported tournament mode',()=>{
  const {plan}=build({mapId:'duel',mode:'duel',duration:180,seedText:'42 43'})
- assert.equal(plan.matches.length,4);assert.equal(plan.submissions.length,4)
- assert.deepEqual(plan.submissions.map(s=>s.endpoint),Array(4).fill('/matches'))
- assert.deepEqual(plan.submissions.map(s=>s.body),plan.matches)
+ assert.equal(plan.matches.length,4);assert.equal(plan.submissions.length,1)
+ assert.equal(plan.submissions[0].endpoint,'/observation-series')
+ assert.deepEqual(plan.submissions[0].body.seeds,[42,43])
+ assert.deepEqual(plan.submissions[0].body.fly_ids,[subject.id,wt.id])
  assert.deepEqual(plan.matches.map(m=>[m.mode,m.map_id,m.seed,m.fly_ids]),[['duel','duel',42,[subject.id,wt.id]],['duel','duel',42,[wt.id,subject.id]],['duel','duel',43,[subject.id,wt.id]],['duel','duel',43,[wt.id,subject.id]]])
  assert.ok(plan.matches.every(m=>m.sandbox&&m.duration_seconds===180))
 })
 test('solo submits one fly per seed even when an incompatible or missing opponent was previously selected',()=>{
  const {plan}=build({mode:'forage',mapId:'labyrinth',opponent:'missing',seedText:'42,43',duration:300})
  assert.equal(plan.matches.length,2);assert.ok(plan.matches.every(m=>m.fly_ids.length===1&&m.fly_ids[0]===subject.id&&m.mode==='forage'))
- assert.ok(plan.submissions.every(s=>s.endpoint==='/matches'))
+ assert.equal(plan.submissions.length,1);assert.equal(plan.submissions[0].endpoint,'/observation-series')
 })
 test('contract duration bounds and ring scoring remain mode-specific',()=>{
  for(const duration of [0,1.5,31,300])assert.equal(build({duration}).plan,null)

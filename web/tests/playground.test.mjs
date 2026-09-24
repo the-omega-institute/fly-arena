@@ -38,15 +38,17 @@ const {WildTypeChallenge}=require('./src/features/arena/WildTypeChallenge.js')
 const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtype.js')
 const {DevelopersFeature}=require('./src/features/developers/DevelopersFeature.js')
 const {I18nProvider,Preferences}=require('./src/shared/i18n.js')
-const dom=new JSDOM('<!doctype html><html><body><main id="root"></main></body></html>',{url:'http://arena.example/'})
-const originals=Object.fromEntries(['window','document','navigator','localStorage','location','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame','matchMedia','IS_REACT_ACT_ENVIRONMENT','fetch'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
-for(const k of ['window','document','navigator','localStorage','location','history','sessionStorage'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
-globalThis.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
-globalThis.IS_REACT_ACT_ENVIRONMENT=true
-globalThis.requestAnimationFrame=()=>1
-globalThis.cancelAnimationFrame=()=>{}
-globalThis.fetch=()=>{throw Error('An onboarding control unexpectedly requested network/compute')}
-let root=createRoot(document.getElementById('root'))
+let dom,root,originals
+test.beforeEach(()=>{
+ dom=new JSDOM('<!doctype html><html><body><main id="root"></main></body></html>',{url:'http://arena.example/'})
+ originals=Object.fromEntries(['window','document','navigator','localStorage','location','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame','matchMedia','IS_REACT_ACT_ENVIRONMENT','fetch'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+ for(const k of ['window','document','navigator','localStorage','location','history','sessionStorage'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
+ globalThis.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true
+ globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{}
+ globalThis.fetch=()=>{throw Error('An onboarding control unexpectedly requested network/compute')}
+ root=createRoot(document.getElementById('root'))
+})
 const spec={schema_version:'flyspec/v1',name:'My fly',description:'',color:'mint',parent_id:null,connectome_sha256:'a'.repeat(64),model_profile:'malecns-lif-cpu-v1',weight_mutations:[],edge_deltas:[],neuron_parameters:{tau_scale:1,threshold_shift_mv:0},plasticity:'none'}
 const wt={id:'a'.repeat(32),name:'Canonical reference',spec,reference_kind:'wildtype'}
 const own={id:'b'.repeat(32),name:'My saved fly',spec:{...spec,parent_id:wt.id},reference_kind:'user'}
@@ -54,11 +56,11 @@ const noop=()=>{}
 const button=label=>{const el=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===label||b.getAttribute('aria-label')===label);assert.ok(el,`Missing button: ${label}`);return el}
 async function click(label){await act(async()=>button(label).click())}
 async function mount(Component,props){await act(async()=>root.render(React.createElement(I18nProvider,null,React.createElement(Preferences),React.createElement(Component,props))))}
-test.afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'));localStorage.clear();sessionStorage.clear()})
-test.after(async()=>{await act(async()=>root.unmount());dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
+test.afterEach(async()=>{await act(async()=>root.unmount());dom.window.close();for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
+test.after(()=>fs.rmSync(out,{recursive:true,force:true}))
 
 test('a novice can clone, edit, train, compare and open AI help without launching work',async()=>{
- const calls=[];const props={canCloneWT:true,hasSavedDesign:false,neuronCount:123,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('edit'),onTrain:()=>calls.push('train'),onArena:()=>calls.push('compare'),onAI:()=>calls.push('ai')}
+ const calls=[];const props={canCompare:true,onCompare:()=>calls.push('compare'),canCloneWT:true,hasSavedDesign:false,neuronCount:123,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('edit'),onTrain:()=>calls.push('train'),onArena:()=>calls.push('compare'),onAI:()=>calls.push('ai')}
  await mount(PlaygroundGuide,props)
  assert.match(document.body.textContent,/123/)
  for(const label of ['Use WT','Open design','Train','Compare','Connect an AI'])await click(label)
@@ -70,7 +72,7 @@ test('a novice can clone, edit, train, compare and open AI help without launchin
  assert.match(document.body.textContent,/not identical to a real animal/)
 })
 test('guide handles unavailable WT and switches all instructions with the global language',async()=>{
- await mount(PlaygroundGuide,{canCloneWT:false,hasSavedDesign:false,onCloneWT:noop,onDesign:noop,onTrain:noop,onArena:noop,onAI:noop})
+ await mount(PlaygroundGuide,{canCompare:false,onCompare:noop,canCloneWT:false,hasSavedDesign:false,onCloneWT:noop,onDesign:noop,onTrain:noop,onArena:noop,onAI:noop})
  assert.equal(button('Use WT').disabled,true)
  assert.ok(!document.querySelector('.playground-guide__count'))
  const language=document.querySelector('select[aria-label="Language"]')
@@ -1334,32 +1336,40 @@ test('unified setup prepares WT in the single opponent selector and submits the 
  assert.match(document.querySelector('.experiment-errors').textContent,/Choose a map/)
  await click('Closed Contact Arena');assert.equal(button('Create paired match series').disabled,false)
  assert.match(document.querySelector('.experiment-plan').textContent,/exclusive center occupancy/)
- await click('Create paired match series');assert.equal(plans[1].submissions.length,2)
- assert.ok(plans[1].submissions.every(s=>s.endpoint==='/matches'&&s.body.mode==='duel'))
+ await click('Create paired match series');assert.equal(plans[1].submissions.length,1)
+ assert.ok(plans[1].submissions.every(s=>s.endpoint==='/observation-series'&&s.body.mode==='duel'))
  const language=document.querySelector('select[aria-label="Language"]')
  await act(async()=>{language.value='zh-CN';language.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
  assert.match(document.querySelector('.experiment-setup').textContent,/提交前的实验计划/)
  assert.match(document.querySelector('.experiment-plan').textContent,/相同种子和条件/)
 })
 
-test('multi-seed contact retries preserve the draft, complete plan and keys across replay focus changes',async t=>{
+// Synthetic admitted reports exercise browser recovery, not simulated performance.
+function observationFixture(body,id='contact-series'){
+ const {seeds,name,...base}=body
+ const matches=seeds.flatMap(seed=>[base.fly_ids,[...base.fly_ids].reverse()].map(fly_ids=>({request:{...base,seed,fly_ids},status:'queued',progress:0}))).map((match,i)=>({...match,id:'contact-'+i}))
+ return {id,owner:'visitor',created:1,spec:body,status:'running',observation_only:false,expected_matches:matches.length,verified_matches:0,issues:[],unexpected_match_ids:[],standings:[],matches,schedule:matches.map((m,i)=>({seed:m.request.seed,spawn_order:i%2+1,fly_ids:m.request.fly_ids,status:m.status,match_ids:[m.id],outcomes:null,issues:[],errors:[]}))}
+}
+
+test('multi-seed contact retries recover one atomic series after a lost response and preserve the editable plan',async t=>{
  const focus=dom.window.HTMLElement.prototype.focus;dom.window.HTMLElement.prototype.focus=()=>{};t.after(()=>{dom.window.HTMLElement.prototype.focus=focus})
  const canvasFile=require.resolve('./src/ArenaCanvas.js');require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:()=>null}}
  const replayFile=require.resolve('./src/features/arena/useReplay.js');require.cache[replayFile]={id:replayFile,filename:replayFile,loaded:true,exports:{useReplay:()=>({scene:null,frames:[],events:[],status:'idle',error:''})}}
  history.replaceState(null,'','#tab=arena');localStorage.clear()
- const owner={id:'visitor',name:'Explorer',token:'test-only'},writes=[],accepted=new Map();let fail=true
+ const owner={id:'visitor',name:'Explorer',token:'test-only'},writes=[],accepted=new Map()
  const maps=[{id:'orchard',name:'果园',english:'Orchard',modes:['forage','contest'],food:[],obstacles:[],size:28},{id:'duel',name:'领地场',english:'Closed Contact Arena',modes:['duel'],food:[],obstacles:[],size:18}]
  const season={connectome:{sha256:spec.connectome_sha256,neuron_count:100,edge_count:1000,circuits:[]},budget:{points:100},match_profiles:[{id:'legacy-v1',ready:true}],default_bridge_profile:'legacy-v1'}
  globalThis.fetch=async(url,options={})=>{
   const path=String(url).replace('/api/v1','')
   if(options.method==='POST'){
    if(path==='/identities')return {ok:true,json:async()=>owner}
-   assert.equal(path,'/matches');const body=JSON.parse(options.body),key=options.headers['Idempotency-Key'];writes.push({body,key})
-   if(writes.length===4&&fail){fail=false;throw Error('Measured test failure')}
-   if(!accepted.has(key))accepted.set(key,{id:'contact-'+accepted.size,status:'queued',progress:0,request:body})
+   assert.equal(path,'/observation-series');const body=JSON.parse(options.body),key=options.headers['Idempotency-Key'];writes.push({body,key})
+   if(!accepted.has(key))accepted.set(key,observationFixture(body))
+   if(writes.length===1)throw Error('Measured lost response')
    return {ok:true,json:async()=>accepted.get(key)}
   }
-  const data=path==='/auth/config'?{mode:'local'}:path==='/season'?season:path==='/flies'?[{...wt,color:'mint'},{...own,color:'amber'}]:path==='/maps'?maps:path==='/matches'?[...accepted.values()]:path==='/preview'?{}:[]
+  const reports=[...accepted.values()]
+  const data=path==='/auth/config'?{mode:'local'}:path==='/season'?season:path==='/flies'?[{...wt,color:'mint'},{...own,color:'amber'}]:path==='/maps'?maps:path==='/matches'?reports.flatMap(r=>r.matches):path==='/preview'?{}:path==='/observation-series/contact-series'?reports[0]:path.startsWith('/observation-series?')?reports:[]
   return {ok:true,json:async()=>data}
  }
  delete require.cache[require.resolve('./src/App.js')];const App=require('./src/App.js').default
@@ -1369,39 +1379,24 @@ test('multi-seed contact retries preserve the draft, complete plan and keys acro
  await click('Closed Contact Arena')
  const seeds=document.querySelector('input[aria-label="Seeds (1–3)"]')
  await act(async()=>{const props=Object.keys(seeds).find(k=>k.startsWith('__reactProps'));seeds[props].onChange({target:{value:'42,43'}})})
- assert.equal(seeds.value,'42,43')
  assert.match(document.querySelector('.experiment-plan').textContent,/4 matches · 2 simulated seconds per match · 8 simulated seconds total/)
  await click('Create paired match series');assert.equal(writes.length,0)
  await click('Create identity')
- assert.equal(writes.length,4);assert.equal(accepted.size,3)
- assert.match(document.body.textContent,/Confirmed matches: 3\/4/)
- assert.match(document.body.textContent,/Measured test failure/)
- assert.ok(document.querySelector('input[aria-label="Seeds (1–3)"]')===seeds,'Seed input must stay mounted across replay focus changes')
- assert.equal(seeds.value,'42,43')
- assert.match(location.hash,/match=contact-2/)
- const disclosure=document.querySelector('.experiment-disclosure')
- assert.equal(disclosure.open,true)
- await act(async()=>{disclosure.querySelector('summary').click();disclosure.dispatchEvent(new dom.window.Event('toggle'))})
- assert.equal(disclosure.open,false)
- await act(async()=>document.querySelectorAll('.recent-matches .match-row')[2].click())
- assert.match(location.hash,/match=contact-0/)
- assert.equal(disclosure.open,false)
- await act(async()=>{disclosure.querySelector('summary').click();disclosure.dispatchEvent(new dom.window.Event('toggle'))})
- assert.equal(disclosure.open,true)
- assert.ok(document.querySelector('input[aria-label="Seeds (1–3)"]')===seeds,'Seed input must stay mounted across replay focus changes')
- assert.equal(seeds.value,'42,43')
- assert.match(document.querySelector('.experiment-plan').textContent,/Seeds: 42, 43/)
+ assert.equal(writes.length,1);assert.equal(accepted.size,1)
+ assert.match(document.body.textContent,/Confirmed matches: 0\/4/)
+ assert.match(document.body.textContent,/Measured lost response/)
  await click('Create paired match series')
- assert.equal(writes.length,8);assert.equal(accepted.size,4)
- assert.deepEqual(writes.slice(4),writes.slice(0,4))
- assert.equal(new Set(writes.slice(0,4).map(w=>w.key)).size,4)
- assert.deepEqual(writes.slice(4).map(w=>w.body.seed),[42,42,43,43])
- assert.deepEqual(writes.slice(4).map(w=>w.body.fly_ids),[[wt.id,own.id],[own.id,wt.id],[wt.id,own.id],[own.id,wt.id]])
- assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
+ assert.equal(writes.length,2);assert.equal(accepted.size,1);assert.deepEqual(writes[1],writes[0])
+ assert.equal(location.hash,'#tab=arena&observation=contact-series')
+ assert.deepEqual(writes[1].body.seeds,[42,43]);assert.deepEqual(writes[1].body.fly_ids,[wt.id,own.id])
+ assert.match(document.body.textContent,/Observation series report/)
+ await act(async()=>document.querySelectorAll('.recent-matches .match-row')[0].click())
+ assert.match(location.hash,/match=contact-0&observation=contact-series/)
+ assert.ok(document.querySelector('input[aria-label="Seeds (1–3)"]')===seeds)
  assert.equal(seeds.value,'42,43')
 })
 
-for(const retryLogin of [false,true])test(`NyxID restores every seed and submission key before a partial contact run; retry ${retryLogin?'after another login':'in the same session'}`,async()=>{
+for(const retryLogin of [false,true])test(`NyxID restores every seed and submission key before an atomic contact plan; retry ${retryLogin?'after another login':'in the same session'}`,async()=>{
  const canvasFile=require.resolve('./src/ArenaCanvas.js');require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:()=>null}}
  const replayFile=require.resolve('./src/features/arena/useReplay.js');require.cache[replayFile]={id:replayFile,filename:replayFile,loaded:true,exports:{useReplay:()=>({scene:null,frames:[],events:[],status:'idle',error:''})}}
  history.replaceState(null,'','#tab=arena');localStorage.clear();sessionStorage.clear()
@@ -1411,15 +1406,15 @@ for(const retryLogin of [false,true])test(`NyxID restores every seed and submiss
  globalThis.fetch=async(url,options={})=>{
   const path=String(url).replace('/api/v1','')
   if(options.method==='POST'){
-   assert.equal(path,'/matches');assert.equal(options.headers['X-Arena-CSRF'],'test-csrf')
+   assert.equal(path,'/observation-series');assert.equal(options.headers['X-Arena-CSRF'],'test-csrf')
    assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43','Restore the visible draft before resuming submission')
    const body=JSON.parse(options.body),key=options.headers['Idempotency-Key'];writes.push({body,key})
-   if(writes.length===4)throw Error('NyxID restoration test failure')
-   if(!accepted.has(key))accepted.set(key,{id:'nyx-contact-'+accepted.size,status:'queued',progress:0,request:body})
+   if(!accepted.has(key))accepted.set(key,observationFixture(body))
+   if(writes.length===1)throw Error('NyxID restoration test failure')
    return {ok:true,json:async()=>accepted.get(key)}
   }
   // A hash-only login URL lets JSDOM exercise real draft persistence without external navigation.
-  const data=path==='/auth/config'?{mode:'nyxid',login_url:'#tab=arena'}:path==='/auth/session'?{authenticated,user:authenticated?owner:null,csrf_token:authenticated?'test-csrf':null}:path==='/season'?season:path==='/flies'?[{...wt,color:'mint'},{...own,color:'amber'}]:path==='/maps'?maps:path==='/matches'?[...accepted.values()]:path==='/preview'?{}:[]
+  const data=path==='/auth/config'?{mode:'nyxid',login_url:'#tab=arena'}:path==='/auth/session'?{authenticated,user:authenticated?owner:null,csrf_token:authenticated?'test-csrf':null}:path==='/season'?season:path==='/flies'?[{...wt,color:'mint'},{...own,color:'amber'}]:path==='/maps'?maps:path==='/matches'?[...accepted.values()].flatMap(r=>r.matches):path==='/preview'?{}:path==='/observation-series/contact-series'?[...accepted.values()][0]:path.startsWith('/observation-series?')?[...accepted.values()]:[]
   return {ok:true,json:async()=>data}
  }
  delete require.cache[require.resolve('./src/App.js')];const App=require('./src/App.js').default
@@ -1441,27 +1436,27 @@ for(const retryLogin of [false,true])test(`NyxID restores every seed and submiss
  assert.deepEqual(pending.setup,pending.experiment.setup)
  assert.deepEqual(pending.experiment.seeds,[42,43]);assert.equal(pending.experiment.matches.length,4)
  const keys=pending.experimentAttempt.keys
- assert.equal(new Set(keys).size,4);assert.ok(keys.every(key=>/^[0-9a-f]{32}$/.test(key)))
+ assert.equal(new Set(keys).size,1);assert.ok(keys.every(key=>/^[0-9a-f]{32}$/.test(key)))
  await returnFromLogin()
- assert.equal(writes.length,4);assert.equal(accepted.size,3)
+ assert.equal(writes.length,1);assert.equal(accepted.size,1)
  assert.deepEqual(writes.map(w=>w.key),keys)
- assert.match(document.body.textContent,/Confirmed matches: 3\/4/)
+ assert.match(document.body.textContent,/Confirmed matches: 0\/4/)
  assert.match(document.body.textContent,/NyxID restoration test failure/)
  assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43')
  assert.match(document.querySelector('.experiment-plan').textContent,/Seeds: 42, 43/)
  if(retryLogin){
   authenticated=false;await act(async()=>window.dispatchEvent(new dom.window.Event('arena:session-expired')))
-  await click('Create paired match series');assert.equal(writes.length,4)
+  await click('Create paired match series');assert.equal(writes.length,1)
   await click('Sign in with NyxID')
   const retry=JSON.parse(sessionStorage.getItem('flyarena.pendingDesign'))
   assert.deepEqual(retry.experiment,pending.experiment);assert.deepEqual(retry.experimentAttempt,pending.experimentAttempt)
   await returnFromLogin()
  }else await click('Create paired match series')
- assert.equal(writes.length,8);assert.equal(accepted.size,4)
- assert.deepEqual(writes.slice(4),writes.slice(0,4))
- assert.deepEqual(writes.slice(4).map(w=>w.body),pending.experiment.submissions.map(s=>s.body))
- assert.deepEqual(writes.slice(4).map(w=>w.body.seed),[42,42,43,43])
- assert.deepEqual(writes.slice(4).map(w=>w.body.fly_ids),[[wt.id,own.id],[own.id,wt.id],[wt.id,own.id],[own.id,wt.id]])
+ assert.equal(writes.length,2);assert.equal(accepted.size,1)
+ assert.deepEqual(writes.slice(1),writes.slice(0,1))
+ assert.deepEqual(writes.slice(1).map(w=>w.body),pending.experiment.submissions.map(s=>s.body))
+ assert.deepEqual(writes.slice(1).map(w=>w.body.seeds),[[42,43]])
+ assert.deepEqual(writes.slice(1).map(w=>w.body.fly_ids),[[wt.id,own.id]])
  assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
  assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43')
 })

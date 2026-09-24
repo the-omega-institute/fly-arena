@@ -109,7 +109,7 @@ class LifeLedger:
             children=[r[0] for r in db.execute("SELECT id FROM flies WHERE json_extract(spec,'$.parent_id')=? ORDER BY created LIMIT 100",(ident,))]
             notes=[dict(r) for r in db.execute('SELECT id,action,reason,match_id,supersedes,created FROM life_notes WHERE fly_id=? ORDER BY created,id',(ident,))]
             if origin and origin['owner']!=owner and not db.execute('SELECT 1 FROM training_publications WHERE run_id=?',(origin['id'],)).fetchone():origin=None
-        from .training import TrainingService
+        from .training import TrainingService, TrainingSpec
         training=TrainingService(self.store,None)
         public_matches={m['id']:m for m in training.gallery_matches()+training.bundled_replay_matches()
                         if ident in m.get('request',{}).get('fly_ids',[])}
@@ -173,12 +173,35 @@ class LifeLedger:
                 'continuation':{'conditions':conditions,'requires_copy':fly.get('source',{}).get('kind')=='published-training'},
                 'descendants':[self.card(c,owner) for c in children if self.visible(c,owner)],
                 'experiences':experiences,'notes':notes,
+                'wt_comparison':self.wt_comparison(fly,owner),
+                'training_strategies':TrainingSpec.model_json_schema()['properties']['strategy']['enum'],
                 'limits':{'experiences':100,'descendants':100,'ancestors':24},
                 'learning':{'birth_spec':True,'within_match_plasticity':fly['spec']['plasticity'],
                             'acquired_state_inherited':False},
                 'interpretation':'Scores apply only to their recorded conditions. Notes are researcher statements, not automatic qualification.'}
 
-    def _lineage_children(self, ident):
+    def wt_comparison(self,fly,owner=None):
+        """Only a complete server-validated paired series establishes WT comparison."""
+        with self.store.db() as db:
+            ids=[r[0] for r in db.execute("""SELECT id FROM tournaments
+                WHERE json_extract(spec,'$.mode')='contest'
+                AND EXISTS(SELECT 1 FROM json_each(spec,'$.fly_ids') WHERE value=?)
+                ORDER BY created DESC""",(fly['id'],))]
+        for ident in ids:
+            series=self.store.tournament(ident)
+            if series['status']!='complete' or len(series['spec']['fly_ids'])!=2:continue
+            rival_id=next((fid for fid in series['spec']['fly_ids'] if fid!=fly['id']),None)
+            if not rival_id or not self.visible(rival_id,owner):continue
+            rival=self.store.fly(rival_id)
+            if rival['reference_kind']!='wildtype' or any(
+                rival['spec'].get(key)!=fly['spec'].get(key) for key in ('connectome_sha256','model_profile')):continue
+            if not all(self.visible_match(match,owner) for match in series['matches']):continue
+            match=dict(series['matches'][0]);match.pop('owner',None)
+            return {'series_id':ident,'protocol_id':series['protocol_id'],'status':series['status'],
+                    'reference_id':rival_id,'match':match}
+        return None
+
+    def _lineage_children(self, ident, offset=0, exclude=None):
         """Return child ids from the immutable FlySpec parent links.
 
         Bundled gallery snapshots are read as public source records in the same
@@ -187,14 +210,14 @@ class LifeLedger:
         children=[]
         with self.store.db() as db:
             children.extend(r[0] for r in db.execute(
-                "SELECT id FROM flies WHERE json_extract(spec,'$.parent_id')=? ORDER BY created,id LIMIT 51", (ident,)))
+                "SELECT id FROM flies WHERE json_extract(spec,'$.parent_id')=? AND id!=? ORDER BY created,id LIMIT ?", (ident,exclude or "",offset+51)))
         from .training import TrainingService
         for run in TrainingService(self.store,None)._bundled_showcase():
             for member in run.get('members',[]):
                 sample=member.get('fly') or {}
                 if member.get('fly_id') and sample.get('spec',{}).get('parent_id')==ident:
                     children.append(member['fly_id'])
-        return list(dict.fromkeys(children))[:51]
+        return [child for child in dict.fromkeys(children) if child!=exclude][offset:offset+51]
 
     def _lineage_generation(self, ident, owner):
         with self.store.db() as db:
@@ -291,13 +314,14 @@ class LifeLedger:
         def redacted_id(kind, anchor):
             digest=hashlib.sha256(f'{kind}:{anchor}'.encode()).hexdigest()[:16]
             return f'redacted:{kind}:{digest}'
-        def add_marker(kind, anchor, omitted=None, relative_depth=None):
+        def add_marker(kind, anchor, omitted=None, relative_depth=None, offset=0):
             marker_id=f'truncated:{kind}:{anchor}'
             if marker_id in seen:return marker_id
             seen.add(marker_id);markers.add(marker_id)
             nodes.append({'id':marker_id,'label':'More lineage…','marker':True,'truncated':True,
                           'direction':kind,'depth':relative_depth if relative_depth is not None else (0 if kind=='siblings' else (-1 if kind=='ancestors' else 1)),
-                          'relation':kind,'omitted_count':omitted,'reference_kind':None,
+                          'relation':kind,'omitted_count':omitted,'omitted_count_is_lower_bound':True,'reference_kind':None,
+                          'continuation':f'/life/{anchor}/slice?direction={kind}&offset={offset}',
                           'evaluation_conditions':[],'evaluation_results':[],'replay_links':[]})
             return marker_id
         def add_node(node_id, relation, relative_depth, *, redacted=False, anchor=None):
@@ -367,13 +391,13 @@ class LifeLedger:
             link(ancestor,previous,'parent')
             previous=ancestor
         if current:
-            marker=add_marker('ancestors',ident,relative_depth=-steps-1)
+            marker=add_marker('ancestors',ident,relative_depth=-steps-1,offset=steps)
             link(marker,previous,'ancestor')
         # Siblings share the selected individual's parent. Private siblings are
         # represented without their id, name, owner, or design details.
         parent_id=root.get('spec',{}).get('parent_id')
         if parent_id:
-            siblings=[child for child in self._lineage_children(parent_id) if child!=ident]
+            siblings=self._lineage_children(parent_id,exclude=ident)
             if len(siblings)>50:
                 visible_siblings=siblings[:50];omitted=len(siblings)-50
             else:visible_siblings=siblings;omitted=0
@@ -387,7 +411,7 @@ class LifeLedger:
                 else:
                     private=redacted_id('sibling',ident+sibling)
                     add_node(private,'sibling',0,redacted=True);link(sibling_parent,private,'sibling')
-            if omitted:add_marker('siblings',ident,omitted)
+            if omitted:add_marker('siblings',ident,omitted,offset=50)
         # Descendant breadth is bounded at each branch; the depth query is the
         # only source of truncation, so the response cannot grow unboundedly.
         frontier=[(ident,0)]
@@ -399,9 +423,9 @@ class LifeLedger:
             if level>=depth:
                 add_marker('descendants',parent_node,len(children));link(parent_node,add_marker('descendants',parent_node,len(children)),'descendant');continue
             shown=children[:50];omitted=max(0,len(children)-50)
-            for child in shown:
+            for index,child in enumerate(shown):
                 if len(nodes)>=max_nodes:
-                    marker=add_marker('descendants',parent_node,len(children));link(parent_node,marker,'descendant');break
+                    marker=add_marker('descendants',parent_node,len(children)-index,offset=index);link(parent_node,marker,'descendant');break
                 child_level=level+1
                 if self.visible(child,owner):
                     add_node(child,'descendant',child_level);link(parent_node,child,'child');frontier.append((child,child_level))
@@ -409,13 +433,62 @@ class LifeLedger:
                     private=redacted_id('descendant',parent_node+child)
                     add_node(private,'descendant',child_level,redacted=True);link(parent_node,private,'child')
             if omitted:
-                marker=add_marker('descendants',parent_node,omitted);link(parent_node,marker,'descendant')
+                marker=add_marker('descendants',parent_node,omitted,offset=50);link(parent_node,marker,'descendant')
         # Ensure the center node is always present first for keyboard navigation
         # consumers while retaining a root-to-leaf visual order elsewhere.
         center=next(n for n in nodes if n['id']==ident)
         nodes=[center]+sorted((n for n in nodes if n is not center),key=lambda n:n['depth'])
         return {'center_id':ident,'depth':depth,'nodes':nodes,'edges':edges,
                 'truncated':list(markers),'limits':{'depth':depth,'branch':50,'nodes':len(nodes)}}
+
+    def saved(self, owner):
+        if owner is None:return []
+        with self.store.db() as db:
+            ids=[r[0] for r in db.execute("""SELECT id FROM flies f WHERE owner=? AND NOT EXISTS(
+                SELECT 1 FROM training_members m WHERE m.fly_id=f.id AND m.saved=0) ORDER BY created DESC LIMIT 200""",(owner,))]
+        return [self.store.fly(ident) for ident in ids]
+
+    def lineage_slice(self, ident, owner=None, *, direction='descendants', offset=0):
+        """Replace the view with the next bounded slice; private IDs never become cursors."""
+        if not self.visible(ident,owner):return None
+        if direction not in ('ancestors','descendants','siblings') or offset<0:raise ValueError('Invalid lineage slice')
+        root=self.store.fly(ident);parent=root['spec'].get('parent_id')
+        if direction=='ancestors':
+            ids=[];current=parent;seen={ident};index=0
+            while current and current not in seen and index<offset+51:
+                seen.add(current)
+                if index>=offset:ids.append(current)
+                fly=self.store.fly(current);current=fly['spec'].get('parent_id') if fly else None;index+=1
+        else:
+            anchor=parent if direction=='siblings' else ident
+            ids=self._lineage_children(anchor,offset,ident if direction=='siblings' else None) if anchor else []
+        def node(fid, relation, depth):
+            if self.visible(fid,owner):return self.card(fid,owner)|{'label':self.store.fly(fid)['name'],'relation':relation,'depth':depth}
+            alias=hashlib.sha256(f'{ident}:{fid}'.encode()).hexdigest()[:16]
+            return {'id':'redacted:'+alias,'label':'Private design','redacted':True,'relation':relation,'depth':depth}
+        nodes=[node(ident,'center',0)];edges=[]
+        if direction=='siblings' and parent:
+            nodes.append(node(parent,'ancestor',-1));anchor_id=nodes[-1]['id']
+            edges.append({'from':anchor_id,'to':ident,'relation':'parent'})
+        else:anchor_id=ident
+        previous=None
+        for index,fid in enumerate(ids[:50]):
+            depth=-(index+1) if direction=='ancestors' else (0 if direction=='siblings' else 1)
+            item=node(fid,'ancestor' if direction=='ancestors' else 'sibling' if direction=='siblings' else 'descendant',depth)
+            nodes.append(item)
+            if direction=='ancestors':
+                # Offset pages omit intermediate links, rather than invent ancestry.
+                target=previous or (ident if offset==0 else None)
+                if target:edges.append({'from':item['id'],'to':target,'relation':'parent'})
+                previous=item['id']
+            else:edges.append({'from':anchor_id,'to':item['id'],'relation':'child'})
+        markers=[]
+        if len(ids)>50:
+            marker=f'truncated:{direction}:{ident}:{offset+50}';markers.append(marker)
+            nodes.append({'id':marker,'label':'More lineage…','marker':True,'relation':direction,'depth':-51 if direction=='ancestors' else 1,
+                          'continuation':f'/life/{ident}/slice?direction={direction}&offset={offset+50}'})
+        return {'center_id':ident,'depth':min(50,len(ids)) if direction=='ancestors' else 1,'nodes':nodes,'edges':edges,
+                'truncated':markers,'limits':{'branch':50,'nodes':len(nodes)},'offset':offset,'direction':direction}
 
     def annotate(self,ident,owner,note,key):
         note=LifeNote.model_validate(note)

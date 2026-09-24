@@ -1,4 +1,16 @@
 export const mapsMessages = {
+  "presets.use": {"en": "Use this question", "zh-CN": "使用这个问题"},
+  "presets.selected": {"en": "Selected", "zh-CN": "已选择"},
+  "presets.title": {"en": "Start with a question", "zh-CN": "从一个问题开始"},
+  "presets.editable": {"en": "Presets only fill an editable plan. Review participants, profiles, seeds and duration before submitting; no computation starts here.", "zh-CN": "预设仅填写可编辑计划。提交前检查参与者、方案、种子与时长；此处不会启动计算。"},
+  "presets.unavailable": {"en": "This map is unavailable for this question on this deployment.", "zh-CN": "此部署没有适合此问题的地图。"},
+  "presets.scarcity.question": {"en": "Does my fly win scarce food against WT?", "zh-CN": "我的果蝇能在稀缺食物竞争中胜过 WT 吗？"},
+  "presets.scarcity.scope": {"en": "Scarcity · paired food competition with swapped positions. Compares verified consumption under these conditions, not general superiority. WT is the server-owned unmodified model reference; if no compatible WT exists, choose a saved subject with a compatible reference.", "zh-CN": "稀缺资源 · 换位配对食物竞争。比较这些条件下经验证的摄取量，不能证明普遍优势。WT 为服务器记录的未修改模型参考；若无兼容 WT，请选择具有兼容参考的保存果蝇。"},
+  "presets.center.question": {"en": "Who holds the center?", "zh-CN": "谁占据中央区域？"},
+  "presets.center.scope": {"en": "Duel · swapped contact-territory pair. Scores exclusive center occupancy in seconds; contested occupancy earns neither fly points. Physical contact is recorded separately. No natural aggression, attack or injury actions are modeled.", "zh-CN": "领地对照 · 换位接触领地配对。独占中央区域按秒计分；共同占据时双方均不得分。物理接触另行记录。未建模自然攻击、攻击动作或伤害。"},
+  "presets.maze.question": {"en": "How does my fly explore the maze?", "zh-CN": "我的果蝇如何探索迷宫？"},
+  "presets.maze.scope": {"en": "Labyrinth · solo observation across three seeds. Inspect recorded paths and goal contact, including failure to arrive. No scoring or competitive winner (#82); arrival is not validated navigation, learning or memory. The analytic odor field passes through walls. This editable short plan is not the preregistered five-seed 180-second study.", "zh-CN": "迷宫 · 三个种子的单蝇观察。检查记录的路径与终点接触，包括未到达的情况。不计分、无竞技胜者（#82）；到达不代表已验证导航、学习或记忆。解析气味场会穿墙。此可编辑短计划不是预注册的五种子 180 秒研究。"},
+
   "Map purpose and suitability": {
     "en": "Map purpose and suitability",
     "zh-CN": "地图用途与适用性"

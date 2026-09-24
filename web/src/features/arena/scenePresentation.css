@@ -33,3 +33,4 @@
 [data-theme=dark] .scene-plan-food{color:#edbd66}
 [data-theme=dark] .scene-plan-ring{stroke:#d8ba6f}
 @media(max-width:600px){.scene-presentation-toolbar{padding:4px 8px;font-size:10px}.scene-plan-legend{font-size:9px;padding:4px 8px}}
+.scene-presentation,.scene-presentation-viewport{min-width:0;max-width:100%;box-sizing:border-box}

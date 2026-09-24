@@ -94,20 +94,21 @@ const {createRequire}=await import('node:module'),{default:React,act}=await impo
 const web=new URL('../',import.meta.url).pathname,out=fs.mkdtempSync(path.join(os.tmpdir(),'probe-controls-'))
 fs.writeFileSync(path.join(out,'package.json'),'{"type":"commonjs"}')
 fs.symlinkSync(fs.realpathSync(path.join(web,'node_modules')),path.join(out,'node_modules'))
-for(const relative of ['src/features/arena/obstacleGeometry.ts','src/features/phenotype/ProbeScene3D.tsx','src/features/phenotype/probeScene.ts','src/shared/research.ts','src/shared/theme.ts','src/shared/messages/lab3d.ts']){
+for(const relative of ['src/shared/SceneAvailability.tsx','src/shared/messages/scene.ts','src/features/arena/obstacleGeometry.ts','src/features/phenotype/ProbeScene3D.tsx','src/features/phenotype/probeScene.ts','src/shared/research.ts','src/shared/theme.ts','src/shared/messages/lab3d.ts']){
  const dest=path.join(out,relative.replace(/\.tsx?$/,'.js'));fs.mkdirSync(path.dirname(dest),{recursive:true})
  fs.writeFileSync(dest,ts.transpileModule(fs.readFileSync(path.join(web,relative),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText)
 }
 fs.writeFileSync(path.join(out,'src/features/phenotype/probeScene.css'),'')
+fs.writeFileSync(path.join(out,'src/shared/sceneAvailability.css'),'')
 fs.mkdirSync(path.join(out,'src/features/arena'),{recursive:true})
 fs.writeFileSync(path.join(out,'src/features/arena/Habitat.js'),'exports.Habitat=()=>null')
-fs.writeFileSync(path.join(out,'src/shared/i18n.js'),"const {lab3dMessages}=require('./messages/lab3d'); exports.useI18n=()=>({resolved:'dark',t:key=>lab3dMessages[key]?.[globalThis.probeTestLocale]||key})")
+fs.writeFileSync(path.join(out,'src/shared/i18n.js'),"const {lab3dMessages}=require('./messages/lab3d'); const {sceneMessages}=require('./messages/scene'); exports.useI18n=()=>({resolved:'dark',t:key=>(sceneMessages[key]||lab3dMessages[key])?.[globalThis.probeTestLocale]||key})")
 const require=createRequire(path.join(out,'package.json'));require.extensions['.css']=()=>{}
-let canvasProps=null,canvasFailure=false
+let canvasProps=null,canvasFailure=false,renderFrame=null
 const canvasEvents=new EventTarget()
 const fiberFile=require.resolve('@react-three/fiber')
 const originalFiber=require.cache[fiberFile]
-require.cache[fiberFile]={id:fiberFile,filename:fiberFile,loaded:true,exports:{Canvas:props=>{canvasProps=props;if(canvasFailure)throw Error('TEST renderer failure');return React.createElement('div',{'data-test-canvas':true},React.Children.toArray(props.children).find(child=>child.type?.name==='ContextGuard'))},useThree:selector=>selector({gl:{domElement:canvasEvents}})}}
+require.cache[fiberFile]={id:fiberFile,filename:fiberFile,loaded:true,exports:{Canvas:props=>{canvasProps=props;if(canvasFailure)throw Error('TEST renderer failure');return React.createElement('div',{'data-test-canvas':true},React.Children.toArray(props.children).find(child=>child.type?.name==='SceneRendererGuard'))},useThree:selector=>selector({gl:{domElement:canvasEvents,getContext:()=>({isContextLost:()=>false})}}),useFrame:fn=>{renderFrame=fn}}}
 const {ProbeScene3D}=require('./src/features/phenotype/ProbeScene3D.js')
 if(originalFiber)require.cache[fiberFile]=originalFiber;else delete require.cache[fiberFile]
 const globalKeys=['window','document','navigator','IS_REACT_ACT_ENVIRONMENT','probeTestLocale']
@@ -171,16 +172,28 @@ uiTest('missing or conflicting geometry cannot mount a 3D canvas and keeps faile
 uiTest('WebGL context loss falls back to 2D and preserves visible failure explanation',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount();await act(async()=>canvasEvents.dispatchEvent(new Event('webglcontextlost',{cancelable:true})))
- assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL unavailable/);assert.equal(button('3D').disabled,true)
+ assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL context lost/);assert.equal(button('3D').disabled,true)
 })
 uiTest('renderer startup exceptions fall back to the plan without crashing the lab',async()=>{
  dom.window.WebGL2RenderingContext=class {};canvasFailure=true
  const original=console.error;console.error=()=>{}
  try{await mount()}finally{console.error=original}
- assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL unavailable/)
+ assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/renderer failed/)
 })
 uiTest('3D explanatory notes and fallback controls follow the Chinese catalog',async()=>{
  globalThis.probeTestLocale='zh-CN';dom.window.WebGL2RenderingContext=class {}
  await mount();assert.match(document.body.textContent,/已记录的平面轨迹/);assert.ok(button('2D 平面图'))
  await mount({reports:[]});assert.match(document.body.textContent,/探针几何记录不可用/)
+})
+
+uiTest('runtime rendering failure and retry preserve seed, time and failed report status',async()=>{
+ dom.window.WebGL2RenderingContext=class {}
+ const failedReports=reports.map(r=>({...r,seed:43,status:'failed'}))
+ await mount({reports:failedReports,seed:43,time:1.5})
+ await act(async()=>renderFrame({gl:{render(){throw Error('TEST frame failure')}},scene:{},camera:{}}))
+ assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/renderer failed/);assert.match(document.body.textContent,/failed/)
+ await click('Retry 3D')
+ const world=React.Children.toArray(canvasProps.children).find(child=>child.type?.name==='ProbeWorld').props
+ assert.equal(world.time,1.5);assert.deepEqual(world.tracks,adaptProbeScene(failedReports,subjects,43).tracks);assert.equal(world.tracks[0].status,'failed')
+ assert.ok(document.querySelector('[data-test-canvas]'))
 })

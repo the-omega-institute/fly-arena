@@ -17,3 +17,11 @@
 
 .experiment-disclosure{grid-column:1/-1;min-width:0}.experiment-disclosure>summary{cursor:pointer;padding:12px 16px;font-size:12px;color:var(--text-muted)}
 .experiment-disclosure>.experiment-setup{display:block}.experiment-disclosure[open]>summary{margin-bottom:8px}
+
+.experiment-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:16px 0 24px}
+.experiment-preset{display:flex;flex-direction:column;padding:16px;border:1px solid var(--line);border-radius:8px;background:var(--paper);min-width:0}
+.experiment-preset.selected{border-color:var(--accent,#39745b);box-shadow:inset 0 0 0 1px var(--accent,#39745b)}
+.experiment-preset h4{font-size:14px;line-height:1.5;margin:0}.experiment-preset .capability-note{flex:1}
+.experiment-preset button{align-self:flex-start;border:1px solid currentColor;padding:9px 12px;border-radius:6px;font-weight:600}
+.experiment-preset button:focus-visible{outline:3px solid var(--accent,#39745b);outline-offset:3px}
+@media(max-width:900px){.experiment-presets{grid-template-columns:1fr}}
