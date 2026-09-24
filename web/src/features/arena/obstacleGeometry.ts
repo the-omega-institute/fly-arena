@@ -1,12 +1,37 @@
 import {createElement,useLayoutEffect,useMemo,useRef} from 'react'
 import * as THREE from 'three'
-import type {ArenaObstacle} from '../../types'
+import type {ArenaGeometryContract,ArenaObstacle} from '../../types'
+
+export const arenaGeometryContract: ArenaGeometryContract = {id:'arena-geometry-v1',units:'mm',worldAxes:{x:'east',y:'north',z:'up'},quaternionOrder:'wxyz'}
 
 export type ObstacleGeometry={
   position:[number,number,number]
   size:[number,number,number]
   quaternion:[number,number,number,number]
   shape:'box'|'ellipsoid'
+}
+
+const finite=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value)
+const vector=(value:unknown,length:number):value is number[]=>Array.isArray(value)&&value.length===length&&value.every(finite)
+
+/** Strict boundary validator shared by map and research scene consumers. */
+export function validateObstacleGeometry(value:unknown):value is ArenaObstacle{
+ if(!value||typeof value!=='object')return false
+ const obstacle=value as Record<string,unknown>
+ if(!vector(obstacle.position,3)||!vector(obstacle.size,3)||obstacle.size.some(n=>n<=0))return false
+ if(obstacle.shape!==undefined&&obstacle.shape!=='box'&&obstacle.shape!=='ellipsoid')return false
+ if(obstacle.quaternion!==undefined&&(!vector(obstacle.quaternion,4)||Math.hypot(...obstacle.quaternion)===0))return false
+ if(obstacle.material!==undefined&&!['leaf','rock','fruit'].includes(String(obstacle.material)))return false
+ if(obstacle.color!==undefined&&(typeof obstacle.color!=='string'||!obstacle.color))return false
+ return true
+}
+
+/** Convert MuJoCo wxyz to three.js xyzw after strict validation. */
+export function normalizeObstacleGeometry(value:unknown):ObstacleGeometry{
+ if(!validateObstacleGeometry(value))throw new Error('Invalid arena obstacle geometry')
+ const obstacle=value as ArenaObstacle
+ const q=obstacle.quaternion||[1,0,0,0],length=Math.hypot(...q)
+ return {position:[...obstacle.position] as [number,number,number],size:[...obstacle.size] as [number,number,number],quaternion:[q[1]/length,q[2]/length,q[3]/length,q[0]/length],shape:obstacle.shape||'box'}
 }
 
 /** Backend centers/full diameters and wxyz rotations, in the recorded world axes. */

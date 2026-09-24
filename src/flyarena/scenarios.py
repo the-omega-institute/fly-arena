@@ -5,6 +5,7 @@ import math
 import numpy as np
 
 from .common import digest
+from .geometry import normalize_arena_scene
 
 VISUAL_OBSERVATION = {
     "id": "raycast_engineered_bilateral_head_v2",
@@ -253,6 +254,9 @@ def scenario(map_id: str, seed: int) -> dict:
     result["food"] = [dict(id=f"food-{i}", position=[float(x + rng.uniform(-.25, .25)),
                         float(y + rng.uniform(-.25, .25)), result.get("food_heights", [.15]*len(result["food"]))[i]], initial=result.get("food_units", 10.0))
                       for i, (x, y) in enumerate(result["food"])]
+    # Validate at the serialization boundary while preserving the historical
+    # dictionary representation and therefore its digest.
+    normalize_arena_scene(result)
     result["sha256"] = digest(result)
     return result
 
@@ -269,6 +273,7 @@ def arena_scene(map_id: str, seed: int, bridge_profile: str = "legacy-v1") -> di
     # Fixed mirrored headings are independent of targets and contestant identity.
     for spawn in result["spawns"]:
         spawn[2] += .65
+    normalize_arena_scene(result)
     result["sha256"] = digest(result)
     return result
 

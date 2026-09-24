@@ -6,16 +6,22 @@ export type ProbeTrack={subject:ExperimentSubject;status:string;segments:Traject
 const finite=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n)
 const vector=(v:unknown,n:number):v is number[]=>Array.isArray(v)&&v.length===n&&v.every(finite)
 const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'
+// Keep the same strict predicate as obstacleGeometry.ts inline: this module is
+// also loaded as a standalone data URL by the no-bundler probe test.
+const validateObstacleGeometry=(value:unknown):value is ArenaObstacle=>{
+ if(!record(value)||!vector(value.position,3)||!vector(value.size,3)||value.size.some(n=>n<=0))return false
+ if(value.shape!==undefined&&value.shape!=='box'&&value.shape!=='ellipsoid')return false
+ if(value.quaternion!==undefined&&(!vector(value.quaternion,4)||Math.hypot(...value.quaternion)===0))return false
+ if(value.material!==undefined&&!['leaf','rock','fruit'].includes(String(value.material)))return false
+ return value.color===undefined||(typeof value.color==='string'&&!!value.color)
+}
 
 /** Never fill absent coordinates or dimensions with plausible scene defaults. */
 export function probeGeometry(value:unknown):ProbeGeometry|null{
  if(!record(value)||!finite(value.size)||value.size<=0||!Array.isArray(value.obstacles)||!Array.isArray(value.food)||!Array.isArray(value.spawns))return null
  const obstacles:ArenaObstacle[]=[]
  for(const o of value.obstacles){
-  if(!record(o)||!vector(o.position,3)||!vector(o.size,3)||o.size.some(n=>n<=0))return null
-  if(o.shape!==undefined&&o.shape!=='box'&&o.shape!=='ellipsoid')return null
-  if(o.quaternion!==undefined&&(!vector(o.quaternion,4)||Math.hypot(...o.quaternion)===0))return null
-  if(o.material!==undefined&&!['leaf','rock','fruit'].includes(String(o.material)))return null
+  if(!record(o)||!validateObstacleGeometry(o))return null
   obstacles.push({position:[...o.position],size:[...o.size],...(o.shape?{shape:o.shape as ArenaObstacle['shape']}:{}),...(o.quaternion?{quaternion:[...o.quaternion as number[]]}:{}),...(o.material?{material:o.material as ArenaObstacle['material']}:{}),...(typeof o.color==='string'?{color:o.color}:{})})
  }
  const food:ProbeGeometry['food']=[]

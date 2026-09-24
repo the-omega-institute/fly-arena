@@ -31,6 +31,7 @@ from .runner import runtime_manifest
 from .experiments.embodied_sensor import catalog as sensory_catalog
 from .bridge import match_profiles, require_bridge, training_profiles, require_training_bridge
 from .scenarios import MAPS, MAP_METADATA, RULES, scenario, arena_scene
+from .geometry import normalize_arena_scene
 from .store import Store
 from .worker import Worker
 from .research import ExperimentSpec
@@ -210,7 +211,9 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                     bridge_profile: str = "legacy-v1"):
         if map_id not in MAPS:
             raise HTTPException(404, "Unknown map")
-        return {**arena_scene(map_id, seed, bridge_profile), "metadata": MAP_METADATA.get(map_id, {})}
+        scene = arena_scene(map_id, seed, bridge_profile)
+        normalize_arena_scene(scene)
+        return {**scene, "metadata": MAP_METADATA.get(map_id, {})}
 
     @app.get("/api/v1/flies")
     def flies():
