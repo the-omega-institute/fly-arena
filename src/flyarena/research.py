@@ -7,6 +7,7 @@ import numpy as np
 from pydantic import Field, StrictInt, model_validator
 from .common import digest
 from .contracts import StrictModel, InterventionSpec
+from .geometry import normalize_obstacle, validate_probe_scene
 
 
 class BackendProfile(StrictModel):
@@ -91,6 +92,15 @@ class TrajectoryPoint(StrictModel):
 class SceneObstacle(StrictModel):
     position: list[float] = Field(min_length=3, max_length=3)
     size: list[float] = Field(min_length=3, max_length=3)
+    shape: Literal['box', 'ellipsoid'] | None = None
+    quaternion: list[float] | None = Field(default=None, min_length=4, max_length=4)
+    material: Literal['leaf', 'rock', 'fruit'] | None = None
+    color: str | None = None
+
+    @model_validator(mode='after')
+    def valid_geometry(self):
+        normalize_obstacle(self.model_dump(exclude_none=True))
+        return self
 
 
 class SceneFood(StrictModel):
@@ -119,6 +129,7 @@ class ProbeScene(StrictModel):
             raise ValueError('Scene requires finite x/y/yaw spawns')
         if len({f.id for f in self.food}) != len(self.food) or any(min(o.size) <= 0 for o in self.obstacles):
             raise ValueError('Invalid scene food identities or obstacle size')
+        validate_probe_scene(self.model_dump(exclude_none=True))
         return self
 
 

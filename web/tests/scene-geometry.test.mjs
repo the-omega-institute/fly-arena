@@ -73,7 +73,7 @@ test('rotated non-habitat box and ellipsoid use the same unit geometry transform
  const size=ellipsoid.boundingBox.getSize(new THREE.Vector3())
  for(const [i,value] of [6,2,4].entries())assert.ok(Math.abs(size.getComponent(i)-value)<1e-5)
  ellipsoid.dispose()
- assert.deepEqual(obstacleGeometry({position:[0,0,0],size:[1,1,1],quaternion:[0,0,0,0]}).quaternion,[0,0,0,1])
+ assert.throws(()=>obstacleGeometry({position:[0,0,0],size:[1,1,1],quaternion:[0,0,0,0]}),/Invalid arena obstacle geometry/)
 })
 
 test('leaf ramps rise toward their bridge and enclosure walls retain tangent headings',()=>{

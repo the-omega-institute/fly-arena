@@ -22,7 +22,7 @@ export function LifeEventTimeline({events,slot,time,onSelect,label}:{events:Repl
     <div className="life-event-rows">{shown.rows.map((event,index)=><button key={`${shown.start+index}:${event.tick}:${event.type}`} aria-current={event===lastObserved?'step':undefined} onClick={()=>onSelect(event)}>
       <span>{(event.tick*.0001).toFixed(2)}s</span>{label(event)}{event.objects?.length?' · '+event.objects.join(', '):''}
     </button>)}</div>
-    {!filtered.length?<small>{t('No events in this category.')}</small>:<div className="life-event-pager">
+    {!filtered.length?<small>{t(lifeEvents(events,slot).length?'No events in this category.':'No event receipts were recorded for this participant. Sampled behavior remains available below.')}</small>:<div className="life-event-pager">
       <button aria-label={t('Earlier events')} disabled={shown.page===0} onClick={()=>setPage(shown.page-1)}>← {t('Earlier events')}</button>
       <span aria-live="polite">{shown.start+1}–{shown.start+shown.rows.length} / {filtered.length}</span>
       <button aria-label={t('Later events')} disabled={shown.page===shown.pages-1} onClick={()=>setPage(shown.page+1)}>{t('Later events')} →</button>

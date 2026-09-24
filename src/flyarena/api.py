@@ -31,6 +31,7 @@ from .runner import runtime_manifest
 from .experiments.embodied_sensor import catalog as sensory_catalog
 from .bridge import match_profiles, require_bridge, training_profiles, require_training_bridge
 from .scenarios import MAPS, MAP_METADATA, RULES, scenario, arena_scene
+from .geometry import normalize_arena_scene
 from .store import Store
 from .worker import Worker
 from .research import ExperimentSpec
@@ -196,6 +197,13 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         if result is None:raise HTTPException(404,'Experience not found')
         return result
 
+    @app.get('/api/v1/life/{ident}/lineage')
+    @app.get('/api/v1/lives/{ident}/lineage')
+    def life_lineage(ident: str, depth: int = Query(default=3, ge=0, le=6), owner=Depends(optional_identity)):
+        result=ledger.lineage(ident,owner,depth)
+        if result is None:raise HTTPException(404,'Life record not found')
+        return result
+
     @app.post('/api/v1/lives/{ident}/notes',status_code=201)
     def life_note(ident: str, body: LifeNote, owner: dict = Depends(identity),
                   idempotency_key: str | None = Header(default=None)):
@@ -210,7 +218,9 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                     bridge_profile: str = "legacy-v1"):
         if map_id not in MAPS:
             raise HTTPException(404, "Unknown map")
-        return {**arena_scene(map_id, seed, bridge_profile), "metadata": MAP_METADATA.get(map_id, {})}
+        scene = arena_scene(map_id, seed, bridge_profile)
+        normalize_arena_scene(scene)
+        return {**scene, "metadata": MAP_METADATA.get(map_id, {})}
 
     @app.get("/api/v1/flies")
     def flies():

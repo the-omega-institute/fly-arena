@@ -1,3 +1,4 @@
+import {validateObstacleGeometry} from '../arena/obstacleGeometry'
 import type {ArenaObstacle} from '../../types'
 import type {ExperimentSubject,ProbeReport,TrajectoryPoint} from '../../shared/research'
 
@@ -6,16 +7,12 @@ export type ProbeTrack={subject:ExperimentSubject;status:string;segments:Traject
 const finite=(n:unknown):n is number=>typeof n==='number'&&Number.isFinite(n)
 const vector=(v:unknown,n:number):v is number[]=>Array.isArray(v)&&v.length===n&&v.every(finite)
 const record=(v:unknown):v is Record<string,unknown>=>!!v&&typeof v==='object'
-
 /** Never fill absent coordinates or dimensions with plausible scene defaults. */
 export function probeGeometry(value:unknown):ProbeGeometry|null{
  if(!record(value)||!finite(value.size)||value.size<=0||!Array.isArray(value.obstacles)||!Array.isArray(value.food)||!Array.isArray(value.spawns))return null
  const obstacles:ArenaObstacle[]=[]
  for(const o of value.obstacles){
-  if(!record(o)||!vector(o.position,3)||!vector(o.size,3)||o.size.some(n=>n<=0))return null
-  if(o.shape!==undefined&&o.shape!=='box'&&o.shape!=='ellipsoid')return null
-  if(o.quaternion!==undefined&&(!vector(o.quaternion,4)||Math.hypot(...o.quaternion)===0))return null
-  if(o.material!==undefined&&!['leaf','rock','fruit'].includes(String(o.material)))return null
+  if(!record(o)||!validateObstacleGeometry(o))return null
   obstacles.push({position:[...o.position],size:[...o.size],...(o.shape?{shape:o.shape as ArenaObstacle['shape']}:{}),...(o.quaternion?{quaternion:[...o.quaternion as number[]]}:{}),...(o.material?{material:o.material as ArenaObstacle['material']}:{}),...(typeof o.color==='string'?{color:o.color}:{})})
  }
  const food:ProbeGeometry['food']=[]

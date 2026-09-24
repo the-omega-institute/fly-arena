@@ -1,10 +1,20 @@
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import ts from 'typescript'
 
-const {outputText}=ts.transpileModule(fs.readFileSync(new URL('../src/features/phenotype/probeScene.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}})
-const {probeGeometry,probeSegments,probeSampleAt,adaptProbeScene,probeFraming}=await import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'))
+const adapterOut=fs.mkdtempSync(path.join(os.tmpdir(),'probe-scene-'))
+fs.writeFileSync(path.join(adapterOut,'package.json'),'{"type":"commonjs"}')
+fs.symlinkSync(fs.realpathSync(new URL('../node_modules',import.meta.url)),path.join(adapterOut,'node_modules'))
+for(const folder of ['arena','phenotype'])fs.mkdirSync(path.join(adapterOut,folder))
+for(const file of ['arena/obstacleGeometry','phenotype/probeScene']){
+ const source=fs.readFileSync(new URL('../src/features/'+file+'.ts',import.meta.url),'utf8')
+ fs.writeFileSync(path.join(adapterOut,file+'.js'),ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)
+}
+const {probeGeometry,probeSegments,probeSampleAt,adaptProbeScene,probeFraming}=await import(path.join(adapterOut,'phenotype/probeScene.js'))
+test.after(()=>fs.rmSync(adapterOut,{recursive:true,force:true}))
 // Synthetic inputs exercise rendering contracts, not measured biological results.
 const subjects=['wildtype','official','design'].map(role=>({role,fly_id:role,artifact_id:role+'-artifact',name:role}))
 const scene={size:80,spawns:[[0,0,Math.PI/2]],obstacles:[{position:[10,0,1.5],size:[1,5,3]}],food:[{id:'test-food',position:[7,5,.15],initial:10}]}
@@ -80,12 +90,11 @@ test('camera includes arena and outlying recorded positions; spawn yaw is not el
 })
 
 // Exercise real view controls; mock only the GPU boundary, never the adapter or clock.
-const {default:os}=await import('node:os'),{default:path}=await import('node:path')
 const {createRequire}=await import('node:module'),{default:React,act}=await import('react'),{createRoot}=await import('react-dom/client'),{JSDOM}=await import('jsdom')
 const web=new URL('../',import.meta.url).pathname,out=fs.mkdtempSync(path.join(os.tmpdir(),'probe-controls-'))
 fs.writeFileSync(path.join(out,'package.json'),'{"type":"commonjs"}')
 fs.symlinkSync(fs.realpathSync(path.join(web,'node_modules')),path.join(out,'node_modules'))
-for(const relative of ['src/features/phenotype/ProbeScene3D.tsx','src/features/phenotype/probeScene.ts','src/shared/research.ts','src/shared/theme.ts','src/shared/messages/lab3d.ts']){
+for(const relative of ['src/features/arena/obstacleGeometry.ts','src/features/phenotype/ProbeScene3D.tsx','src/features/phenotype/probeScene.ts','src/shared/research.ts','src/shared/theme.ts','src/shared/messages/lab3d.ts']){
  const dest=path.join(out,relative.replace(/\.tsx?$/,'.js'));fs.mkdirSync(path.dirname(dest),{recursive:true})
  fs.writeFileSync(dest,ts.transpileModule(fs.readFileSync(path.join(web,relative),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText)
 }
@@ -101,26 +110,44 @@ const originalFiber=require.cache[fiberFile]
 require.cache[fiberFile]={id:fiberFile,filename:fiberFile,loaded:true,exports:{Canvas:props=>{canvasProps=props;if(canvasFailure)throw Error('TEST renderer failure');return React.createElement('div',{'data-test-canvas':true},React.Children.toArray(props.children).find(child=>child.type?.name==='ContextGuard'))},useThree:selector=>selector({gl:{domElement:canvasEvents}})}}
 const {ProbeScene3D}=require('./src/features/phenotype/ProbeScene3D.js')
 if(originalFiber)require.cache[fiberFile]=originalFiber;else delete require.cache[fiberFile]
-const dom=new JSDOM('<!doctype html><main id="root"></main>',{url:'http://probe.test/'})
 const globalKeys=['window','document','navigator','IS_REACT_ACT_ENVIRONMENT','probeTestLocale']
-const originals=Object.fromEntries(globalKeys.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
-for(const k of ['window','document','navigator'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
-globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.probeTestLocale='en'
-dom.window.HTMLCanvasElement.prototype.getContext=()=>({getExtension:()=>({loseContext(){}})})
-let root=createRoot(document.getElementById('root'))
 const props={reports,subjects,seed:42,time:0,fallback:React.createElement('svg',{'data-plan':true})}
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text)
+let root=null,dom=null
 async function mount(overrides={}){await act(async()=>root.render(React.createElement(ProbeScene3D,{...props,...overrides})))}
 async function click(text){await act(async()=>button(text).click())}
-test.afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'));canvasProps=null;canvasFailure=false;globalThis.probeTestLocale='en';delete dom.window.WebGL2RenderingContext})
-test.after(async()=>{await act(async()=>root.unmount());dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
+async function withDom(fn){
+ const originals=Object.fromEntries(globalKeys.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+ dom=new JSDOM('<!doctype html><main id="root"></main>',{url:'http://probe.test/'})
+ try{
+  for(const k of ['window','document','navigator'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.probeTestLocale='en'
+  dom.window.HTMLCanvasElement.prototype.getContext=()=>({getExtension:()=>({loseContext(){}})})
+  root=createRoot(document.getElementById('root'));canvasProps=null;canvasFailure=false
+  await fn()
+ }finally{
+  try{if(root)await act(async()=>root.unmount())}finally{
+   dom.window.close();root=null;dom=null;canvasProps=null;canvasFailure=false
+   for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}
+  }
+ }
+}
+const uiTest=(name,fn)=>test(name,{concurrency:false},()=>withDom(fn))
+test.after(()=>fs.rmSync(out,{recursive:true,force:true}))
 
-test('view automatically falls back to the 2D slot when WebGL is absent',async()=>{
+test('UI fixture restores global descriptors even when a mounted test fails',async()=>{
+ const originals=globalKeys.map(k=>Object.getOwnPropertyDescriptor(globalThis,k))
+ await assert.rejects(withDom(async()=>{await mount();throw Error('TEST assertion failure')}),/TEST assertion failure/)
+ assert.deepEqual(globalKeys.map(k=>Object.getOwnPropertyDescriptor(globalThis,k)),originals)
+ assert.equal(root,null);assert.equal(dom,null)
+})
+
+uiTest('view automatically falls back to the 2D slot when WebGL is absent',async()=>{
  await mount();assert.ok(document.querySelector('[data-plan]'));assert.equal(button('3D').disabled,true)
  assert.equal(button('2D plan').getAttribute('aria-pressed'),'true');assert.match(document.body.textContent,/WebGL unavailable/)
  assert.equal(canvasProps,null)
 })
-test('3D toggle and selected seed use the external shared clock without resetting it',async()=>{
+uiTest('3D toggle and selected seed use the external shared clock without resetting it',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount();assert.ok(document.querySelector('[data-test-canvas]'));assert.equal(button('3D').getAttribute('aria-pressed'),'true')
  assert.match(document.body.textContent,/Recorded planar trajectories/)
@@ -134,25 +161,25 @@ test('3D toggle and selected seed use the external shared clock without resettin
  await mount({reports:[...reports,...later],seed:43,time:1.5});assert.equal(world().tracks[0].segments[0][0].x,10)
  await mount({time:4});assert.equal(document.body.textContent.match(/No recorded position at shared time/g).length,3)
 })
-test('missing or conflicting geometry cannot mount a 3D canvas and keeps failed status visible',async()=>{
+uiTest('missing or conflicting geometry cannot mount a 3D canvas and keeps failed status visible',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount({reports:[{...reports[0],scene:undefined,status:'failed'}]})
  assert.ok(document.querySelector('[data-plan]'));assert.equal(button('3D').disabled,true);assert.match(document.body.textContent,/geometry unavailable/);assert.match(document.body.textContent,/failed/)
  await mount({reports:[reports[0],{...reports[1],scene:{...scene,size:10}}]})
  assert.match(document.body.textContent,/geometry conflicts/);assert.equal(canvasProps,null)
 })
-test('WebGL context loss falls back to 2D and preserves visible failure explanation',async()=>{
+uiTest('WebGL context loss falls back to 2D and preserves visible failure explanation',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount();await act(async()=>canvasEvents.dispatchEvent(new Event('webglcontextlost',{cancelable:true})))
  assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL unavailable/);assert.equal(button('3D').disabled,true)
 })
-test('renderer startup exceptions fall back to the plan without crashing the lab',async()=>{
+uiTest('renderer startup exceptions fall back to the plan without crashing the lab',async()=>{
  dom.window.WebGL2RenderingContext=class {};canvasFailure=true
  const original=console.error;console.error=()=>{}
  try{await mount()}finally{console.error=original}
  assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL unavailable/)
 })
-test('3D explanatory notes and fallback controls follow the Chinese catalog',async()=>{
+uiTest('3D explanatory notes and fallback controls follow the Chinese catalog',async()=>{
  globalThis.probeTestLocale='zh-CN';dom.window.WebGL2RenderingContext=class {}
  await mount();assert.match(document.body.textContent,/已记录的平面轨迹/);assert.ok(button('2D 平面图'))
  await mount({reports:[]});assert.match(document.body.textContent,/探针几何记录不可用/)

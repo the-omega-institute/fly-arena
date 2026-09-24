@@ -1,5 +1,6 @@
 import {ReplayCamera} from './features/arena/ReplayCamera'
 import {ArenaWorldLabel} from './features/arena/ArenaWorldLabel'
+import {replayLabelHidden} from './features/arena/replayInspector'
 import {useEffect,useMemo,useRef} from 'react'
 import {Canvas,useFrame,useThree} from '@react-three/fiber'
 import {OrbitControls,Grid,Html} from '@react-three/drei'
@@ -10,12 +11,17 @@ import {sceneThemes} from './shared/theme'
 import {colors} from './types'
 import {Habitat} from './features/arena/Habitat'
 import {ArenaObstacles,arenaBounds} from './features/arena/obstacleGeometry'
-import {sceneFraming,sceneGrid,recordedCameraTarget,replayLabelOpacity} from './features/arena/followCamera'
+import {previewSceneFraming,sceneFraming,sceneGrid,recordedCameraTarget,replayLabelOpacity} from './features/arena/followCamera'
 
 function ReplayLabel({fly,slot,frame,next,alpha,selected,identity,follow}:{fly:Scene['flies'][number];slot:number;frame:Frame;next?:Frame;alpha:number;selected:boolean;identity?:string;follow:boolean}){
  const label=useRef<HTMLDivElement>(null),point=useMemo(()=>new THREE.Vector3(),[])
  const position=recordedCameraTarget(frame,next,alpha,slot)
- useFrame(({camera})=>{if(label.current&&position)label.current.style.opacity=String(replayLabelOpacity(camera.position.distanceTo(point.set(...position)),follow))})
+ useFrame(({camera,gl})=>{
+  if(!label.current||!position)return
+  const hud=gl.domElement.closest('.arena-stage')?.querySelector('.score-overlay')
+  label.current.style.visibility=replayLabelHidden(label.current.getBoundingClientRect(),gl.domElement.getBoundingClientRect(),hud?.getBoundingClientRect())?'hidden':'visible'
+  label.current.style.opacity=String(replayLabelOpacity(camera.position.distanceTo(point.set(...position)),follow))
+ })
  if(!position)return null
  return <Html position={position} style={{pointerEvents:'none'}}><div ref={label} className="replay-label-anchor"><ArenaWorldLabel fly={fly} slot={slot} selected={selected} identity={identity} compact/></div></Html>
 }
@@ -89,7 +95,7 @@ function ArenaScene({preview,scene,frame,next,alpha=0,color='mint',design=false,
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
   const world=scene||layout
-  const framing=useMemo(()=>sceneFraming(world?arenaBounds(world):{min:[-5,-5,-.25],max:[5,5,2]},viewport.width/Math.max(1,viewport.height),design?33:40,!!world?.task),[world,viewport.width,viewport.height,design])
+  const framing=useMemo(()=>world&&layout&&!scene&&!preview?previewSceneFraming(arenaBounds(world),viewport.width/Math.max(1,viewport.height)):sceneFraming(world?arenaBounds(world):{min:[-5,-5,-.25],max:[5,5,2]},viewport.width/Math.max(1,viewport.height),design?33:40,!!world?.task),[world,layout,scene,preview,viewport.width,viewport.height,design])
   const cameraPosition:[number,number,number]=design?[6,-9,5]:framing.position
   const cameraTarget:[number,number,number]=design?[0,0,.8]:framing.target
   const span=framing.span,shadowExtent=span*.8
@@ -130,7 +136,7 @@ function CameraClipping({far}:{far:number}){
 
 export function ArenaCanvas(props:Parameters<typeof ArenaScene>[0]){
   const {t}=useI18n()
-  return <Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:40,near:.05,far:1000}} gl={{antialias:true,alpha:false}} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
+  return <Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:props.layout?52:40,near:.05,far:1000}} gl={{antialias:true,alpha:false}} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
     <ArenaScene {...props}/>
   </Canvas>
 }

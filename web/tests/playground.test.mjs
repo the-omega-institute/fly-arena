@@ -1464,3 +1464,100 @@ for(const retryLogin of [false,true])test(`NyxID restores every seed and submiss
  assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
  assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43')
 })
+
+for(const profile of ['legacy-v1','sensorimotor-research-v2'])test(`${profile} two-fly inspector exposes its navigator before neural detail in Chinese`,async()=>{
+ const {replayInspectionFixture}=await import('./fixtures/replay-inspection.mjs')
+ const {MatchObservations}=require('./src/features/arena/MatchObservations.js')
+ localStorage.setItem('flyarena.locale','zh-CN')
+ const props=replayInspectionFixture(profile,[wt,own]),seeks=[]
+ globalThis.fetch=async()=>({ok:true,json:async()=>({neurons:[],edges:[]})})
+ // JSDOM cannot measure rendered heights; check the actual desktop CSS contract
+ // alongside the mounted controls. WebGL rendering is deliberately excluded.
+ const style=document.createElement('style');style.textContent=fs.readFileSync(path.join(web,'src/features/arena/brainActivity.css'),'utf8');document.head.append(style)
+ const Inspector=()=>React.createElement('div',{className:'life-theater-layout'},React.createElement('div',{className:'arena-stage'}),React.createElement(MatchObservations,{...props,onSeek:time=>seeks.push(time)}))
+ try{
+  await mount(Inspector,{})
+  const column=document.querySelector('.observations'),computed=dom.window.getComputedStyle(column)
+  assert.equal(computed.maxHeight,'none');assert.equal(computed.overflow,'visible')
+  const stageStyle=dom.window.getComputedStyle(document.querySelector('.arena-stage'))
+  assert.equal(stageStyle.position,'sticky');assert.equal(stageStyle.top,'95px')
+  assert.equal(column.querySelector('.replay-outcome-summary strong').textContent,'平局')
+  const flow=column.querySelector('.replay-flow-detail'),timeline=flow.querySelector('.life-event-navigation'),heading=flow.querySelector('.brain-theater .panel-heading')
+  assert.ok(timeline.compareDocumentPosition(heading)&dom.window.Node.DOCUMENT_POSITION_FOLLOWING)
+  assert.equal(timeline.closest('details'),null)
+  assert.ok(flow.querySelectorAll('.behavior-chapters-list button').length)
+  if(profile==='legacy-v1'){
+   assert.match(timeline.textContent,/未记录该个体的事件凭据/)
+   assert.equal(timeline.querySelectorAll('.life-event-rows button').length,0)
+   // Sensory and score changes must not be presented as event receipts.
+   assert.ok(!flow.querySelector('.event-response'))
+  }else{
+   const rows=timeline.querySelectorAll('.life-event-rows button');assert.equal(rows.length,1)
+   assert.match(rows[0].textContent,/food-0/)
+   await act(async()=>rows[0].click());assert.equal(seeks.at(-1),.5)
+   assert.ok(flow.querySelector('.event-response'))
+  }
+  const participants=column.querySelectorAll('.observation-subjects button')
+  await act(async()=>participants[1].click())
+  const second=column.querySelector('.life-event-navigation')
+  if(profile==='legacy-v1')assert.match(second.textContent,/未记录该个体的事件凭据/)
+  else{assert.match(second.textContent,/wall-0/);assert.doesNotMatch(second.textContent,/food-0/)}
+ }finally{style.remove()}
+})
+
+for(const locale of ['en','zh-CN'])test(`life tree is the only relation view and delta codes are localized in ${locale}`,async()=>{
+ const {LifeLedger}=require('./src/features/life/LifeLedger.js')
+ localStorage.setItem('flyarena.locale',locale);history.replaceState(null,'','#tab=life&fly='+own.id)
+ let delta={code:'founder',changed:false,changed_circuits:[],changed_parameters:[],edge_changes:{count:0,edges:[]},intervention_changes:{count:0,items:[]},summary:'API prose must not appear'}
+ const record={fly:own,can_annotate:false,origin:null,ancestors:[wt],descendants:[{...wt,id:'child'}],notes:[],experiences:[]}
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).endsWith('/lives')?[own]:record})
+ const expected=locale==='en'?['Founder design; no parent design was recorded.','Recorded changes relative to the parent FlySpec.','No design change relative to the parent FlySpec was recorded.','Parent design is private; the relative delta is unavailable.']:['创始设计；未记录亲代设计。','已记录相对亲代 FlySpec 的设计变化。','未记录相对亲代 FlySpec 的设计变化。','亲代设计为私有；无法查看相对差分。']
+ for(const [i,code] of ['founder','changed','unchanged','parent_unavailable'].entries()){
+  delta={...delta,code,changed:code==='changed'?true:code==='parent_unavailable'?null:false}
+  await act(async()=>root.render(null))
+  await mount(LifeLedger,{identity:null,selected:own.id,onBranch:noop,onCompete:noop,onReplay:noop})
+  const detail=document.querySelector('.life-lineage-detail')
+  assert.ok(detail.textContent.includes(expected[i]));assert.doesNotMatch(detail.textContent,/API prose must not appear/)
+  assert.equal(document.querySelectorAll('.life-lineage').length,1)
+  assert.equal(document.querySelector('.life-relations'),null)
+  assert.doesNotMatch(document.body.textContent,/Ancestors · nearest first|Direct descendants|祖先 · 从最近父代开始|直接后代/)
+  assert.match(document.querySelector('.life-birth').textContent,/τ ×1/)
+ }
+ history.replaceState(null,'','/')
+})
+
+for(const locale of ['en','zh-CN'])test(`life tree renders structured parent/child changes and intervention multiplicity in ${locale}`,async()=>{
+ const {LifeLedger}=require('./src/features/life/LifeLedger.js')
+ localStorage.setItem('flyarena.locale',locale);history.replaceState(null,'','#tab=life&fly='+own.id)
+ const added={selector:{pre:{class:'olfactory'}},scale:1.25},removed={selector:{post:{ids:['123']}},scale:0}
+ let delta={code:'changed',changed:true,summary:'Untranslated API summary',changed_circuits:['olfactory'],changed_parameters:[],
+  design_changes:[{name:'model_profile',parent:'malecns-lif-cpu-v1',child:'malecns-rate-cpu-v1'},{name:'connectome_sha256',parent:null,child:'fixture-digest'}],
+  circuit_scales:[{selector:'olfactory',parent:2,child:4,parent_scales:[2],child_scales:[2,2]}],
+  edge_changes:{count:0,edges:[]},intervention_changes:{count:2,items:[{parent:added,child:added,parent_count:1,child_count:3},{parent:removed,child:null,parent_count:2,child_count:0}]}}
+ const record={fly:own,can_annotate:false,origin:null,ancestors:[],descendants:[],notes:[],experiences:[]}
+ globalThis.fetch=async url=>({ok:true,json:async()=>String(url).includes('/lineage?')?{center_id:own.id,depth:3,nodes:[{id:own.id,label:own.name,depth:0,relation:'center',delta}],edges:[]}:String(url).endsWith('/lives')?[own]:record})
+ const props={identity:null,selected:own.id,onBranch:noop,onCompete:noop,onReplay:noop}
+ await mount(LifeLedger,props)
+ const detail=document.querySelector('.life-lineage-detail')
+ const row=field=>[...detail.querySelectorAll('p')].find(p=>p.querySelector('strong code')?.textContent===field)?.textContent
+ const parent=locale==='en'?'Parent value':'亲代值',child=locale==='en'?'Child value':'后代值'
+ assert.ok(row('model_profile').includes(`${parent}: "malecns-lif-cpu-v1" → ${child}: "malecns-rate-cpu-v1"`))
+ assert.ok(row('connectome_sha256').includes(`${parent}: null → ${child}: "fixture-digest"`))
+ assert.ok(row('olfactory').includes(`${parent}: [2] → ${child}: [2,2]`))
+ assert.ok(row('olfactory').includes(`${locale==='en'?'Cumulative multiplier':'累积倍率'}: ${parent} ×2 → ${child} ×4`))
+ const addedRow=[...detail.querySelectorAll('p')].find(p=>p.textContent.includes(locale==='en'?'Added intervention occurrences':'新增干预次数')).textContent
+ assert.ok(addedRow.includes(locale==='en'?'Added intervention occurrences: 2 · Parent count: 1 → Child count: 3':'新增干预次数: 2 · 亲代次数: 1 → 后代次数: 3'))
+ assert.ok(addedRow.includes(JSON.stringify(added)))
+ const removedRow=[...detail.querySelectorAll('p')].find(p=>p.textContent.includes(locale==='en'?'Removed intervention occurrences':'移除干预次数')).textContent
+ assert.ok(removedRow.includes(locale==='en'?'Removed intervention occurrences: 2 · Parent count: 2 → Child count: 0':'移除干预次数: 2 · 亲代次数: 2 → 后代次数: 0'))
+ assert.ok(removedRow.includes(JSON.stringify(removed)))
+ assert.doesNotMatch(detail.textContent,/Untranslated API summary/)
+ if(locale==='zh-CN')assert.doesNotMatch(detail.textContent,/Design field|Parent value|Child value|Circuit multipliers|Cumulative multiplier|intervention occurrences|Parent count|Child count/)
+ // A profile-only edit must remain inspectable even with no circuit/intervention edits.
+ delta={...delta,design_changes:delta.design_changes.slice(0,1),changed_circuits:[],circuit_scales:[],intervention_changes:{count:0,items:[]}}
+ await act(async()=>root.render(null));await mount(LifeLedger,props)
+ const profileOnly=document.querySelector('.life-lineage-detail').textContent
+ assert.ok(profileOnly.includes(`${parent}: "malecns-lif-cpu-v1" → ${child}: "malecns-rate-cpu-v1"`))
+ assert.doesNotMatch(profileOnly,/olfactory|intervention occurrences|干预次数|fixture-digest/)
+ history.replaceState(null,'','/')
+})

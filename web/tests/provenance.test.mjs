@@ -276,7 +276,8 @@ test('environment touch shows recorded target and neural activity without invent
   assert.match(textOnly(render(MatchObservations,{...props,events})),/Environment contact · obstacle-0/)
   const oldFrame={...frame,senses:[{odor:[0,0],visual:[0,0],touch:1,nearest_food:0,mouth_distance:0}]}
   const oldText=textOnly(render(MatchObservations,{...props,frame:oldFrame,frames:[oldFrame]}))
-  assert.match(oldText,/Food contact/)
+  assert.doesNotMatch(oldText,/Food contact/)
+  assert.match(oldText,/No event receipts were recorded for this participant/)
   assert.doesNotMatch(oldText,/Contacted environment/)
 })
 
