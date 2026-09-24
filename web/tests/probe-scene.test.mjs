@@ -116,20 +116,25 @@ const originals=Object.fromEntries(globalKeys.map(k=>[k,Object.getOwnPropertyDes
 for(const k of ['window','document','navigator'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.probeTestLocale='en'
 dom.window.HTMLCanvasElement.prototype.getContext=()=>({getExtension:()=>({loseContext(){}})})
-let root=createRoot(document.getElementById('root'))
 const props={reports,subjects,seed:42,time:0,fallback:React.createElement('svg',{'data-plan':true})}
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text)
+let root=null
 async function mount(overrides={}){await act(async()=>root.render(React.createElement(ProbeScene3D,{...props,...overrides})))}
 async function click(text){await act(async()=>button(text).click())}
-test.afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'));canvasProps=null;canvasFailure=false;globalThis.probeTestLocale='en';delete dom.window.WebGL2RenderingContext})
-test.after(async()=>{await act(async()=>root.unmount());dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
+const uiTest=(name,fn)=>test(name,{concurrency:false},async()=>{
+ root=createRoot(document.getElementById('root'));canvasProps=null;canvasFailure=false;globalThis.probeTestLocale='en';delete dom.window.WebGL2RenderingContext
+ try{await fn()}finally{
+  await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=null;canvasProps=null;canvasFailure=false;globalThis.probeTestLocale='en';delete dom.window.WebGL2RenderingContext
+ }
+})
+test.after(async()=>{dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
 
-test('view automatically falls back to the 2D slot when WebGL is absent',async()=>{
+uiTest('view automatically falls back to the 2D slot when WebGL is absent',async()=>{
  await mount();assert.ok(document.querySelector('[data-plan]'));assert.equal(button('3D').disabled,true)
  assert.equal(button('2D plan').getAttribute('aria-pressed'),'true');assert.match(document.body.textContent,/WebGL unavailable/)
  assert.equal(canvasProps,null)
 })
-test('3D toggle and selected seed use the external shared clock without resetting it',async()=>{
+uiTest('3D toggle and selected seed use the external shared clock without resetting it',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount();assert.ok(document.querySelector('[data-test-canvas]'));assert.equal(button('3D').getAttribute('aria-pressed'),'true')
  assert.match(document.body.textContent,/Recorded planar trajectories/)
@@ -143,25 +148,25 @@ test('3D toggle and selected seed use the external shared clock without resettin
  await mount({reports:[...reports,...later],seed:43,time:1.5});assert.equal(world().tracks[0].segments[0][0].x,10)
  await mount({time:4});assert.equal(document.body.textContent.match(/No recorded position at shared time/g).length,3)
 })
-test('missing or conflicting geometry cannot mount a 3D canvas and keeps failed status visible',async()=>{
+uiTest('missing or conflicting geometry cannot mount a 3D canvas and keeps failed status visible',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount({reports:[{...reports[0],scene:undefined,status:'failed'}]})
  assert.ok(document.querySelector('[data-plan]'));assert.equal(button('3D').disabled,true);assert.match(document.body.textContent,/geometry unavailable/);assert.match(document.body.textContent,/failed/)
  await mount({reports:[reports[0],{...reports[1],scene:{...scene,size:10}}]})
  assert.match(document.body.textContent,/geometry conflicts/);assert.equal(canvasProps,null)
 })
-test('WebGL context loss falls back to 2D and preserves visible failure explanation',async()=>{
+uiTest('WebGL context loss falls back to 2D and preserves visible failure explanation',async()=>{
  dom.window.WebGL2RenderingContext=class {}
  await mount();await act(async()=>canvasEvents.dispatchEvent(new Event('webglcontextlost',{cancelable:true})))
  assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL unavailable/);assert.equal(button('3D').disabled,true)
 })
-test('renderer startup exceptions fall back to the plan without crashing the lab',async()=>{
+uiTest('renderer startup exceptions fall back to the plan without crashing the lab',async()=>{
  dom.window.WebGL2RenderingContext=class {};canvasFailure=true
  const original=console.error;console.error=()=>{}
  try{await mount()}finally{console.error=original}
  assert.ok(document.querySelector('[data-plan]'));assert.match(document.body.textContent,/WebGL unavailable/)
 })
-test('3D explanatory notes and fallback controls follow the Chinese catalog',async()=>{
+uiTest('3D explanatory notes and fallback controls follow the Chinese catalog',async()=>{
  globalThis.probeTestLocale='zh-CN';dom.window.WebGL2RenderingContext=class {}
  await mount();assert.match(document.body.textContent,/已记录的平面轨迹/);assert.ok(button('2D 平面图'))
  await mount({reports:[]});assert.match(document.body.textContent,/探针几何记录不可用/)

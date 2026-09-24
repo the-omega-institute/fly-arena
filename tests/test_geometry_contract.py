@@ -1,9 +1,14 @@
 """The arena-geometry-v1 envelope is shared without rewriting seeded scenes."""
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 import pytest
+
+# Keep this test tied to the checkout under test even when the developer's
+# virtualenv contains an editable install of another fly-arena checkout.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from flyarena.geometry import GeometryError, validate_arena_scene, validate_probe_scene
 from flyarena.scenarios import MAPS, arena_scene, scenario
@@ -19,7 +24,11 @@ def test_contract_fixture_covers_all_maps_and_seeds():
         for seed, expected in seeds.items():
             actual = scenario(map_id, int(seed))
             validate_arena_scene(actual)
-            assert actual == expected
+            # Canonical JSON makes the contract comparison independent of
+            # dictionary insertion order and Python's repr details.
+            assert json.dumps(actual, sort_keys=True, separators=(",", ":"), ensure_ascii=False) == json.dumps(
+                expected, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+            )
             assert actual["sha256"] == digest({k: v for k, v in actual.items() if k != "sha256"})
             for profile in ("legacy-v1", "sensorimotor-research-v2"):
                 assert arena_scene(map_id, int(seed), profile)["sha256"] == FIXTURE["bridge_digests"][profile][map_id][seed]
