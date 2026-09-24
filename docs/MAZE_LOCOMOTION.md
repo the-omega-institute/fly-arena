@@ -386,3 +386,59 @@ runs had upright fraction 1.0 and no sampled inversion; these are short-window
 observations only. The report is explicitly outside the preregistered protocol
 and has no set-level verdict. The complete five-seed, 180-second Mac Studio
 study has **not** been executed by this implementation task.
+
+
+## Completed phase-2 study: 2026-09-24
+
+**Preregistered verdict: negative.** All ten 180-second observations completed
+on Mac Studio in 21,892.84 wall seconds (6 h 4 min 53 s). Seeds 43 and 44
+improved under the joint rule; seeds 42, 45 and 46 were negative. There were
+no incomplete or invalid pairs, no reported protocol violations and no recorded
+execution errors. Issue #82 remains unresolved. This candidate does not meet
+the criterion for advancement and is not promoted to the default motor profile.
+
+The baseline was `dn-cpg-approach-v4`; the candidate was
+`dn-cpg-recovery-v5-candidate`. Both used the frozen canonical WT, labyrinth /
+forage, `sensorimotor-research-v2`, `engineered-kernel-contact-v1`, the same
+runtime and paired scene, and the preregistered 20 Hz recording policy.
+
+| Seed | Upright B → C (%) | First inversion B → C (s) | Inverted burden B → C (s) | Visited cells B → C | Joint result |
+|---:|---:|---:|---:|---:|---|
+| 42 | 34.0000 → 9.8611 | 51.75 → 17.75 | 118.80 → 162.25 | 176 → 28 | negative |
+| 43 | 0.8333 → 15.8611 | 1.50 → 22.30 | 178.50 → 151.45 | 15 → 63 | improved |
+| 44 | 18.1944 → 37.3611 | 27.95 → 36.15 | 147.25 → 112.75 | 126 → 181 | improved |
+| 45 | 11.6667 → 7.5000 | 20.75 → 13.50 | 159.00 → 166.50 | 92 → 53 | negative |
+| 46 | 15.6667 → 5.0556 | 28.20 → 9.10 | 151.80 → 170.90 | 92 → 32 | negative |
+
+The table rounds only for display; the decision uses unrounded values. All four
+acceptance metrics worsened in each negative seed. The preregistered rule makes
+any negative seed sufficient for a negative set-level verdict; improvements in
+other seeds cannot compensate. No run recorded goal-food contact through 180 s.
+Those goal times remain null/right-censored, and goal contact is descriptive,
+not an acceptance criterion.
+
+The [complete paired report](evidence/maze-phase2-20260924.json) retains every
+run's inversion episodes, individual recovery censoring, wall-contact onsets
+and sampled duration, pre-inversion drive statistics, path length, coverage,
+paired differences and source/receipt bindings. The frozen study digest is
+`93659137407be6a093d51842adebc738ac0e4a2166050b99620a69fd5d10394b`.
+Original recordings remain at
+`/Users/macstudio/fly-arena-mvp/var/research/issue82-phase2/study-20260924/`.
+
+A separate [post-completion evidence audit](evidence/maze-phase2-20260924-audit.json)
+rechecked all ten observations on Mac Studio without running another simulation
+or rewriting the original study evidence. It checked canonical study/manifest/
+receipt digests, frozen harness and analyzer hashes, all 60 receipt-bound files
+(including neural and physical checkpoints), all ten 3,601-frame grids, bounded
+recorded drives, subject/runtime/motor/scene bindings, and equality of recomputed
+analysis with the retained analysis and final report. Recomputing the joint
+rule returned the same negative verdict. This establishes integrity and
+reproducibility of the recorded analysis; it is not an independent simulation
+replication or biological validation.
+
+The measured outcome argues against this version of the engineering recovery
+controller. It does not establish which feedback or gait interaction caused
+the regressions. A later candidate needs a separately specified intervention
+and a new prospective evaluation; these five seeds must not be relabeled as
+unseen validation data after tuning against this result. Preserve this failed
+candidate and the earlier failed baseline observation as evidence.
