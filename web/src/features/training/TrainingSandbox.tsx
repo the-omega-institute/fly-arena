@@ -1,5 +1,5 @@
 import {eligibleTrainingMaps,trainingEligibilityProblem} from './trainingEligibility'
-import {lifeHash} from '../life/navigation'
+import {lifeHash,continuationFocus} from '../life/navigation'
 import {useEffect,useRef,useState} from 'react'
 import {ArrowRight,Check,Dna,Download,GitBranch,Loader2,Pause,Play,Save,Square,TrendingUp} from 'lucide-react'
 import {api,newRequestKey} from '../../api'
@@ -16,7 +16,7 @@ import {ConditionResults} from './ConditionResults'
 import type {ConditionResult} from './ConditionResults'
 import {evaluationConditions,type ComparableRun} from './comparison'
 import type {EvaluationCondition} from './comparison'
-import {evaluationCount,planProblem,memberRole,trainingFocus,trainingHash,competitionSetup} from './plan'
+import {continuationPlan,type ContinuationRecord,evaluationCount,planProblem,memberRole,trainingFocus,trainingHash,competitionSetup} from './plan'
 
 type Plan={evaluation_conditions?:EvaluationCondition[]|null;name:string;founder_id:string;opponent_id:string|null;strategy:Strategy;optimizer_name?:string;circuits:string[];mutation_strength:number;population:number;generations:number;max_evaluations:number;map_id:string;mode:'forage'|'contest';duration_seconds:number;seed:number;bridge_profile:string;sensory_profile?:string;fitness_objective?:string}
 type Member={condition_results?:ConditionResult[];generation:number;slot:number;fly_id:string;saved:number;fitness:number|null;fly:Fly;matches:Match[]}
@@ -28,6 +28,12 @@ const statusKey:Record<string,string>={awaiting_candidates:'Waiting for your opt
 
 export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onSaved,onCompete,onReplay}:Props){
   const {t,locale}=useI18n()
+  const [continuationId,setContinuationId]=useState(()=>continuationFocus(location.hash))
+  const [continuation,setContinuation]=useState<ReturnType<typeof continuationPlan>|null>(null)
+  const [continuationFlies,setContinuationFlies]=useState<Fly[]>([])
+  const [continuationLoaded,setContinuationLoaded]=useState(false)
+  const [requiresCopy,setRequiresCopy]=useState(false)
+  const preparedContinuation=useRef('')
   const [founder,setFounder]=useState(selected||flies[0]?.id||'')
   const [opponent,setOpponent]=useState(flies.find(f=>f.id!==founder)?.id||'')
   const [name,setName]=useState('Evolution 01')
@@ -51,7 +57,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   const [proposal,setProposal]=useState('')
   const [showcaseRevision,setShowcaseRevision]=useState(0)
   const [exampleFounder,setExampleFounder]=useState<Fly|null>(null)
-  const availableFlies=exampleFounder&&!flies.some(f=>f.id===exampleFounder.id)?[exampleFounder,...flies]:flies
+  const availableFlies=[...flies,...continuationFlies,...(exampleFounder?[exampleFounder]:[])].filter((fly,index,all)=>all.findIndex(f=>f.id===fly.id)===index)
   const [circuits,setCircuits]=useState(['olfactory','projection','descending'])
   const [strength,setStrength]=useState(.08)
   const [population,setPopulation]=useState(2)
@@ -64,14 +70,15 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   const [runs,setRuns]=useState<Training[]>([])
   const [focus,setFocusState]=useState(()=>trainingFocus(location.hash))
   const setup=useRef<HTMLElement>(null)
-  function setFocus(value:string){history.pushState(null,'',trainingHash(value));setFocusState(value)}
-  useEffect(()=>{const sync=()=>setFocusState(trainingFocus(location.hash));window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync);return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync)}},[])
+  function setFocus(value:string){history.pushState(null,'',trainingHash(value));setFocusState(value);setContinuationId('')}
+  useEffect(()=>{const sync=()=>{setFocusState(trainingFocus(location.hash));setContinuationId(continuationFocus(location.hash))};window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync);return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync)}},[])
   const [busy,setBusy]=useState('')
   const [error,setError]=useState('')
   const [message,setMessage]=useState('')
   const [loadedOwner,setLoadedOwner]=useState<string|null>(null)
   const revision=useRef(0)
   const [generation,setGeneration]=useState<number|null>(null)
+  const continuationPending=!!continuationId&&(!continuationLoaded||requiresCopy)
   const profile=chosenBridge?.ready
   const selectedFly=availableFlies.find(f=>f.id===founder)
   const bridgeModelCompatible=(p:TrainingBridge)=>!p.models||[selectedFly,...(mode==='contest'?[availableFlies.find(f=>f.id===opponent)]:[])].every(f=>!!f&&p.models!.includes(f.spec.model_profile))
@@ -85,7 +92,37 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   const current=visibleRuns.find(r=>r.id===focus)
   const shownGeneration=generation??Math.max(0,...(current?.members.map(m=>m.generation)||[]))
   const members=current?.members.filter(m=>m.generation===shownGeneration)||[]
-  useEffect(()=>{if(!founder&&flies.length)setFounder(selected||flies[0].id)},[flies,selected,founder])
+  useEffect(()=>{setContinuationFlies([]);setExampleFounder(null)},[identity?.id])
+  useEffect(()=>{if(!continuationId&&!founder&&flies.length)setFounder(selected||flies[0].id)},[flies,selected,founder])
+  useEffect(()=>{
+    const key=JSON.stringify([continuationId,identity?.id,identity?.token])
+    if(continuationId&&preparedContinuation.current===key)return
+    preparedContinuation.current='';setContinuation(null);setContinuationLoaded(false);setRequiresCopy(false)
+    if(!continuationId)return
+    setContinuationFlies([])
+    setFounder('');setFocusState('');setError('')
+    if(!season||!maps.length)return
+    const ctrl=new AbortController()
+    async function prepare(){
+      try{
+        const record=await api<ContinuationRecord>('/lives/'+continuationId,{signal:ctrl.signal},identity)
+        const opponentIds=[...new Set((record.continuation?.conditions??[]).flatMap(c=>c.opponent_id?[c.opponent_id]:[]))]
+        const rivals=await Promise.all(opponentIds.map(async id=>{try{return (await api<ContinuationRecord>('/lives/'+id,{signal:ctrl.signal},identity)).fly}catch{return null}}))
+        if(ctrl.signal.aborted)return
+        const available=[record.fly,...rivals.filter((f):f is Fly=>!!f)]
+        const plan=continuationPlan(record,season!,maps,available)
+        setContinuationFlies(available);setFounder(record.fly.id);setContinuation(plan);setRequiresCopy(!!record.continuation?.requires_copy)
+        setName((record.fly.name.slice(0,44)+' · '+t('New branch')).slice(0,64))
+        const environment=plan.environment
+        setBridgeProfile(environment?.bridge_profile||'');setSensoryProfile(environment?.sensory_profile||'');setFitnessObjective(environment?.fitness_objective||'')
+        setMap(plan.conditions[0]?.map_id||'');setSeed(plan.conditions[0]?.seed??42);setExtraConditions(plan.conditions.slice(1))
+        setDuration(environment?.duration_seconds??5);setMode(environment?.mode==='contest'?'contest':'forage');setOpponent(environment?.opponent_id||'')
+        setPopulation(2);setGenerations(1);setBudget(Math.max(2,2*plan.conditions.length*(environment?.mode==='contest'?2:1)))
+        preparedContinuation.current=key;setContinuationLoaded(true)
+      }catch(e){if(!ctrl.signal.aborted)setError(String(e))}
+    }
+    void prepare();return()=>ctrl.abort()
+  },[continuationId,identity?.id,identity?.token,season,maps])
   useEffect(()=>{
     const controller=new AbortController();let timer:ReturnType<typeof setTimeout>
     async function poll(){
@@ -107,6 +144,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   async function act(key:string,fn:()=>Promise<void>){setBusy(key);setError('');setMessage('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
   function accept(run:Training){revision.current++;setRuns(old=>[run,...old.filter(r=>r.id!==run.id)]);setLoadedOwner(identity?.id||null);if(focus!==run.id)setFocus(run.id)}
   async function start(){
+    if(continuationPending)return
     if(problem){setError(t(problem));return}
     if(!profile||!modelReady){setError(locale==='zh-CN'?'请选择可运行且兼容大脑模型的感觉—运动方案。':'Choose an available sensorimotor setup compatible with the selected brains.');return}
     if(!fitnessReady){setError(t('Selected objective is unavailable on this server.'));return}
@@ -134,6 +172,15 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       requestAnimationFrame(()=>setup.current?.scrollIntoView({block:'start'}))
     })
   }
+  async function copyContinuation(){
+    if(!identity){onLogin();return}
+    const sample=availableFlies.find(f=>f.id===continuationId)
+    if(!sample?.source)return
+    await act('copy:'+sample.id,async()=>{
+      const fly=await api<Fly>(`/training-showcase/${sample.source!.run_id}/flies/${sample.id}/copy`,{method:'POST'},identity)
+      await onSaved(fly);setExampleFounder(fly);setFounder(fly.id);setRequiresCopy(false)
+    })
+  }
   function restoreEnvironment(spec:{bridge_profile?:string;map_id:string;seed:number;duration_seconds:number;sensory_profile?:string;fitness_objective?:string;evaluation_conditions?:EvaluationCondition[]|null}){const conditions=evaluationConditions(spec);setBridgeProfile(spec.bridge_profile||'legacy-v1');setMap(conditions[0].map_id);setSeed(conditions[0].seed);setDuration(spec.duration_seconds);setSensoryProfile(spec.sensory_profile||'odor-only-v1');setFitnessObjective(spec.fitness_objective||'food');setExtraConditions(conditions.slice(1))}
   function exportRun(){if(!current)return;const url=URL.createObjectURL(new Blob([JSON.stringify(current,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='training-'+current.id+'.json';link.click();URL.revokeObjectURL(url)}
   const generationsHistory=current?Array.from({length:current.spec.generations},(_,i)=>{
@@ -144,9 +191,10 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
   return <div className={"training-layout "+(current?"has-session":"new-session")}>
     <aside ref={setup} className="panel training-setup">
       <div className="panel-heading"><span><Dna size={17}/>{t('Start a training session')}</span><span className="tiny-label">SANDBOX</span></div>
+      {continuationId&&<section aria-label={t('Review lineage continuation')}><h3>{t('Review lineage continuation')}</h3><a href={lifeHash(continuationId)}>{continuationId}</a><p>{t('Only accessible recorded evaluations are reused. Missing fields need a new choice; editable budget and search settings are new, not inherited. No computation starts until Start training.')}</p>{!continuationLoaded&&!error&&<p role="status">{t('Loading recorded conditions…')}</p>}{continuation&&<><p>{t('Retained conditions')} · {continuation.conditions.length} / {continuation.reviews.length}</p>{!continuation.conditions.length&&<p>{t('No eligible recorded conditions. Choose a new setup before starting.')}</p>}{continuation.environment&&!continuation.environment.fitness_objective&&<p>{t('Selection objective was not recorded; choose a new objective.')}</p>}{continuation.environment&&!continuation.environment.sensory_profile&&<p>{t('Sensory input was not recorded; choose a new input.')}</p>}<details><summary>{t('Retained and dropped conditions')}</summary>{continuation.reviews.map((review,index)=><div key={index}><strong>{t(review.retained?'Retained':'Dropped')}</strong><p>{t(review.reason)}</p><code>{JSON.stringify(review.record)}</code></div>)}</details></>}{requiresCopy&&<><p>{t('This published snapshot needs a local copy linked to the recorded individual before training.')}</p><button className="secondary" disabled={!!busy||!season?.gallery_copy_available} onClick={copyContinuation}>{t('Save a copy and prepare training')}</button></>}</section>}
       <label>{t('Session name')}<input value={name} maxLength={64} onChange={e=>setName(e.target.value)}/></label>
-      <label>{t('Starting fly')}<select value={founder} onChange={e=>setFounder(e.target.value)}><option value="">{t('Choose a fly')}</option>{availableFlies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>
-      <label htmlFor="training-fitness-objective">{t('Selection objective')}<select id="training-fitness-objective" value={fitnessObjective} onChange={e=>setFitnessObjective(e.target.value)}>{fitnessOptions.map(p=><option key={p.id} value={p.id} disabled={!p.ready}>{t(p.name)}</option>)}</select></label>
+      <label>{t('Starting fly')}<select value={founder} disabled={!!continuationId} onChange={e=>setFounder(e.target.value)}><option value="">{t('Choose a fly')}</option>{availableFlies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>
+      <label htmlFor="training-fitness-objective">{t('Selection objective')}<select id="training-fitness-objective" value={fitnessObjective} onChange={e=>setFitnessObjective(e.target.value)}>{!fitnessObjective&&<option value="" disabled>{t('Choose a selection objective')}</option>}{fitnessOptions.map(p=><option key={p.id} value={p.id} disabled={!p.ready}>{t(p.name)}</option>)}</select></label>
       <p className="training-hint">{t(fitnessObjective==='sustained-foraging-v1'?'Fitness = (total food + food in the second half) × fraction of time not inverted. This rewards later feeding and posture; it does not guarantee learned behavior.':'Select candidates by food collected; competitions use the margin over the opponent.')}</p>
       {!fitnessReady&&<p className="training-hint" role="status">{t('Selected objective is unavailable on this server.')}</p>}
       <AlgorithmPicker value={strategy} onChange={setStrategy} name={optimizerName} onName={setOptimizerName}/>
@@ -156,7 +204,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <p className="training-hint">{bridgeProfile==='sensorimotor-research-v2'?(locale==='zh-CN'?'实验方案：LIF 下行神经活动经过核函数解码和运动变换。嗅觉模式只将嗅觉送入大脑；可另选实验性的视觉、味觉与左右触觉输入。训练可运行不代表行为有效或已具备赛事资格。':'Experimental setup: LIF descending activity feeds a kernel decoder and motor transfer. Odor-only mode leaves vision and touch as observations; an experimental visual, taste and lateral touch profile can be selected when available. Availability does not establish effective behavior or competition qualification.'):(locale==='zh-CN'?'下行神经活动经过线性读出和滤波后驱动身体。可搭配嗅觉输入或实验性视觉、味觉与触觉输入。':'Descending activity drives the body through a linear readout and filter. Supports odor input and experimental visual, taste and touch inputs.')}</p>
       {!modelReady&&<p className="training-hint" role="status">{locale==='zh-CN'?'此方案与所选大脑模型不兼容；请选择兼容方案。':'This setup is incompatible with the selected brain models; choose a compatible setup.'}</p>}
       {chosenBridge?.reason&&<p className="training-hint" role="status">{chosenBridge.reason}</p>}
-      <label htmlFor="training-sensory-profile">{t('Sensory input profile')}<select id="training-sensory-profile" value={sensoryProfile} onChange={e=>setSensoryProfile(e.target.value)}>{sensoryOptions.map(p=><option key={p.id} value={p.id} disabled={!p.ready||!sensoryCompatible(p.id)}>{sensoryLabel(p.id)}</option>)}</select></label>
+      <label htmlFor="training-sensory-profile">{t('Sensory input profile')}<select id="training-sensory-profile" value={sensoryProfile} onChange={e=>setSensoryProfile(e.target.value)}>{!sensoryProfile&&<option value="" disabled>{t('Choose sensory input')}</option>}{sensoryOptions.map(p=><option key={p.id} value={p.id} disabled={!p.ready||!sensoryCompatible(p.id)}>{sensoryLabel(p.id)}</option>)}</select></label>
       <p className="training-hint">{t('Every candidate uses these senses in evaluation and subsequent competition.')}</p>
       {!season?.training_sensory_profiles&&<p className="training-hint">{t('This server currently offers odor-only training.')}</p>}
       {mode==='contest'&&<label>{t('Fixed opponent')}<select value={opponent} onChange={e=>setOpponent(e.target.value)}><option value="">{t('Choose a fly')}</option>{availableFlies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>}
@@ -165,7 +213,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <p className="training-hint">{locale==='en'?'Brain model':'大脑模型'} · {selectedFly?.spec.model_profile||'—'}</p>
       {strategy==='external'&&selectedFly?.spec.model_profile==='malecns-rate-cpu-v1'&&<p className="training-hint">{locale==='en'?'Train neural responses with Adam on your device, then evaluate proposals here.':'可在自己的设备上用 Adam 训练神经响应，再把候选提交到这里评测。'} <a href="https://github.com/the-omega-institute/fly-arena/blob/main/docs/RATE_MODEL.md" target="_blank" rel="noreferrer">{locale==='en'?'Adam trainer setup':'Adam 训练器配置'}</a></p>}
       <div className="training-pair"><label>{t('Population')}<input type="number" min="2" max="6" value={population} onChange={e=>setPopulation(+e.target.value)}/></label><label>{t(strategy==='random_search'?'Search rounds':'Generations')}<input type="number" min="1" max="8" value={generations} onChange={e=>setGenerations(+e.target.value)}/></label></div>
-      <div className="training-pair"><label>{t('Seconds per evaluation')}<select value={duration} onChange={e=>setDuration(+e.target.value)}>{[1,2,3,4,5,6,7,8,9,10,20,30].map(n=><option key={n} value={n}>{n} s{n<=2?(locale==='zh-CN'?' · 流程试跑':' · Workflow trial'):n>=5?(locale==='zh-CN'?' · 行为观察':' · Behavior observation'):''}</option>)}</select></label><label>{t('Seed')}<input type="number" min="0" max="2147483647" value={seed} onChange={e=>setSeed(+e.target.value)}/></label></div>
+      <div className="training-pair"><label>{t('Seconds per evaluation')}<select value={duration} onChange={e=>setDuration(+e.target.value)}>{Array.from({length:30},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} s{n<=2?(locale==='zh-CN'?' · 流程试跑':' · Workflow trial'):n>=5?(locale==='zh-CN'?' · 行为观察':' · Behavior observation'):''}</option>)}</select></label><label>{t('Seed')}<input type="number" min="0" max="2147483647" value={seed} onChange={e=>setSeed(+e.target.value)}/></label></div>
       <fieldset className="training-environments"><legend>{t('Evaluation conditions')} · {conditions.length}/4</legend>
         <p className="training-hint">{t('The environment and seed above are condition 1. Add maps or seeds for the same candidate.')}</p>
         {extraConditions.map((condition,index)=><div key={index} className="extra-condition"><strong>{t('Condition')} {index+2}</strong><div className="training-pair">
@@ -179,7 +227,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <div className={'training-budget '+(needed>budget?'over':'')}><strong>{needed} / {budget}</strong><span>{t('evaluations planned / limit')}</span><small>{population} × {generations} × {conditions.length}{mode==='contest'?' × 2':''} · {t(mode==='contest'?'Both spawn positions in every condition.':'One solo evaluation per condition and individual.')}</small></div>
       <TrainingWorkload population={population} generations={generations} mode={mode} conditions={conditions} duration={duration}/>
       <p className="training-hint">{t('Simulations run in a queue and may take minutes. Closing this page does not stop training.')}</p>
-      <button className="primary wide" disabled={!!busy||!profile||!modelReady||!sensoryReady||!fitnessReady||!!problem} onClick={start}>{busy==='create'?<Loader2 size={16} className="spin"/>:<Play size={16}/>} {t('Start training')}<ArrowRight size={16}/></button>
+      <button className="primary wide" disabled={continuationPending||!!busy||!profile||!modelReady||!sensoryReady||!fitnessReady||!!problem} onClick={start}>{busy==='create'?<Loader2 size={16} className="spin"/>:<Play size={16}/>} {t('Start training')}<ArrowRight size={16}/></button>
       {problem&&<p className="training-hint" role="status">{t(problem)}</p>}
       {!profile&&<p className="training-hint">{t('Training simulation is unavailable on this server.')}</p>}
     </aside>
@@ -188,7 +236,7 @@ export function TrainingSandbox({flies,identity,selected,season,maps,onLogin,onS
       <TrainingShowcase maps={maps} onReplay={onReplay} revision={showcaseRevision} copyAvailable={!!season?.gallery_copy_available} busy={!!busy} onBranch={copyExample}/>
       <TrainingComparison key={identity?.id||'guest'} runs={visibleRuns} maps={maps} flies={flies} onOpen={id=>{setFocus(id);setGeneration(null)}}/>
       <div className="training-tabs"><button className={!current?'active':''} onClick={()=>setFocus('')}>{t('New session')}</button>{visibleRuns.map(r=><button key={r.id} className={current?.id===r.id?'active':''} onClick={()=>{setFocus(r.id);setGeneration(null)}}>{r.spec.name}<small>{t(statusKey[r.status]||r.status)}</small></button>)}</div>
-      {!current?<><div className="arena-stage training-map"><div className="stage-heading"><span>{t('YOUR TRAINING GROUND')}</span><span>{t('Seed')} {seed}</span></div><div className="arena-canvas">{previewProblem?<p className="training-hint" role="status">{t(previewProblem)}</p>:<MapPreview mapId={map} seed={seed} bridgeProfile={bridgeProfile} participants={mode==='forage'?[selectedFly]:[selectedFly,flies.find(f=>f.id===opponent)]}/>}</div></div><div className="panel training-welcome"><GitBranch size={28}/><h2>{t('Give your fly a few generations.')}</h2><p>{t('Choose a strategy and a small budget. Compare descendants through actual matches, inspect their behavior, and keep the ones you want to compete with.')}</p><div><span>01 · {t('Design')}</span><ArrowRight size={16}/><span>02 · {t('Train')}</span><ArrowRight size={16}/><span>03 · {t('Compete')}</span></div></div></>:<>
+      {!current?<><div className="arena-stage training-map"><div className="stage-heading"><span>{t('YOUR TRAINING GROUND')}</span><span>{t('Seed')} {seed}</span></div><div className="arena-canvas">{previewProblem?<p className="training-hint" role="status">{t(previewProblem)}</p>:<MapPreview mapId={map} seed={seed} bridgeProfile={bridgeProfile} participants={mode==='forage'?[selectedFly]:[selectedFly,availableFlies.find(f=>f.id===opponent)]}/>}</div></div><div className="panel training-welcome"><GitBranch size={28}/><h2>{t('Give your fly a few generations.')}</h2><p>{t('Choose a strategy and a small budget. Compare descendants through actual matches, inspect their behavior, and keep the ones you want to compete with.')}</p><div><span>01 · {t('Design')}</span><ArrowRight size={16}/><span>02 · {t('Train')}</span><ArrowRight size={16}/><span>03 · {t('Compete')}</span></div></div></>:<>
         <section className="panel training-overview"><div className="panel-heading"><span><GitBranch size={17}/>{current.spec.name}</span><span className="training-status">{t(statusKey[current.status]||current.status)}</span></div><div className="training-context"><span>{t(algorithmName(current.spec.strategy))}</span><span>{t('Selection objective')} · {objectiveName(current.spec.fitness_objective||'food')}</span><span>{locale==='zh-CN'?'感觉—运动方案':'Sensorimotor setup'} · {bridgeLabel(current.spec.bridge_profile)}</span><span>{t('Sensory profile')} · {sensoryLabel(current.spec.sensory_profile||'odor-only-v1')}</span><span>{(locale==='en'?maps.find(map=>map.id===current.spec.map_id)?.english:maps.find(map=>map.id===current.spec.map_id)?.name)||current.spec.map_id}</span><span>{t(current.spec.mode==='forage'?'Collect food':'Compete for food')}</span><span>{t('Seed')} {current.spec.seed} · {current.spec.duration_seconds} {t('s')}</span></div><div className="training-summary"><div><span>{t('Evaluations completed')}</span><strong>{current.evaluations_completed}<small> / {current.evaluations_total}</small></strong></div><div><span>{t('Best fitness')}</span><strong>{best==null?'—':best.toFixed(2)}</strong></div><div><span>{t('Starting fitness')}</span><strong>{current.baseline_fitness===null?'—':current.baseline_fitness.toFixed(2)}</strong></div></div><div className="training-progress"><span style={{width:current.progress*100+'%'}}/></div><div className="training-controls"><small>{t(current.spec.fitness_objective==='sustained-foraging-v1'?'Fitness = (total food + food in the second half) × fraction of time not inverted. Contest fitness is the difference from the opponent, averaged across swapped positions and conditions.':current.spec.mode==='contest'?'Fitness is the mean of complete condition margins, each averaged across both positions.':'Fitness is the mean food consumed across all complete conditions.')} {t('Training results do not affect the public leaderboard.')}</small>{!terminal(current.status)&&<>{current.control==='pause'?<button className="secondary" disabled={!!busy} onClick={()=>control('resume')}><Play size={14}/>{t('Resume')}</button>:<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('pause')}><Pause size={14}/>{t('Pause')}</button>}<button className="secondary" disabled={!!busy||current.control==='stop'} onClick={()=>control('stop')}><Square size={13}/>{t('Stop')}</button></>}</div>{current.error&&<p className="training-error">{current.error}</p>}</section>
         {current.status==='complete'&&<div className="training-publish"><button className="secondary" disabled={!!busy} onClick={()=>act('publish',async()=>{await api(`/training/${current.id}/publish`,{method:'POST'},identity);setShowcaseRevision(v=>v+1);setMessage(t('Trajectory published in the gallery.'))})}>{t('Publish trajectory')}</button><p>{t('Shares this completed session, every candidate design, score and replay with all visitors.')}</p></div>}
         <div className="training-context">{evaluationConditions(current.spec).map((condition,i)=><span key={i}>{t('Condition')} {i+1} · {maps.find(m=>m.id===condition.map_id)?.[locale==='en'?'english':'name']||condition.map_id} · {t('Seed')} {condition.seed}</span>)}</div>

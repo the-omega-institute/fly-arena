@@ -55,9 +55,38 @@ class LifeLedger:
                 ORDER BY f.created DESC LIMIT 200''',(owner,)).fetchall()
         return [self.card(r[0],owner) for r in rows]
 
+    def discover(self,owner=None,*,query='',reference_kind=None,has_descendants=None,offset=0,limit=25,scope='public'):
+        """Search all DB designs before paging; private candidates never affect public counts."""
+        if scope not in ('public','accessible'):raise ValueError('Unknown discovery scope')
+        if reference_kind not in (None,'wildtype','official','user','ai'):raise ValueError('Unknown reference kind')
+        if not 1<=limit<=100 or offset<0:raise ValueError('Invalid discovery page')
+        viewer=owner if scope=='accessible' else None
+        def visibility(alias):
+            return f'''({alias}.owner=? OR NOT EXISTS(SELECT 1 FROM training_members m WHERE m.fly_id={alias}.id AND m.saved=0)
+                OR EXISTS(SELECT 1 FROM training_members m JOIN training_publications p ON p.run_id=m.run_id WHERE m.fly_id={alias}.id))'''
+        descendant=f"EXISTS(SELECT 1 FROM flies child WHERE json_extract(child.spec,'$.parent_id')=f.id AND {visibility('child')})"
+        where=[visibility('f')];params=[viewer]
+        query=query.strip().lower()
+        if query:
+            where.append('(instr(lower(f.name),?)>0 OR substr(lower(f.id),1,length(?))=?)');params.extend([query]*3)
+        if reference_kind:
+            where.append('p.reference_kind=?');params.append(reference_kind)
+        if has_descendants is not None:
+            where.append(descendant+'=?');params.extend([viewer,int(has_descendants)])
+        source='FROM flies f LEFT JOIN fly_provenance p ON p.fly_id=f.id WHERE '+' AND '.join(where)
+        with self.store.db() as db:
+            total=db.execute('SELECT count(*) '+source,params).fetchone()[0]
+            rows=db.execute('SELECT f.id, '+descendant+' AS has_descendants '+source+
+                            ' ORDER BY f.created DESC,f.id DESC LIMIT ? OFFSET ?',
+                            [viewer,*params,limit,offset]).fetchall()
+        items=[self.card(row['id'],owner)|{'has_descendants':bool(row['has_descendants'])} for row in rows]
+        return {'items':items,'total':total,'offset':offset,'limit':limit,
+                'next_offset':offset+limit if offset+limit<total else None}
+
     def card(self,ident,owner=None):
         fly=self.store.fly(ident)
-        return {'id':ident,'name':fly['name'],'color':fly['color'],'parent_id':fly['spec']['parent_id'],
+        parent=fly['spec']['parent_id']
+        return {'id':ident,'name':fly['name'],'color':fly['color'],'parent_id':parent if parent and self.visible(parent,owner) else None,
                 'created':fly['created'],'reference_kind':fly['reference_kind'],'can_annotate':owner is not None and fly['owner']==owner}
 
     def visible_match(self,match,owner):
@@ -122,7 +151,26 @@ class LifeLedger:
             origin_info={'run_id':source['run_id'],'strategy':plan['strategy'],'optimizer_name':plan.get('optimizer_name',''),
                          'round':source['generation']+1,'slot':source['slot'],'fitness':source['fitness'],'saved':False,
                          'evaluation_context':source['evaluation_context'],'plan':plan}
+        conditions=[];bundled_plans=None
+        for experience in experiences:
+            match=experience['match'];request=match.get('request') or {}
+            condition={key:request[key] for key in ('map_id','seed','bridge_profile','sensory_profile','mode','duration_seconds') if key in request}
+            # An objective belongs to the evaluation's own recorded training plan,
+            # never to an unrelated origin or a contemporary default.
+            with self.store.db() as db:
+                plan_row=db.execute('SELECT r.spec FROM training_evaluations e JOIN training_runs r ON r.id=e.run_id WHERE e.match_id=?',(match['id'],)).fetchone()
+            plan=json.loads(plan_row[0]) if plan_row else None
+            if plan is None and self.store.match(match['id']) is None:
+                if bundled_plans is None:
+                    bundled_plans={m['id']:run.get('spec') for run in training._bundled_showcase()
+                                   for member in run.get('members',[]) for m in member.get('matches',[]) if m.get('id')}
+                plan=bundled_plans.get(match['id'])
+            if plan and 'fitness_objective' in plan:condition['fitness_objective']=plan['fitness_objective']
+            others=[fid for fid in request.get('fly_ids',[]) if fid!=ident]
+            if request.get('mode')=='contest' and len(others)==1 and self.visible(others[0],owner):condition['opponent_id']=others[0]
+            conditions.append({'match_id':match['id'],'status':match['status'],**condition})
         return {'fly':fly,'can_annotate':can_annotate,'origin':origin_info,'ancestors':ancestors,
+                'continuation':{'conditions':conditions,'requires_copy':fly.get('source',{}).get('kind')=='published-training'},
                 'descendants':[self.card(c,owner) for c in children if self.visible(c,owner)],
                 'experiences':experiences,'notes':notes,
                 'limits':{'experiences':100,'descendants':100,'ancestors':24},

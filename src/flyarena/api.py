@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Literal
 
 from contextlib import asynccontextmanager
 from functools import lru_cache
@@ -184,6 +185,15 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     @app.get('/api/v1/lives')
     def life_list(owner=Depends(optional_identity)):
         return ledger.listing(owner)
+
+    @app.get('/api/v1/lives/discover')
+    def life_discover(query: str = Query(default='',max_length=200),
+                      reference_kind: Literal['wildtype','official','user','ai'] | None = None,
+                      has_descendants: bool | None = None, offset: int = Query(default=0,ge=0),
+                      limit: int = Query(default=25,ge=1,le=100),
+                      scope: Literal['public','accessible'] = 'public',owner=Depends(optional_identity)):
+        return ledger.discover(owner,query=query,reference_kind=reference_kind,has_descendants=has_descendants,
+                               offset=offset,limit=limit,scope=scope)
 
     @app.get('/api/v1/lives/{ident}')
     def life_get(ident: str, owner=Depends(optional_identity)):
