@@ -1,0 +1,97 @@
+{
+  "date": "2026-09-24",
+  "branch": "fix/predeploy-qa",
+  "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
+  "verdict": "blocked",
+  "scope": "Pre-deploy integration QA for rounds 3+4, local disposable database, no worker. Not deployed.",
+  "checks": [
+    {
+      "command": "cd web && npm test",
+      "runtime": "Node v26.3.0",
+      "status": "passed",
+      "passed": 259,
+      "failed": 0,
+      "skipped": 0,
+      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-node26.log"
+    },
+    {
+      "command": "cd web; TEST_FILES=$(node -p 'JSON.parse(require(\"node:fs\").readFileSync(\"package.json\", \"utf8\")).scripts.test.replace(/^node --test /, \"\")'); /private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/node22/node_modules/.bin/node --test ${=TEST_FILES}",
+      "shell": "zsh",
+      "runtime": "Node v22.23.3",
+      "status": "passed",
+      "passed": 259,
+      "failed": 0,
+      "skipped": 0,
+      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-node22.log"
+    },
+    {
+      "command": "cd web && npm run test:journeys",
+      "runtime": "Node v26.3.0",
+      "status": "passed",
+      "passed": 74,
+      "failed": 0,
+      "skipped": 0,
+      "scope": "React controls in JSDOM; not a real browser or GPU test",
+      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-journeys.log"
+    },
+    {
+      "command": "cd web && npm run build",
+      "runtime": "Node v26.3.0",
+      "status": "passed",
+      "warning": "Main JS chunk is 1660.66 kB minified (487.24 kB gzip), above the configured 1100 kB warning threshold. No browser performance impact was measured.",
+      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-build.log"
+    }
+  ],
+  "incidents": [
+    {
+      "severity": "validation-blocker",
+      "where": "Backend startup, 127.0.0.1:8193",
+      "status": "not resolved",
+      "evidence": "Uvicorn completed application startup, then exited 3: [Errno 1] error while attempting to bind on address (127.0.0.1, 8193): operation not permitted. Application shutdown completed.",
+      "classification": "Sandbox execution restriction; not established as an application defect."
+    },
+    {
+      "severity": "validation-blocker",
+      "where": "Vite startup, 127.0.0.1:5599",
+      "status": "not resolved",
+      "evidence": "Vite exited 1: listen EPERM: operation not permitted 127.0.0.1:5599.",
+      "classification": "Sandbox execution restriction; not established as an application defect."
+    }
+  ],
+  "product_defects": [],
+  "product_defects_note": "No product defect established by completed checks. Browser defect discovery was blocked; this is not a claim that the product is defect-free.",
+  "browser_coverage": {
+    "status": "not run",
+    "viewports": [
+      {
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "width": 390,
+        "height": 844
+      }
+    ],
+    "locales": [
+      "zh-CN",
+      "en"
+    ],
+    "pending": [
+      "First-visit guide next action, clone WT, edit and save design, local registration/login",
+      "WT preset, submission, queued series and observation states with no worker",
+      "Series deep link",
+      "Life ledger lineage, continue evolution plan, public fly challenge with own fly",
+      "Existing replay aca9ac97af8a4cfcb863c3b45da5e857: 3D/2D toggle, sticky scene, event navigator, comparison context",
+      "Lab 3D",
+      "Brain anatomy and forced WebGL failure fallback",
+      "Each tab mobile layout",
+      "Browser console errors"
+    ],
+    "screenshots": [],
+    "screenshot_directory": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/shots"
+  },
+  "changes": "QA evidence report only; no application, scientific semantics, localization, CI, or backend source changes.",
+  "python_tests": "Not run: no Python/backend source changes.",
+  "cleanup": "Both launched servers exited after denied port binding; backend completed shutdown. Temporary Node REPL exited. A process-table cross-check was denied by the sandbox (ps: operation not permitted).",
+  "log_ref": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/log-qa.jsonl"
+}
