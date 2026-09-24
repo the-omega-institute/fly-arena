@@ -34,6 +34,11 @@ export function sceneFraming(bounds:{min:readonly number[];max:readonly number[]
  return {position:target.map((value,axis)=>value+backward[axis]*distance) as [number,number,number],target,distance,span}
 }
 
+/** Static map previews use a wider presentation lens so the measured layout fills the card. */
+export function previewSceneFraming(bounds:{min:readonly number[];max:readonly number[]},aspect:number):SceneFraming{
+ return sceneFraming(bounds,aspect,52,false)
+}
+
 /** Millimeter grid with bounded density, shared across plain arena sizes. */
 export function sceneGrid(size:number){
  const step=10**Math.floor(Math.log10(Math.max(1,size/24))),ratio=size/24/step

@@ -5,6 +5,7 @@ import {guideMessages} from './messages/guide'
 import {mapsMessages} from './messages/maps'
 import {duelMessages} from './messages/duel'
 import {lifeMessages} from './messages/life'
+import {replayMessages} from './messages/replay'
 
 const baseCatalog = {
 "接触对抗 / 领地争夺":{"en": "Contact / territory contest", "zh-CN": "接触对抗 / 领地争夺"},
@@ -1526,5 +1527,6 @@ export const catalog = {
   ...mapsMessages,
   ...duelMessages,
   ...lifeMessages,
+  ...replayMessages,
 } as const
 export type MessageKey=keyof typeof catalog
