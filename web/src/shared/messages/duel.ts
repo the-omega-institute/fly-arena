@@ -250,9 +250,9 @@ export const duelMessages = {
     "en": "Paired food and ring series require 1–30 simulated seconds per match.",
     "zh-CN": "食物及擂台配对系列赛要求每场 1–30 模拟秒。"
   },
-  "Use 1–300 whole simulated seconds per match.": {
-    "en": "Use 1–300 whole simulated seconds per match.",
-    "zh-CN": "每场时长须为 1–300 整数模拟秒。"
+  "Use 1–180 whole simulated seconds per match.": {
+    "en": "Use 1–180 whole simulated seconds per match.",
+    "zh-CN": "每场时长须为 1–180 整数模拟秒。"
   },
   "Experiment submitted. Recorded results will appear as each match finishes.": {
     "en": "Experiment submitted. Recorded results will appear as each match finishes.",
@@ -286,9 +286,9 @@ export const duelMessages = {
     "en": "Prepare WT challenge",
     "zh-CN": "准备挑战 WT"
   },
-  "Preset: orchard · seed 42 · 2 seconds per match. Review the plan, then create the paired series: two swapped matches, 4 simulated seconds total.": {
-    "en": "Preset: orchard · seed 42 · 2 seconds per match. Review the plan, then create the paired series: two swapped matches, 4 simulated seconds total.",
-    "zh-CN": "预设：果园 · 种子 42 · 每场 2 秒。检查计划后创建双循环系列赛：换边两场，共 4 模拟秒。"
+  "Preset: orchard · seed 42 · 10 seconds per match. Review the plan, then create the paired series: two swapped matches, 20 simulated seconds total.": {
+    "en": "Preset: orchard · seed 42 · 10 seconds per match. Review the plan, then create the paired series: two swapped matches, 20 simulated seconds total.",
+    "zh-CN": "预设：果园 · 种子 42 · 每场 10 秒。检查计划后创建双循环系列赛：换边两场，共 20 模拟秒。"
   },
 "New experiment · setup":{"en": "New experiment · setup", "zh-CN": "新实验 · 设置"},
 "Observation only — arrival time is not a scored outcome yet (#82). Failure to arrive stays visible; there is no competitive winner.":{"en": "Observation only — arrival time is not a scored outcome yet (#82). Failure to arrive stays visible; there is no competitive winner.", "zh-CN": "仅供观察 — 到达时间尚不能作为计分结果（#82）。未到达会如实保留；没有竞争胜者。"},

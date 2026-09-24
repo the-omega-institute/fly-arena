@@ -152,3 +152,29 @@ def test_api_recovers_durable_schedule_and_filters_owner_before_limit(tmp_path):
         assert report['schedule'][0]['errors'] == ['fixture failure']
         assert [row['id'] for row in client.get('/api/v1/tournaments?owner=owner').json()] == [saved['id']]
         assert client.get('/api/v1/tournaments/not-found').status_code == 404
+
+
+def test_sandbox_180_second_pair_is_atomic_recoverable_and_outside_rankings(tmp_path):
+    store = Store(tmp_path)
+    ids = [store.add_fly('owner', {'name': c, 'color': 'mint'}, {'artifact_id': c*64})['id'] for c in 'ab']
+    spec = TournamentRequest(name='long sandbox comparison', fly_ids=ids,
+                             duration_seconds=180, sandbox=True).model_dump()
+    report = store.add_tournament('owner', spec, 'runtime', 'long-pair')
+    assert report['expected_matches'] == 2 and report['verified_matches'] == 0
+    first, second = report['matches']
+    assert first['request']['fly_ids'] == second['request']['fly_ids'][::-1]
+    assert all(m['request']['duration_seconds'] == 180 and m['request']['sandbox'] for m in report['matches'])
+    assert store.add_tournament('owner', spec, 'new-runtime', 'long-pair')['id'] == report['id']
+    with pytest.raises(ValueError, match='different request'):
+        store.add_tournament('owner', dict(spec, duration_seconds=60), 'runtime', 'long-pair')
+    restarted = Store(tmp_path)
+    assert restarted.tournament(report['id'])['spec']['duration_seconds'] == 180
+    # Synthetic verified outcomes exercise membership/accounting, not long-run physics.
+    import json
+    with restarted.db() as db:
+        db.execute("UPDATE matches SET status='verified',result=? WHERE tournament=?",
+                   (json.dumps({'winner_slot': 0, 'scores': [2., 1.], 'outcome': 'win'}), report['id']))
+    result = restarted.tournament(report['id'])
+    assert result['status'] == 'complete'
+    assert all(row['wins'] == row['losses'] == 1 for row in result['standings'])
+    assert all(row['matches'] == row['points'] == 0 for row in restarted.leaderboard())

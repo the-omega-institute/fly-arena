@@ -61,10 +61,10 @@ test('next action advances only with saved designs and recorded comparison/evolu
 })
 test('WT preparation uses a compatible server reference and the exact Arena paired plan',()=>{
  const plan=guideComparisonPlan([fly,wt],fly.id,maps,season)
- assert.deepEqual(plan.setup,{selected:fly.id,opponent:wt.id,mapId:'orchard',mode:'contest',seedText:'42',duration:2,bridgeProfile:'legacy-v1',sensoryProfile:'odor-only-v1'})
+ assert.deepEqual(plan.setup,{selected:fly.id,opponent:wt.id,mapId:'orchard',mode:'contest',seedText:'42',duration:10,bridgeProfile:'legacy-v1',sensoryProfile:'odor-only-v1'})
  assert.equal(plan.submissions[0].endpoint,'/tournaments')
  assert.deepEqual(plan.matches.map(m=>m.fly_ids),[[fly.id,wt.id],[wt.id,fly.id]])
- assert.ok(plan.matches.every(m=>m.seed===42&&m.duration_seconds===2))
+ assert.ok(plan.matches.every(m=>m.seed===42&&m.duration_seconds===10))
  for(const flies of [[fly],[fly,{...wt,reference_kind:'user',name:'WT'}],[fly,{...wt,spec:{...spec,model_profile:'other'}}],[fly,{...wt,spec:{...spec,connectome_sha256:'other'}}]])assert.equal(guideComparisonPlan(flies,fly.id,maps,season),null)
  assert.equal(guideComparisonPlan([fly,wt],wt.id,maps,season),null)
  assert.equal(guideComparisonPlan([fly,wt],fly.id,maps,null),null)
@@ -152,7 +152,7 @@ for(const [module,names] of Object.entries({
  'features/arena/ArenaFeature':['ArenaFeature'],
 })){const file=require.resolve('./src/'+module+'.js');require.cache[file]={id:file,filename:file,loaded:true,exports:Object.fromEntries(names.map(name=>[name,props=>{if(name==='ArenaFeature')arenaProps=props;return null}]))}}
 const App=require('./src/App.js').default
-test('App comparison action installs the WT plan, selects the saved fly, and never submits work',async()=>withDOM('#tab=design',async(dom,mount)=>{
+test('App comparison action stays in design and opens explicit comparison without submitting work',async()=>withDOM('#tab=design',async(dom,mount)=>{
  const requests=[]
  localStorage.setItem('flyarena.identity',JSON.stringify({id:'me',name:'Designer',token:'fixture'}))
  globalThis.fetch=async(url,options={})=>{
@@ -163,11 +163,9 @@ test('App comparison action installs the WT plan, selects the saved fly, and nev
  await mount(App,{})
  assert.equal(document.querySelector('[data-guide-next]').dataset.guideNext,'compare')
  await act(async()=>document.querySelector('[data-guide-next]').click())
- assert.equal(arenaProps.selected,fly.id);assert.equal(arenaProps.opponent,wt.id)
- assert.equal(arenaProps.mode,'contest');assert.equal(arenaProps.mapId,'orchard')
- assert.equal(arenaProps.duration,2);assert.equal(arenaProps.seedText,'42')
- assert.equal(arenaProps.bridgeProfile,'legacy-v1');assert.equal(arenaProps.sensoryProfile,'odor-only-v1')
- assert.equal(arenaProps.focused,'');assert.equal(arenaProps.seriesId,'')
- assert.equal(arenaProps.play,false);assert.match(location.hash,/tab=arena/)
+ assert.match(location.hash,/tab=design/)
+ assert.ok(document.querySelector('[aria-label="Compare your saved design"]'))
+ assert.equal(document.querySelector('select[aria-label="Observation time per match"]').value,'10')
+ assert.ok(document.body.textContent.includes('Start comparison · results stay here'))
  assert.ok(requests.every(([,method])=>method==='GET'))
 }))

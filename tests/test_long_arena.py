@@ -11,7 +11,7 @@ from flyarena.common import write_json
 from test_replay import receipt_factory, resign
 
 
-def test_observation_horizon_does_not_expand_training_or_tournaments():
+def test_observation_horizon_keeps_ranked_tournaments_bounded():
     assert MatchRequest(fly_ids=['a'*32], mode='forage', map_id='labyrinth', duration_seconds=300, sandbox=True)
     for request in [dict(fly_ids=['a'*32],mode='forage',duration_seconds=301),
                     dict(fly_ids=['a'*32,'b'*32],mode='contest',map_id='labyrinth'),
@@ -19,6 +19,9 @@ def test_observation_horizon_does_not_expand_training_or_tournaments():
         with pytest.raises(ValueError): MatchRequest(**request)
     with pytest.raises(ValueError):
         TournamentRequest(name='bounded series',fly_ids=['a'*32,'b'*32],duration_seconds=180)
+    assert TournamentRequest(name='sandbox pair', fly_ids=['a'*32,'b'*32], duration_seconds=180, sandbox=True)
+    with pytest.raises(ValueError):
+        TournamentRequest(name='too long', fly_ids=['a'*32,'b'*32], duration_seconds=181, sandbox=True)
     assert recording_policy(30)==POLICY
     assert recording_policy(180)==LONG_POLICY
     validate_policy(LONG_POLICY,RULES)

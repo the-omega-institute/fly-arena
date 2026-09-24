@@ -66,14 +66,14 @@ test('contact territory saves one durable plan without substituting contest or u
  assert.ok(plan.matches.every(m=>m.sandbox&&m.duration_seconds===180))
 })
 test('solo submits one fly per seed even when an incompatible or missing opponent was previously selected',()=>{
- const {plan}=build({mode:'forage',mapId:'labyrinth',opponent:'missing',seedText:'42,43',duration:300})
+ const {plan}=build({mode:'forage',mapId:'labyrinth',opponent:'missing',seedText:'42,43',duration:180})
  assert.equal(plan.matches.length,2);assert.ok(plan.matches.every(m=>m.fly_ids.length===1&&m.fly_ids[0]===subject.id&&m.mode==='forage'))
  assert.equal(plan.submissions.length,1);assert.equal(plan.submissions[0].endpoint,'/observation-series')
 })
 test('contract duration bounds and ring scoring remain mode-specific',()=>{
- for(const duration of [0,1.5,31,300])assert.equal(build({duration}).plan,null)
- for(const duration of [1,30])assert.ok(build({duration}).plan)
- for(const duration of [0,301,NaN])assert.equal(build({duration,mode:'duel',mapId:'duel'}).plan,null)
+ for(const duration of [0,1.5,181,300])assert.equal(build({duration}).plan,null)
+ for(const duration of [1,30,60,180])assert.ok(build({duration}).plan)
+ for(const duration of [0,181,301,NaN])assert.equal(build({duration,mode:'duel',mapId:'duel'}).plan,null)
  const {plan}=build({mapId:'ring',mode:'sumo'})
  assert.equal(plan.submissions[0].body.mode,'sumo');assert.equal(plan.matches.length,2)
  assert.match(experimentScore('sumo','ring'),/food is not the winning metric/)

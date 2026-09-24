@@ -139,7 +139,7 @@ class TournamentRequest(StrictModel):
     map_id: Literal["orchard", "maze", "scarcity", "ring", "terrarium", "enclosure", "canopy", "switchback", "blank", "labyrinth", "duel"] = "orchard"
     mode: Literal["contest", "sumo"] = "contest"
     seeds: list[int] = Field(default_factory=lambda: [42], min_length=1, max_length=3)
-    duration_seconds: int = Field(default=5, ge=1, le=30)
+    duration_seconds: int = Field(default=5, ge=1, le=180)
 
     def validate_admission(self):
         MatchRequest(fly_ids=self.fly_ids[:2], map_id=self.map_id, mode=self.mode,
@@ -147,6 +147,8 @@ class TournamentRequest(StrictModel):
 
     @model_validator(mode="after")
     def valid_entries(self):
+        if not self.sandbox and self.duration_seconds > 30:
+            raise ValueError("Ranked tournaments require at most 30 seconds per match; use sandbox for longer comparisons")
         if len(set(self.fly_ids)) != len(self.fly_ids):
             raise ValueError("Tournament entries must be distinct")
         if len(set(self.seeds)) != len(self.seeds) or any(s < 0 or s > 2**31 - 1 for s in self.seeds):

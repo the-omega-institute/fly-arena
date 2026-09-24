@@ -109,7 +109,7 @@ for(const locale of ['en','zh-CN'])test(`question cards have explicit native but
   assert.equal(current.mapId,experimentPresets[index].mapId)
  }
  // Changing a preset condition through its native select clears the selected card.
- const duration=[...document.querySelectorAll('select')].find(select=>[...select.options].some(option=>option.value==='300'))
+ const duration=[...document.querySelectorAll('select')].find(select=>[...select.options].some(option=>option.value==='180'))
  await act(async()=>{duration.value='60';duration.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
  assert.equal(document.querySelectorAll('.experiment-preset.selected').length,0)
  assert.equal(previews.length,3)

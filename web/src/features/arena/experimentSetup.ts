@@ -44,8 +44,8 @@ export function buildExperimentPlan(setup:ExperimentSetup,flies:Fly[],maps:Arena
   else {const reason=opponentReason(subject,opponent,setup.bridgeProfile);if(reason)errors.push(reason)}
  }
  if(!seeds)errors.push('Enter 1–3 distinct whole-number seeds from 0 to 2147483647, separated by commas.')
- const tournament=setup.mode==='contest'||setup.mode==='sumo',max=tournament?30:300
- if(!Number.isInteger(setup.duration)||setup.duration<1||setup.duration>max)errors.push(tournament?'Paired food and ring series require 1–30 simulated seconds per match.':'Use 1–300 whole simulated seconds per match.')
+ const tournament=setup.mode==='contest'||setup.mode==='sumo'
+ if(!Number.isInteger(setup.duration)||setup.duration<1||setup.duration>180)errors.push('Use 1–180 whole simulated seconds per match.')
  if(errors.length||!seeds)return {plan:null,errors}
  const base={sandbox:true as const,bridge_profile:setup.bridgeProfile,sensory_profile:setup.sensoryProfile,map_id:setup.mapId,mode:setup.mode as ExperimentMode,duration_seconds:setup.duration}
  const slots=setup.mode==='forage'?[[setup.selected]]:[[setup.selected,setup.opponent],[setup.opponent,setup.selected]]

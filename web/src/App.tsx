@@ -1,3 +1,4 @@
+import {FirstComparison} from './features/design/FirstComparison'
 import {buildExperimentPlan,type ExperimentPlan} from './features/arena/experimentSetup'
 import './features/arena/experimentSetup.css'
 import {playableProfile} from './types'
@@ -5,7 +6,7 @@ import type {ReplayDesignOrigin} from './features/arena/replayDesign'
 import {NeuralPreviewPanel,type NeuralPreview,type PreviewRecord} from './features/design/NeuralPreviewPanel'
 import {BrainModelPicker} from './features/design/BrainModelPicker'
 import {LifeLedger} from './features/life/LifeLedger'
-import {guideSubject,guideComparisonPlan,baselineComparison,hasRecordedEvolution,useGuideEvidence} from './features/guide/nextAction'
+import {guideSubject,baselineComparison,hasRecordedEvolution,useGuideEvidence} from './features/guide/nextAction'
 import {PlaygroundGuide} from './features/guide/PlaygroundGuide'
 import {matchingWildType} from './features/arena/wildtype'
 import {TrainingSandbox} from './features/training/TrainingSandbox'
@@ -72,7 +73,8 @@ export default function App(){
   const pendingExperiment=useRef<ExperimentPlan|null>(null)
   const experimentAttempt=useRef<{fingerprint:string;keys:string[]}|null>(null)
   const experimentSubmitting=useRef(false)
-  const pendingIntent=useRef<'match'|'save-arena'|'save-train'|null>(null)
+  const pendingIntent=useRef<'match'|'save'|'save-arena'|'save-train'|null>(null)
+  const [comparisonFocus,setComparisonFocus]=useState(0)
   const [identityName,setIdentityName]=useState('')
   const [invite,setInvite]=useState('')
   const [showToken,setShowToken]=useState(false)
@@ -82,7 +84,7 @@ export default function App(){
   const [mapId,setMapId]=useState('orchard')
   const [mode,setMode]=useState('forage')
   const [opponent,setOpponent]=useState('')
-  const [duration,setDuration]=useState(2)
+  const [duration,setDuration]=useState(10)
   const [seedText,setSeedText]=useState('42')
   const [focused,setFocusedState]=useState<string>(readRoute(location.hash).match)
   const [play,setPlay]=useState(false)
@@ -97,7 +99,6 @@ export default function App(){
   const selectedFly=availableFlies.find(f=>f.id===selected)
   const guideFly=guideSubject(availableFlies,selected,identity?.id)
   const guideEvidence=useGuideEvidence(tab==='design'?guideFly:undefined,identity)
-  const guidePlan=guideComparisonPlan(availableFlies,guideFly?.id||'',maps,season)
   function prepareGuideComparison(plan:ExperimentPlan){const setup=plan.setup;setSelected(setup.selected);setOpponent(setup.opponent);setMode(setup.mode);setMapId(setup.mapId);setSeedText(setup.seedText);setDuration(setup.duration);setBridgeProfile(setup.bridgeProfile);setSensoryProfile(setup.sensoryProfile);navigate('arena',experimentId,'','');setPlay(false)}
   const [archivedMatch,setArchivedMatch]=useState<Match|null>(null)
   const [archiveError,setArchiveError]=useState<{id:string;message:string}|null>(null)
@@ -199,19 +200,19 @@ export default function App(){
   async function validate(){if(!identity){setLogin(true);return}await action('validate',async()=>{const r=await api<Report>('/flies/validate',{method:'POST',body:JSON.stringify(spec)},identity);setReport(r);setToast(t("权重、图谱版本和变异预算验证通过。"))})}
   async function previewNeural(){if(!identity){setLogin(true);return}await action('neural-preview',async()=>{const result=await api<NeuralPreview>('/flies/preview',{method:'POST',body:JSON.stringify(spec)},identity);setNeuralPreview({data:result,specKey:JSON.stringify(spec)});setToast(t('Neural preview recorded from the retained graph.'))})}
   async function previewExample(){await action('neural-example',async()=>{const response=await fetch('/examples/neural-preview-nectar-v3.json');if(!response.ok)throw Error(locale==='zh-CN'?'刺激样本暂不可用':'Stimulus example is unavailable');const data:NeuralPreview=await response.json();if(!['neural-design-preview/v2','neural-design-preview/v3'].includes(data.schema)||!data.example)throw Error('Invalid stimulus example');setNeuralPreview({data,specKey:null})})}
-  async function submitMatch(owner:Identity, flyIds:string[], setup:{map_id:string;mode:string;duration_seconds:number;seed:number}){
-    const match=await api<Match>('/matches',{method:'POST',headers:{'Idempotency-Key':newRequestKey()},body:JSON.stringify({...setup,fly_ids:flyIds,bridge_profile:bridgeProfile,sensory_profile:selectedSensoryProfile,sandbox:true})},owner)
-    setFocused(match.id);await refresh();setToast(t("比赛已进入仿真队列，完成后自动加载回放。"))
-  }
-  async function publish(destination:'train'|'arena'='train'){
-    if(!identity){pendingIntent.current=destination==='arena'?'save-arena':'save-train';setLogin(true);return}
+  function openSavedComparison(){setTab('design');setComparisonFocus(value=>value+1)}
+  useEffect(()=>{
+    if(!comparisonFocus||tab!=='design')return
+    const panel=document.getElementById('saved-design-comparison')
+    panel?.scrollIntoView?.({block:'start',behavior:'smooth'});panel?.focus({preventScroll:true})
+  },[comparisonFocus,tab])
+  async function publish(){
+    if(!identity){pendingIntent.current='save';setLogin(true);return}
     await action('publish',async()=>{
       const fly=await api<Fly>('/flies',{method:'POST',body:JSON.stringify(spec)},identity)
-      await refresh();setSelected(fly.id);setReport(fly.report);setBaseSpec(fly.spec);setParentId(fly.id);setReplayOrigin(null)
-      if(destination==='arena'){
-        setMapId('orchard');setMode('forage');setDuration(2);setSeedText('42')
-        await submitMatch(identity,[fly.id],{map_id:'orchard',mode:'forage',duration_seconds:2,seed:42})
-      }else{setTab('train');setToast(t('Design saved. Choose a strategy and budget to start training.'))}
+      setFlies(old=>[fly,...old.filter(item=>item.id!==fly.id)])
+      setSelected(fly.id);setReport(fly.report);setBaseSpec(fly.spec);setParentId(fly.id);setReplayOrigin(null)
+      openSavedComparison();setToast('')
     })
   }
   async function startMatch(requested:ExperimentPlan){
@@ -247,7 +248,7 @@ export default function App(){
     if(!season||!setupRestored)return
     const intent=pendingIntent.current;pendingIntent.current=null
     if(intent==='match'){const plan=pendingExperiment.current;if(plan)void startMatch(plan)}
-    else if(intent)void publish(intent==='save-arena'?'arena':'train')
+    else if(intent)void publish()
   },[identity,login,season,setupRestored])
   function loadSpec(value:Spec){assertSpec(value);setReplayOrigin(null);setParentId(value.parent_id||null);setBaseSpec(value);setInterventions(value.interventions||[]);setName(value.name);setColor(value.color);setSelected(value.parent_id||'');const values:Record<string,number>=defaultScales();for(const m of value.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(value.neuron_parameters?.tau_scale??1);setThreshold(value.neuron_parameters?.threshold_shift_mv??0);setEdgeDeltas(value.edge_deltas||[]);setReport(null);setTab('design');setToast(t("设计已导入；保存时将再次通过服务端验证。"))}
   function designFromReplay(draft:Spec,origin:ReplayDesignOrigin){loadSpec(draft);setReplayOrigin(origin);setSelected('');setNeuralPreview(null);setPlay(false)}
@@ -275,9 +276,10 @@ export default function App(){
       {tab==='design'&&<>
         {replayOrigin&&<section className="panel replay-design-origin" aria-label={locale==='zh-CN'?'回放设计来源':'Replay design source'}><div><strong>{locale==='zh-CN'?'从这份参赛大脑继续设计：':'Designing from this recorded brain: '}{replayOrigin.name}</strong><p>{locale==='zh-CN'?'当前是未保存的后代草稿。修改、预览并保存后，选择算法训练或与 WT 竞技。':'This is an unsaved child draft. Edit, preview and save it, then select training or compete with WT.'}</p></div><button className="text-link" aria-label={locale==='zh-CN'?'回看亲代这场表现':'Revisit the parent’s match'} onClick={()=>setFocused(replayOrigin.matchId)}>{locale==='zh-CN'?'回看亲代这场表现':'Revisit the parent’s match'} →</button></section>}
 
+        {guideFly&&identity&&<div id="saved-design-comparison" tabIndex={-1}><FirstComparison key={identity.id+guideFly.id} subject={guideFly} flies={availableFlies} maps={maps} season={season} identity={identity} onArena={(series,match)=>{setSelected(guideFly.id);navigate('arena','',match,series,'');setPlay(false)}}/></div>}
         <PlaygroundGuide neuronCount={season?.connectome.neuron_count}
-          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!guideFly} subjectName={guideFly?.name} canCompare={!!guidePlan} hasCompared={!!baselineComparison(availableFlies,guideFly,guideEvidence.record)} hasEvolved={hasRecordedEvolution(guideEvidence.record,guideFly)} evidenceError={guideEvidence.error}
-          onCompare={()=>{if(guidePlan)prepareGuideComparison(guidePlan)}}
+          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!guideFly} subjectName={guideFly?.name} canCompare={!!guideFly} hasCompared={!!baselineComparison(availableFlies,guideFly,guideEvidence.record)} hasEvolved={hasRecordedEvolution(guideEvidence.record,guideFly)} evidenceError={guideEvidence.error}
+          onCompare={openSavedComparison}
           onDesign={()=>{document.getElementById('fly-name')?.scrollIntoView({block:'center',behavior:'smooth'});document.getElementById('fly-name')?.focus({preventScroll:true})}}
           onCloneWT={()=>{const wt=matchingWildType(flies);if(wt){clone(wt);setToast(locale==='zh-CN'?'已复制 WT 为草稿。修改并保存后，再训练或挑战。':'WT copied into a draft. Edit and save it before training or competing.');document.getElementById('fly-name')?.focus()}}}
           onTrain={()=>{if(guideFly)setSelected(guideFly.id);navigate('train',experimentId,'','')}} onArena={()=>{if(guideFly)setSelected(guideFly.id);setMode('contest');navigate('arena',experimentId,'','');setPlay(false)}}
@@ -305,7 +307,7 @@ export default function App(){
             <p className="capability-note">{t('Start with olfactory → projection / local → readout. Vision depends on the match sensory profile; weight edits alone do not add learning or new motor channels.')}</p><div className="sliders">{season?.connectome.circuits.filter(c=>!['visual','memory','motor'].includes(c.id)).map(c=><label key={c.id} className={'slider-control '+(['visual','memory','motor'].includes(c.id)?'exploratory':'primary-control')}><span><span className="circuit-dot" style={{background:c.color}}/>{t(c.label)}<small>× {scales[c.id]?.toFixed(2)}</small></span><input aria-label={t(c.label)+' '+t('Weight')} type="range" min="0.5" max="2" step=".01" value={scales[c.id]??1} onChange={e=>{setScales(s=>({...s,[c.id]:Number(e.target.value)}));setReport(null)}}/></label>)}</div><details className="exploratory-controls"><summary>{t('Exploratory edits: vision, memory and motor')}</summary><p>{t('Experimental visual input requires a compatible sensory profile. Memory and motor edits remain exploratory.')}</p><div className="sliders">{season?.connectome.circuits.filter(c=>['visual','memory','motor'].includes(c.id)).map(c=><label key={c.id} className={'slider-control '+(['visual','memory','motor'].includes(c.id)?'exploratory':'primary-control')}><span><span className="circuit-dot" style={{background:c.color}}/>{t(c.label)}<small>× {scales[c.id]?.toFixed(2)}</small></span><input aria-label={t(c.label)+' '+t('Weight')} type="range" min="0.5" max="2" step=".01" value={scales[c.id]??1} onChange={e=>{setScales(s=>({...s,[c.id]:Number(e.target.value)}));setReport(null)}}/></label>)}</div></details>
             <details className="intrinsic"><summary>{t("神经元动力学")}<ChevronDown size={13}/></summary><label>{t("膜时间常数")}<b>× {tau.toFixed(2)}</b><input aria-label={t("膜时间常数")} type="range" min=".8" max="1.2" step=".01" value={tau} onChange={e=>{setTau(+e.target.value);setReport(null)}}/></label><label>{t("发放阈值变化")}<b>{threshold>0?'+':''}{threshold.toFixed(1)} {t("mV")}</b><input aria-label={t("发放阈值")} type="range" min="-1" max="1" step=".1" value={threshold} onChange={e=>{setThreshold(+e.target.value);setReport(null)}}/></label></details>
             <div className={'budget '+(used>100?'over':'')}><div><span>{report?t("已验证预算"):t("预算估算")}</span><strong>{used.toFixed(1)} <small>/ 100</small></strong></div><div className="budget-track"><span style={{width:Math.min(100,used)+'%'}}/></div><p>{report?`${num(report.changed_edges)} ${t('Changed connections')}`:t("强化与削弱都消耗预算，最终由服务端核算。")}</p>{!report&&(interventions.length>0||edgeDeltas.length>0)&&<p>{t('Estimate excludes advanced and edge edits. Validate for the authoritative total.')}</p>}</div>
-            <div className="editor-actions"><button className="primary" onClick={()=>publish('arena')} disabled={!!busy||!season||!season.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))}><Play size={15}/>{locale==='zh-CN'?'保存并试跑 2 秒':'Save and simulate 2 seconds'}</button><button className="secondary" onClick={validate} disabled={!!busy}>{busy==='validate'?<Loader2 className="spin" size={15}/>:<ShieldCheck size={15}/>}{t("验证")}</button><button className="secondary" onClick={previewNeural} disabled={!!busy||!season}>{busy==='neural-preview'?<Loader2 className="spin" size={15}/>:<AudioLines size={15}/>}{t('Preview neural response')}</button><button className="secondary" onClick={previewExample} disabled={!!busy}>{busy==='neural-example'?<Loader2 className="spin" size={15}/>:<Beaker size={15}/>} {locale==='zh-CN'?'查看真实刺激样本':'View recorded stimulus example'}</button><button className="primary" onClick={()=>publish()} disabled={!!busy||!season}>{busy==='publish'?<Loader2 className="spin" size={15}/>:<Plus size={15}/>}{t("保存果蝇")}</button></div>
+            <div className="editor-actions"><button className="primary" onClick={()=>publish()} disabled={!!busy||!season}>{busy==='publish'?<Loader2 className="spin" size={15}/>:<Plus size={15}/>}{locale==='zh-CN'?'保存并对比':'Save and compare'}</button><button className="secondary" onClick={validate} disabled={!!busy}>{busy==='validate'?<Loader2 className="spin" size={15}/>:<ShieldCheck size={15}/>}{t("验证")}</button><button className="secondary" onClick={previewNeural} disabled={!!busy||!season}>{busy==='neural-preview'?<Loader2 className="spin" size={15}/>:<AudioLines size={15}/>}{t('Preview neural response')}</button><button className="secondary" onClick={previewExample} disabled={!!busy}>{busy==='neural-example'?<Loader2 className="spin" size={15}/>:<Beaker size={15}/>} {locale==='zh-CN'?'查看真实刺激样本':'View recorded stimulus example'}</button></div>
           </aside>
         </div>
         {neuralPreview&&<NeuralPreviewPanel record={neuralPreview} stale={neuralPreview.specKey!==JSON.stringify(spec)} circuits={season?.connectome.circuits||[]} onImport={loadSpec} onReplay={id=>{setFocused(id);setTab('arena')}}/>}

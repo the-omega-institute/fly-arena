@@ -94,9 +94,9 @@ test('WT challenge prepares the exact visible small preset and requires a saved 
  await mount(WildTypeChallenge,{flies:[wt,own],selected:'',onPrepare:p=>plans.push(p)})
  assert.equal(button('Prepare WT challenge').disabled,true)
  await mount(WildTypeChallenge,{flies:[wt,own],selected:own.id,onPrepare:p=>plans.push(p)})
- assert.match(document.body.textContent,/4 simulated seconds total/)
+ assert.match(document.body.textContent,/20 simulated seconds total/)
  await click('Prepare WT challenge')
- assert.deepEqual(plans,[{subject:own,reference:wt,map_id:'orchard',mode:'contest',duration_seconds:2,seed:42}])
+ assert.deepEqual(plans,[{subject:own,reference:wt,map_id:'orchard',mode:'contest',duration_seconds:10,seed:42}])
 })
 test('AI instructions copy the actual origin without credentials and survive clipboard failure',async()=>{
  let copied='';let identityRequests=0
@@ -616,12 +616,13 @@ test('a replay participant becomes an editable saved child and the exact new tra
  assert.equal(writes.length,0)
  await click('Revisit the parent’s match');assert.match(location.hash,/match=replay-match/)
  await click('Design from this brain')
- const save=button('Save fly');assert.ok(save)
+ const save=button('Save and compare');assert.ok(save)
  await act(async()=>save.click())
  assert.equal(writes.length,1);assert.equal(writes[0].parent_id,own.id)
  assert.deepEqual(writes[0].edge_deltas,participant.spec.edge_deltas)
  assert.deepEqual(writes[0].weight_mutations,participant.spec.weight_mutations)
- assert.equal(new URLSearchParams(location.hash.slice(1)).get('tab'),'train')
+ assert.equal(new URLSearchParams(location.hash.slice(1)).get('tab'),'design')
+ await click('Train')
  const founder=[...document.querySelectorAll('label')].find(label=>label.textContent.startsWith('Starting fly'))?.querySelector('select')
  assert.ok(founder);assert.equal(founder.value,'c'.repeat(32))
  assert.equal(participant.spec.parent_id,null)
@@ -1268,17 +1269,18 @@ test('a first visitor can start a solo run, sign in once and submit exactly once
  await mount(App,{})
  assert.equal(location.hash,'#tab=arena','opening the arena must not force an old replay')
  assert.equal(document.querySelector('select[aria-label="Match mode"]').value,'forage')
- assert.equal(document.querySelector('select[aria-label="Duration"]').value,'2')
+ assert.equal(document.querySelector('select[aria-label="Observation time per match"]').value,'10')
  assert.equal(button('Run my simulation').disabled,false)
  await click('Run my simulation');assert.ok(document.querySelector('.modal'));assert.equal(writes.length,0)
  await click('Close');assert.equal(document.querySelector('.modal'),null);assert.equal(writes.length,0)
  await click('Run my simulation');await click('Create identity')
  assert.deepEqual(writes.map(w=>w.path),['/identities','/matches'])
- assert.deepEqual(writes[1].body.fly_ids,[wt.id]);assert.equal(writes[1].body.mode,'forage');assert.equal(writes[1].body.duration_seconds,2)
+ assert.deepEqual(writes[1].body.fly_ids,[wt.id]);assert.equal(writes[1].body.mode,'forage');assert.equal(writes[1].body.duration_seconds,10)
  assert.match(location.hash,/match=new-/)
- await click('Design your own fly');await click('Save and simulate 2 seconds')
- assert.deepEqual(writes.map(w=>w.path),['/identities','/matches','/flies','/matches'])
- assert.deepEqual(writes.at(-1).body.fly_ids,['d'.repeat(32)],'run the saved child rather than the selected WT')
+ await click('Design your own fly');await click('Save and compare')
+ assert.deepEqual(writes.map(w=>w.path),['/identities','/matches','/flies'])
+ assert.match(location.hash,/tab=design/)
+ assert.ok(document.querySelector('[aria-label="Compare your saved design"]'))
 });
 
 test('long maze observations distinguish failure from arrival and seek actual time',async()=>{
@@ -1324,11 +1326,11 @@ test('unified setup prepares WT in the single opponent selector and submits the 
  const opponent=document.querySelector('select[aria-label="Opponent"]')
  assert.equal(opponent.value,wt.id);assert.equal(document.querySelectorAll('select[aria-label="Opponent"]').length,1)
  assert.equal(opponent.querySelector(`option[value="${own.id}"]`).disabled,true)
- assert.match(document.querySelector('.experiment-plan').textContent,/2 matches · 2 simulated seconds per match · 4 simulated seconds total/)
+ assert.match(document.querySelector('.experiment-plan').textContent,/2 matches · 10 simulated seconds per match · 20 simulated seconds total/)
  await click('Create paired match series')
  assert.equal(plans.length,1);assert.equal(plans[0].submissions[0].endpoint,'/tournaments')
  assert.deepEqual(plans[0].matches.map(m=>m.fly_ids),[[own.id,wt.id],[wt.id,own.id]])
- assert.deepEqual(plans[0].seeds,[42]);assert.ok(plans[0].matches.every(m=>m.mode==='contest'&&m.map_id==='orchard'&&m.duration_seconds===2))
+ assert.deepEqual(plans[0].seeds,[42]);assert.ok(plans[0].matches.every(m=>m.mode==='contest'&&m.map_id==='orchard'&&m.duration_seconds===10))
  const intent=document.querySelector('select[aria-label="Match mode"]')
  await act(async()=>{intent.value='contact';intent.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
  assert.equal(button('Create paired match series').disabled,true)
@@ -1379,7 +1381,7 @@ test('multi-seed contact retries recover one atomic series after a lost response
  await click('Closed Contact Arena')
  const seeds=document.querySelector('input[aria-label="Seeds (1–3)"]')
  await act(async()=>{const props=Object.keys(seeds).find(k=>k.startsWith('__reactProps'));seeds[props].onChange({target:{value:'42,43'}})})
- assert.match(document.querySelector('.experiment-plan').textContent,/4 matches · 2 simulated seconds per match · 8 simulated seconds total/)
+ assert.match(document.querySelector('.experiment-plan').textContent,/4 matches · 10 simulated seconds per match · 40 simulated seconds total/)
  await click('Create paired match series');assert.equal(writes.length,0)
  await click('Create identity')
  assert.equal(writes.length,1);assert.equal(accepted.size,1)
@@ -1457,7 +1459,7 @@ for(const retryLogin of [false,true])test(`NyxID restores every seed and submiss
  assert.deepEqual(writes.slice(1).map(w=>w.body),pending.experiment.submissions.map(s=>s.body))
  assert.deepEqual(writes.slice(1).map(w=>w.body.seeds),[[42,43]])
  assert.deepEqual(writes.slice(1).map(w=>w.body.fly_ids),[[wt.id,own.id]])
- assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===2))
+ assert.ok(writes.every(w=>w.body.mode==='duel'&&w.body.map_id==='duel'&&w.body.sandbox&&w.body.duration_seconds===10))
  assert.equal(document.querySelector('input[aria-label="Seeds (1–3)"]').value,'42,43')
 })
 
@@ -1556,4 +1558,105 @@ for(const locale of ['en','zh-CN'])test(`life tree renders structured parent/chi
  assert.ok(profileOnly.includes(`${parent}: "malecns-lif-cpu-v1" → ${child}: "malecns-rate-cpu-v1"`))
  assert.doesNotMatch(profileOnly,/olfactory|intervention occurrences|干预次数|fixture-digest/)
  history.replaceState(null,'','/')
+})
+
+// Synthetic receipts below test the guided flow and accounting, not scientific outcomes.
+const comparisonOwner={id:'designer-me',name:'Designer',token:'fixture-only'}
+const comparisonSubject={...own,owner:comparisonOwner.id}
+const comparisonWT={...wt,owner:'reference-owner'}
+const comparisonOther={...own,id:'c'.repeat(32),owner:'another-owner',designer:'Another designer',name:'Public fly'}
+const comparisonSeason={match_profiles:[{id:'legacy-v1',ready:true}],sensory_profiles:[]}
+const comparisonMaps=[{id:'orchard',name:'果园',english:'Orchard',modes:['forage','contest']}]
+function comparisonFixture(id,body,status='complete'){
+ const matches=[body.fly_ids,[...body.fly_ids].reverse()].map((fly_ids,i)=>({id:id+'-'+i,status:status==='complete'?'verified':'queued',request:{...body,fly_ids,seed:42},result:null}))
+ const schedule=matches.map((match,i)=>({seed:42,spawn_order:i+1,fly_ids:match.request.fly_ids,status:match.status,match_ids:[match.id],issues:[],errors:[],outcomes:status==='complete'?match.request.fly_ids.map((fly_id,slot)=>({fly_id,score:slot===0?4:2,outcome:slot===0?'win':'loss'})):null}))
+ return {id,owner:comparisonOwner.id,spec:body,status,schedule,matches,issues:[],unexpected_match_ids:[],standings:[],expected_matches:2,verified_matches:status==='complete'?2:0}
+}
+function comparisonProps(onArena=noop){return {subject:comparisonSubject,flies:[comparisonSubject,comparisonWT,comparisonOther],identity:comparisonOwner,maps:comparisonMaps,season:comparisonSeason,onArena}}
+for(const locale of ['en','zh-CN'])test(`saved design compares WT and another owner for 180 seconds without leaving design in ${locale}`,async()=>{
+ localStorage.setItem('flyarena.locale',locale);history.replaceState(null,'','#tab=design')
+ const {FirstComparison}=require('./src/features/design/FirstComparison.js'),writes=[],records=new Map(),navigation=[]
+ globalThis.fetch=async(url,options={})=>{
+  const path=String(url).replace(/^.*\/api\/v1/,'')
+  if(options.method==='POST'){
+   assert.equal(path,'/tournaments');assert.equal(options.headers.Authorization,'Bearer fixture-only')
+   const body=JSON.parse(options.body);writes.push(body)
+   const report=comparisonFixture('comparison-'+writes.length,body);records.set(report.id,report)
+   return {ok:true,json:async()=>report}
+  }
+  return {ok:true,json:async()=>records.get(path.split('/').at(-1))}
+ }
+ await mount(FirstComparison,comparisonProps((...args)=>navigation.push(args)))
+ assert.equal(writes.length,0)
+ const select=document.querySelector('.observation-duration select')
+ assert.equal(select.value,'10');assert.equal(Math.max(...[...select.options].map(o=>Number(o.value))),180)
+ await act(async()=>{select.value='180';select.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})
+ assert.match(document.querySelector('.first-comparison-plan').textContent,/4.*180.*720/)
+ await click(locale==='en'?'Start comparison · results stay here':'开始对比，结果显示在这里')
+ assert.equal(writes.length,2);assert.equal(location.hash,'#tab=design');assert.deepEqual(navigation,[])
+ assert.deepEqual(writes.map(w=>w.fly_ids),[[comparisonSubject.id,comparisonWT.id],[comparisonSubject.id,comparisonOther.id]])
+ assert.ok(writes.every(w=>w.duration_seconds===180&&w.sandbox===true&&w.mode==='contest'&&w.seeds[0]===42))
+ assert.equal(document.querySelectorAll('.first-comparison-scores').length,2)
+ assert.ok([...document.querySelectorAll('.first-comparison-scores strong')].every(el=>el.textContent==='3.0000'),'join scores by fly ID across reversed slots')
+ assert.match(document.querySelector('.first-comparison-next').textContent,locale==='en'?/One seed does not establish/:/单个种子的结果/)
+ await click(locale==='en'?'Open Arena · replay and explore':'去竞技场查看回放与继续探索')
+ assert.deepEqual(navigation,[['comparison-1','comparison-1-0']])
+})
+
+test('first comparison preserves accepted work and reuses the uncertain request after refresh',async()=>{
+ const {FirstComparison}=require('./src/features/design/FirstComparison.js'),writes=[],records=new Map()
+ let loseResponse=true
+ globalThis.fetch=async(url,options={})=>{
+  const path=String(url).replace(/^.*\/api\/v1/,'')
+  if(options.method==='POST'){
+   const body=JSON.parse(options.body),key=options.headers['Idempotency-Key'];writes.push({key,body})
+   if(!records.has(key))records.set(key,comparisonFixture('retry-'+records.size,body,'running'))
+   if(body.fly_ids[1]===comparisonOther.id&&loseResponse){loseResponse=false;throw Error('Lost response after acceptance')}
+   return {ok:true,json:async()=>records.get(key)}
+  }
+  return {ok:true,json:async()=>[...records.values()].find(r=>r.id===path.split('/').at(-1))}
+ }
+ await mount(FirstComparison,comparisonProps())
+ await click('Start comparison · results stay here')
+ assert.equal(writes.length,2);assert.equal(records.size,2)
+ assert.match(document.body.textContent,/Lost response after acceptance/)
+ assert.equal(document.querySelector('.first-comparison-next'),null)
+ assert.equal(document.querySelector('.first-comparison-scores'),null)
+ await mount(()=>null,{})
+ await mount(FirstComparison,comparisonProps())
+ assert.equal(writes.length,2,'restoring a comparison does not submit computation')
+ await click('Retry unconfirmed submissions')
+ assert.equal(writes.length,3);assert.equal(records.size,2)
+ assert.deepEqual(writes[2],writes[1],'reuse the same request and idempotency key, skip acknowledged WT pair')
+ assert.equal(document.querySelector('.first-comparison-next'),null)
+ assert.match(document.body.textContent,/0\/2 matches verified/)
+})
+
+test('first comparison excludes self, references and incompatible public flies, and permits WT-only work',async()=>{
+ const {FirstComparison}=require('./src/features/design/FirstComparison.js')
+ const {publicComparisonFlies}=require('./src/features/design/comparisonSummary.js')
+ const props=comparisonProps()
+ const rejected=[{...comparisonOther,owner:comparisonOwner.id},{...comparisonOther,reference_kind:'official'},{...comparisonOther,spec:{...spec,model_profile:'other'}},{...comparisonOther,spec:{...spec,connectome_sha256:'other'}}]
+ assert.deepEqual(publicComparisonFlies([...props.flies,...rejected],comparisonSubject),[comparisonOther])
+ await mount(FirstComparison,{...props,flies:[comparisonSubject,comparisonWT,...rejected]})
+ assert.match(document.body.textContent,/No compatible public design from another owner/)
+ assert.equal(button('Start comparison · results stay here').disabled,false)
+ assert.match(document.querySelector('.first-comparison-plan').textContent,/2 matches × 10 simulated seconds = 20/)
+ await mount(()=>null,{})
+ await mount(FirstComparison,{...props,flies:[comparisonSubject,...rejected]})
+ assert.equal(button('Start comparison · results stay here').disabled,true)
+ assert.match(document.body.textContent,/Choose at least one available reference/)
+})
+
+test('first comparison summary never turns partial, failed, mismatched or missing evidence into zero',()=>{
+ const {comparisonResult}=require('./src/features/design/comparisonSummary.js')
+ const body={fly_ids:[comparisonSubject.id,comparisonWT.id]}
+ const complete=comparisonFixture('fixture',body)
+ assert.equal(comparisonResult(complete,comparisonSubject.id).own,3)
+ for(const patch of [{status:'running'},{status:'incomplete'},{verified_matches:1},{issues:['runtime_mismatch']},{unexpected_match_ids:['extra']},{schedule:complete.schedule.slice(0,1)}])assert.equal(comparisonResult({...complete,...patch},comparisonSubject.id),null)
+ const missing=structuredClone(complete);missing.schedule[0].outcomes=null
+ assert.equal(comparisonResult(missing,comparisonSubject.id),null)
+ const zero=structuredClone(complete)
+ for(const leg of zero.schedule)for(const result of leg.outcomes){result.score=0;result.outcome='draw'}
+ assert.deepEqual(comparisonResult(zero,comparisonSubject.id),{own:0,rival:0,wins:0,draws:2})
 })
