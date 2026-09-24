@@ -622,7 +622,7 @@ test('a replay participant becomes an editable saved child and the exact new tra
  assert.deepEqual(writes[0].edge_deltas,participant.spec.edge_deltas)
  assert.deepEqual(writes[0].weight_mutations,participant.spec.weight_mutations)
  assert.equal(new URLSearchParams(location.hash.slice(1)).get('tab'),'design')
- await click('Train')
+ await click('Training sandbox')
  const founder=[...document.querySelectorAll('label')].find(label=>label.textContent.startsWith('Starting fly'))?.querySelector('select')
  assert.ok(founder);assert.equal(founder.value,'c'.repeat(32))
  assert.equal(participant.spec.parent_id,null)

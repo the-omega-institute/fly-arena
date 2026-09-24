@@ -166,7 +166,8 @@ test('App comparison action stays in design and opens explicit comparison withou
  assert.equal(panel.open,true)
  await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Continue editing your draft →').click())
  assert.equal(panel.open,false)
- assert.equal(document.querySelector('[data-guide-next]').dataset.guideNext,'edit')
+ assert.equal(document.querySelector('[data-guide-next]'),null,'help stays outside the editing flow')
+ assert.match(document.querySelector('.design-start-button').textContent,/Continue designing/)
  assert.equal(document.activeElement.id,'fly-name')
  await act(async()=>{panel.querySelector('summary').click();await new Promise(resolve=>setTimeout(resolve,10))})
  assert.equal(panel.open,true)
@@ -195,4 +196,48 @@ for(const locale of ['en','zh-CN'])test(`draft guidance advances to editing with
  assert.equal(document.querySelector('[data-guide-next]'),null)
  assert.equal(document.querySelector('.playground-guide__library').open,false)
  assert.doesNotMatch(document.body.textContent,/guide\.[a-z]/)
+}))
+
+for(const locale of ['en','zh-CN'])test(`first screen leads with a fly and help is an explicit dialog in ${locale}`,async()=>withDOM('#tab=design',async(dom,mount)=>{
+ localStorage.setItem('flyarena.locale',locale)
+ const requests=[]
+ globalThis.fetch=async(url,options={})=>{
+  const endpoint=String(url).replace(/^.*\/api\/v1/,'');requests.push([endpoint,options.method||'GET'])
+  const data=endpoint==='/auth/config'?{mode:'local'}:endpoint==='/season'?{...season,connectome:{...season.connectome,neuron_count:1},budget:{points:100}}:endpoint==='/flies'?[wt]:endpoint==='/maps'?maps:endpoint==='/preview'?null:[]
+  return {ok:true,json:async()=>data}
+ }
+ await mount(App,{})
+ assert.equal(document.querySelector('.playground-guide'),null)
+ assert.equal(document.querySelector('dialog'),null)
+ assert.equal(document.querySelector('.design-library').open,false)
+ const help=document.querySelector('.guide-help-trigger')
+ help.focus()
+ await act(async()=>help.click())
+ const dialog=document.querySelector('dialog')
+ assert.ok(dialog.open)
+ assert.equal(dialog.contains(document.activeElement),true)
+ assert.equal(document.querySelector('.app-shell > main .playground-guide'),null)
+ await act(async()=>dialog.dispatchEvent(new dom.window.Event('cancel',{cancelable:true})))
+ assert.equal(document.querySelector('dialog'),null)
+ assert.equal(document.activeElement,help)
+ await act(async()=>document.querySelector('.design-start-button').click())
+ assert.equal(document.activeElement.id,'fly-name')
+ assert.match(document.querySelector('.draft-status').textContent,new RegExp(wt.id))
+ assert.equal(document.querySelector('.playground-guide'),null)
+ assert.ok(requests.every(([,method])=>method==='GET'))
+ // An action chosen inside help must close it and place focus in the destination.
+ await act(async()=>help.click())
+ await act(async()=>document.querySelector('[data-guide-next]').click())
+ assert.equal(document.querySelector('dialog'),null)
+ assert.equal(document.activeElement.id,'fly-name')
+ // A direct color edit also creates a draft; the primary action must not clone over it.
+ await mount(App,{key:'fresh-design'})
+ const draftName=document.getElementById('fly-name').value
+ const colorButton=document.querySelectorAll('.color-row button')[1]
+ await act(async()=>colorButton.click())
+ assert.match(document.querySelector('.design-start-button').textContent,/Continue designing|继续改造/)
+ await act(async()=>document.querySelector('.design-start-button').click())
+ assert.equal(document.getElementById('fly-name').value,draftName)
+ assert.ok(colorButton.classList.contains('chosen'))
+ assert.doesNotMatch(document.querySelector('.draft-status').textContent,new RegExp(wt.id))
 }))
