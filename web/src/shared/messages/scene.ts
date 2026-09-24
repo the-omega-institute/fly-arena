@@ -1,5 +1,24 @@
 export const sceneMessages = {
  "scene.goal": {"en": "GOAL / physical contact", "zh-CN": "终点 / 实际接触"},
- "scene.presentation": {"en": "Recorded geometry · food markers show remaining units; lighting and surface grain are illustrative.", "zh-CN": "记录的几何形状 · 食物标记显示剩余数量；光照与表面纹理为示意。"},
- "scene.layoutPresentation": {"en": "Configured geometry · food markers show initial units; lighting and surface grain are illustrative.", "zh-CN": "配置的几何形状 · 食物标记显示初始数量；光照与表面纹理为示意。"}
+ "scene.presentation": {"en": "Recorded geometry · food markers show recorded remaining units; hollow markers mean unrecorded amounts; lighting and surface grain are illustrative.", "zh-CN": "记录的几何形状 · 食物标记显示记录的剩余数量，空心标记表示数量未记录；光照与表面纹理为示意。"},
+ "scene.layoutPresentation": {"en": "Configured geometry · food markers show initial units; lighting and surface grain are illustrative.", "zh-CN": "配置的几何形状 · 食物标记显示初始数量；光照与表面纹理为示意。"},
+ "scene.view": {"en": "Arena view", "zh-CN": "竞技场视图"},
+ "scene.3d": {"en": "3D", "zh-CN": "3D"},
+ "scene.2d": {"en": "2D plan", "zh-CN": "2D 平面图"},
+ "scene.webglUnavailable": {"en": "WebGL unavailable. Showing the 2D plan.", "zh-CN": "WebGL 不可用，已显示 2D 平面图。"},
+ "scene.contextLost": {"en": "WebGL context lost. Showing the 2D plan.", "zh-CN": "WebGL 上下文丢失，已显示 2D 平面图。"},
+ "scene.rendererFailed": {"en": "3D renderer failed. Showing the 2D plan.", "zh-CN": "3D 渲染失败，已显示 2D 平面图。"},
+ "scene.geometryUnavailable": {"en": "Scene geometry unavailable; no plan can be drawn.", "zh-CN": "场景几何信息不可用，无法绘制平面图。"},
+ "scene.recordedPlan": {"en": "Recorded arena · top-down plan", "zh-CN": "已记录竞技场 · 俯视平面图"},
+ "scene.layoutPlan": {"en": "Configured arena · top-down plan", "zh-CN": "已配置竞技场 · 俯视平面图"},
+ "scene.obstacle": {"en": "Obstacle", "zh-CN": "障碍物"},
+ "scene.spawn": {"en": "Spawn", "zh-CN": "出生点"},
+ "scene.remaining": {"en": "Recorded remaining units", "zh-CN": "记录的剩余数量"},
+ "scene.initial": {"en": "Initial units", "zh-CN": "初始数量"},
+ "scene.unrecorded": {"en": "Unrecorded", "zh-CN": "未记录"},
+ "scene.axes": {"en": "Equal x/y scale · mm · +x east → · +y north ↑", "zh-CN": "x/y 等比例 · 毫米 · +x 东 → · +y 北 ↑"},
+ "scene.recordedNote": {"en": "Recorded geometry and trails; position markers interpolate between adjacent recorded samples on the shared clock. Gaps stay missing. Food shows the current recorded sample; ? means unrecorded. Markers are symbolic, not body poses.", "zh-CN": "已记录的几何与轨迹；位置标记按共享时钟在相邻记录样本之间插值，缺失处保留空白。食物显示当前记录样本，? 表示未记录。标记为示意，不表示身体姿态。"},
+ "scene.layoutNote": {"en": "Modeled layout · spawn slots and initial food amounts. No recorded movement.", "zh-CN": "建模布局 · 出生位置和初始食物数量，无运动记录。"},
+ "scene.spawnsUnavailable": {"en": "Spawn geometry not recorded.", "zh-CN": "出生点几何信息未记录。"},
+ "scene.positionUnavailable": {"en": "No recorded position at this time", "zh-CN": "此时无位置记录"}
 } as const
