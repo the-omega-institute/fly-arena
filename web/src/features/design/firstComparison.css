@@ -17,3 +17,9 @@
 .first-comparison-next{background:var(--surface-soft)}
 @media(max-width:700px){.first-comparison{padding:16px;gap:16px}.first-comparison h2{font-size:21px}.first-comparison-targets,.first-comparison-results{grid-template-columns:minmax(0,1fr)}.first-comparison-steps{display:grid;gap:8px}.first-comparison-choice,.first-comparison-result,.first-comparison-plan,.first-comparison-next{padding:14px}}
 .experiment-setup .two-fields>.observation-duration{grid-column:1/-1}
+
+#saved-design-comparison>summary{cursor:pointer;padding:14px 18px;font-size:14px;line-height:1.6;overflow-wrap:anywhere;color:var(--accent);background:var(--surface);border:1px solid var(--border);border-radius:8px;margin-bottom:16px}
+.editor-first-step{font-size:12px;line-height:1.7;color:var(--text-muted);padding:10px;background:var(--surface-soft);border-radius:6px;margin-bottom:16px}
+.design-extra{margin:14px 0;font-size:12px;line-height:1.7}.design-extra>summary{cursor:pointer;color:var(--accent);padding:8px 0}.design-extra>.editor-actions{flex-wrap:wrap;margin-top:10px}.design-extra .secondary{white-space:normal;text-align:left}
+.design-advanced{padding:10px 18px;border:1px solid var(--border);border-radius:8px}
+@media(max-width:600px){.design-workspace>.editor{grid-row:1}.design-workspace>.collection{grid-row:3}.design-workspace>.specimen-panel{grid-row:2}}

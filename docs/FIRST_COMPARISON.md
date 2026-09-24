@@ -12,6 +12,14 @@ Only the explicit Start comparison action submits work. Progress and the result 
 
 Submission keys, immutable request bodies and acknowledged series IDs are stored under the current owner and saved-fly IDs in this browser's local storage. Refresh or reopening reads existing reports without automatically submitting work. If a response is lost, explicit retry reuses its original key; acknowledged series are skipped. Local-storage failure cannot cancel server-side work; existing records remain available in Arena's series list. Resetting the panel is offered only after every acknowledged series has no queued/running legs.
 
+## Guidance and progressive disclosure
+
+The first-visit guide starts at Clone WT. Cloning or editing a draft changes the next step to editing and saving; a previous fly's recorded progress cannot mark a new draft as evaluated. The editor gives a short name → one small weight change → save sequence. On phones it appears before the body preview and library. Neural-model selection, stimulus/response tools and targeted interventions remain available in closed disclosures.
+
+When the saved comparison is open, it supplies the primary next step. The general guide becomes a closed workspace/science reference so it cannot simultaneously direct a visitor toward training. Its workspace map explains the purpose of Arena, Training, Life archive, Phenotype Lab and AI / API; these are optional destinations rather than a mandatory tour.
+
+Continue editing collapses the saved comparison and focuses the name field. The comparison stays mounted, preserving request identities and polling while the visitor edits. Reopening the disclosure shows the saved version's existing progress or results; unsaved edits do not alter its subject or submit work. The guide labels a draft with its draft name rather than a previous saved fly's name.
+
 ## Duration boundaries
 
 - The Arena web planner accepts 1–180 whole seconds for all its modes; the duration control presents the choices above and can display valid imported shorter values.
@@ -23,4 +31,4 @@ Submission keys, immutable request bodies and acknowledged series IDs are stored
 
 The DOM journeys test the saved-design handoff, WT/public eligibility, 180-second request construction, complete versus partial evidence, correct slot aggregation and refresh/retry recovery. Backend tests create durable 180-second sandbox pairs, verify atomic and idempotent admission, recover records after reopening the database and check that sandbox results earn no leaderboard points.
 
-Real Chromium checks exercise the actual frontend at 1440 and 390 pixels in English and Chinese, including the login-return handoff, saved-design identity, explicit compute start, reload, results-before-Arena and horizontal overflow. These browser checks use synthetic API responses in an isolated context; their scores are UI fixtures, not new scientific results or a live NyxID-provider validation. No new 180-second physical study is claimed by these checks.
+Real Chromium checks exercise the actual frontend at 1440 and 390 pixels in English and Chinese, including Clone WT → edit progression, collapsed advanced tools, phone editor placement, login-return handoff, saved-design identity, the two-second trial explanation, explicit compute start, editing while queued, reopening without resubmission, reload, results-before-Arena and horizontal overflow. These browser checks use synthetic API responses in an isolated context; their scores are UI fixtures, not new scientific results or a live NyxID-provider validation. No new 180-second physical study is claimed by these checks.

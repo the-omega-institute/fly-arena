@@ -12,7 +12,7 @@ import './firstComparison.css'
 type Request=Extract<ExperimentPlan['submissions'][number],{endpoint:'/tournaments'}>['body']
 type Entry={key:string;request:Request;referenceName:string;kind:'wt'|'public';id?:string}
 type Attempt={entries:Entry[]}
-type Props={subject:Fly;flies:Fly[];maps:ArenaMap[];season:Season|null;identity:Identity;onArena:(series:string,match:string)=>void}
+type Props={subject:Fly;flies:Fly[];maps:ArenaMap[];season:Season|null;identity:Identity;onEdit?:()=>void;onArena:(series:string,match:string)=>void}
 
 function restore(key:string,subject:Fly):Attempt|null{
  try{
@@ -28,7 +28,7 @@ function restore(key:string,subject:Fly):Attempt|null{
  return null
 }
 
-export function FirstComparison({subject,flies,maps,season,identity,onArena}:Props){
+export function FirstComparison({subject,flies,maps,season,identity,onEdit,onArena}:Props){
  const {locale,t}=useI18n(),zh=locale==='zh-CN'
  const storageKey=`flyarena.first-comparison.${identity.id}.${subject.id}`
  const wt=matchingWildType(flies,subject),others=publicComparisonFlies(flies,subject)
@@ -70,7 +70,7 @@ export function FirstComparison({subject,flies,maps,season,identity,onArena}:Pro
  }
  const reportReceived=(report:Series)=>setReports(old=>({...old,[report.id]:report}))
  return <section className="first-comparison panel" aria-label={zh?'保存后的首次对比':'Compare your saved design'}>
-  <header><span className="eyebrow">{zh?'设计已保存 · 下一步':'DESIGN SAVED · NEXT STEP'}</span><h2>{zh?'先看看它与其他果蝇有什么不同':'See how your fly compares'}</h2><p><strong>{subject.name}</strong> · {zh?'这里比较已保存的版本；下方尚未保存的修改不会加入本次对比。':'This compares the saved version. Unsaved edits below are not included.'}</p></header>
+  <header><span className="eyebrow">{zh?'设计已保存 · 下一步':'DESIGN SAVED · NEXT STEP'}</span><h2>{zh?'先看看它与其他果蝇有什么不同':'See how your fly compares'}</h2><p><strong>{subject.name}</strong> · {zh?'这里比较已保存的版本；下方尚未保存的修改不会加入本次对比。':'This compares the saved version. Unsaved edits below are not included.'}</p>{onEdit&&<button className="text-link" onClick={onEdit}>{zh?'继续编辑草稿 →':'Continue editing your draft →'}</button>}</header>
   <ol className="first-comparison-steps"><li>{zh?'1 选择对照与时间':'1 Choose references and time'}</li><li>{zh?'2 在这里查看结果':'2 Read results here'}</li><li>{zh?'3 去竞技场继续探索':'3 Explore further in Arena'}</li></ol>
   {!attempt?<>
    <div className="first-comparison-targets">
@@ -81,7 +81,7 @@ export function FirstComparison({subject,flies,maps,season,identity,onArena}:Pro
    <div className="first-comparison-plan"><h3>{zh?'这次会怎样比较':'What this comparison will do'}</h3><p>{zh?'果园 · 食物竞争 · 相同种子 42 · 相同嗅觉输入与运动方案。每个对照交换一次出生位置，减少位置造成的偏差。':'Orchard food competition · seed 42 · identical odor input and motor profile. Each reference is tested in both starting positions to reduce position bias.'}</p><p><strong>{planned.length*2} {zh?'场':'matches'} × {duration} {zh?'模拟秒':'simulated seconds'} = {planned.length*2*duration} {zh?'模拟秒合计':'simulated seconds total'}</strong></p><p>{zh?'先比较两场的平均摄取量，再去回放看发生了什么。这些结果只描述当前条件，不计入公开排行榜。':'Compare mean food intake across both positions, then inspect what happened in the replay. Results describe these conditions and stay outside the public leaderboard.'}</p>{errors.map(e=><p role="status" key={e}>{t(e)}</p>)}{!planned.length&&<p role="status">{zh?'请至少选择一个可用对照。':'Choose at least one available reference.'}</p>}</div>
    <button className="primary" disabled={busy||!planned.length||!!errors.length} onClick={()=>void start()}>{zh?'开始对比，结果显示在这里':'Start comparison · results stay here'}</button>
   </>:<>
-   <p>{zh?'对比已准备。每个对照各两场，交换出生位置；关闭或刷新页面不会取消已提交的计算。':'Comparison prepared: two swapped matches per reference. Closing or refreshing this page does not cancel submitted work.'}</p>
+   <p>{zh?'对比已准备。每个对照各两场，交换出生位置；关闭或刷新页面不会取消已提交的计算。可以继续编辑草稿，回到这里查看进度；无需重复点击开始。':'Comparison prepared: two swapped matches per reference. Closing or refreshing this page does not cancel submitted work. You can keep editing and return here for progress; no need to start again.'}</p>
    <div className="first-comparison-results">{attempt.entries.map(entry=><ComparisonReport key={entry.key} entry={entry} subject={subject} onReport={reportReceived} onArena={onArena}/>)}</div>
    {attempt.entries.some(e=>!e.id)&&<button className="primary" disabled={busy} onClick={()=>void start()}>{busy?(zh?'正在提交对比…':'Submitting comparison…'):(zh?'重试未确认的提交':'Retry unconfirmed submissions')}</button>}
    {error&&<p role="alert">{error} {zh?'已接受的任务会保留；重试会沿用原请求，不会重复提交已确认的对比。':'Accepted work is retained. Retry reuses the original requests.'}</p>}

@@ -161,11 +161,38 @@ test('App comparison action stays in design and opens explicit comparison withou
   return {ok:true,json:async()=>data}
  }
  await mount(App,{})
- assert.equal(document.querySelector('[data-guide-next]').dataset.guideNext,'compare')
- await act(async()=>document.querySelector('[data-guide-next]').click())
+ assert.equal(document.querySelector('[data-guide-next]'),null,'comparison is the only active next step')
+ const panel=document.getElementById('saved-design-comparison')
+ assert.equal(panel.open,true)
+ await act(async()=>[...document.querySelectorAll('button')].find(b=>b.textContent==='Continue editing your draft →').click())
+ assert.equal(panel.open,false)
+ assert.equal(document.querySelector('[data-guide-next]').dataset.guideNext,'edit')
+ assert.equal(document.activeElement.id,'fly-name')
+ await act(async()=>{panel.querySelector('summary').click();await new Promise(resolve=>setTimeout(resolve,10))})
+ assert.equal(panel.open,true)
+ assert.equal(document.querySelector('[data-guide-next]'),null)
  assert.match(location.hash,/tab=design/)
  assert.ok(document.querySelector('[aria-label="Compare your saved design"]'))
  assert.equal(document.querySelector('select[aria-label="Observation time per match"]').value,'10')
  assert.ok(document.body.textContent.includes('Start comparison · results stay here'))
  assert.ok(requests.every(([,method])=>method==='GET'))
+}))
+
+for(const locale of ['en','zh-CN'])test(`draft guidance advances to editing without claiming evaluation in ${locale}`,async()=>withDOM('',async(dom,mount)=>{
+ localStorage.setItem('flyarena.locale',locale)
+ const calls=[]
+ const props={canCloneWT:true,canCompare:true,hasSavedDesign:false,onCloneWT:()=>calls.push('clone'),onCompare:()=>calls.push('compare'),onTrain:noop,onArena:noop,onDesign:()=>calls.push('edit'),onAI:noop}
+ await mount(PlaygroundGuide,props)
+ await act(async()=>document.querySelector('[data-guide-next]').click())
+ await mount(PlaygroundGuide,{...props,hasDraft:true})
+ assert.equal(document.querySelector('[data-guide-next]').dataset.guideNext,'edit')
+ await act(async()=>document.querySelector('[data-guide-next]').click())
+ // A new draft still needs saving even when a previous fly has completed evaluation.
+ await mount(PlaygroundGuide,{...props,hasDraft:true,hasSavedDesign:true,hasCompared:true})
+ assert.equal(document.querySelector('[data-guide-next]').dataset.guideNext,'edit')
+ assert.deepEqual(calls,['clone','edit'])
+ await mount(PlaygroundGuide,{...props,hasSavedDesign:true,referenceOnly:true})
+ assert.equal(document.querySelector('[data-guide-next]'),null)
+ assert.equal(document.querySelector('.playground-guide__library').open,false)
+ assert.doesNotMatch(document.body.textContent,/guide\.[a-z]/)
 }))

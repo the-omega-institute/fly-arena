@@ -79,6 +79,11 @@ for(const locale of ['en','zh-CN'])test(`guide renders ordered summaries, workin
  const props={canCompare:true,onCompare:()=>calls.push('compare'),canCloneWT:false,hasSavedDesign:true,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('design'),onArena:()=>calls.push('arena'),onTrain:()=>calls.push('train'),onAI:()=>calls.push('ai')}
  try{
   await act(async()=>root.render(React.createElement(I18nProvider,null,React.createElement(PlaygroundGuide,props))))
+  const library=document.querySelector('.playground-guide__library')
+  assert.equal(library.open,false)
+  await act(async()=>library.querySelector('summary').click())
+  assert.equal(library.open,true)
+  assert.ok(library.textContent.includes(guideMessages['guide.workspaces'][locale]))
   assert.deepEqual([...document.querySelectorAll('[data-guide-section]')].map(el=>el.dataset.guideSection),guideSections.map(s=>s.id))
   assert.deepEqual([...document.querySelectorAll('[data-guide-step]')].map(el=>el.dataset.guideStep),journeySteps.map(s=>s.id))
   for(const section of guideSections){
@@ -91,7 +96,6 @@ for(const locale of ['en','zh-CN'])test(`guide renders ordered summaries, workin
    assert.equal(details.open,true)
    for(const key of section.details)assert.ok(details.textContent.includes(guideMessages[key][locale]))
   }
-  assert.equal(document.querySelectorAll('details').length,11)
   const clone=document.querySelector('[data-guide-step="clone"] button');assert.equal(clone.disabled,true)
   await act(async()=>clone.click());assert.deepEqual(calls,[])
   for(const step of ['edit','compare','evolve','compete'])await act(async()=>document.querySelector(`[data-guide-step="${step}"] button`).click())

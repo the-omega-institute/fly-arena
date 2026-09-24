@@ -22,8 +22,8 @@ export const journeySteps:readonly JourneyStep[]=[
   {id:'compete',title:'guide.compete.title',summary:'guide.compete.summary',detail:'guide.compete.detail',action:'compete',label:'guide.action.compete'},
 ]
 
-/** Progress is supplied from recorded evidence, never from clicking a guide action. */
-export function nextGuideStep({hasSavedDesign,hasCompared=false,hasEvolved=false}:{hasSavedDesign:boolean;hasCompared?:boolean;hasEvolved?:boolean}){
- const id=!hasSavedDesign?'clone':!hasCompared?'compare':hasEvolved?'compete':'evolve'
+/** Draft guidance follows editor state; comparison/evolution completion requires recorded evidence. */
+export function nextGuideStep({hasSavedDesign,hasDraft=false,hasCompared=false,hasEvolved=false}:{hasSavedDesign:boolean;hasDraft?:boolean;hasCompared?:boolean;hasEvolved?:boolean}){
+ const id=hasDraft?'edit':!hasSavedDesign?'clone':!hasCompared?'compare':hasEvolved?'compete':'evolve'
  return journeySteps.find(step=>step.id===id)!
 }
