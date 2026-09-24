@@ -110,24 +110,37 @@ const originalFiber=require.cache[fiberFile]
 require.cache[fiberFile]={id:fiberFile,filename:fiberFile,loaded:true,exports:{Canvas:props=>{canvasProps=props;if(canvasFailure)throw Error('TEST renderer failure');return React.createElement('div',{'data-test-canvas':true},React.Children.toArray(props.children).find(child=>child.type?.name==='ContextGuard'))},useThree:selector=>selector({gl:{domElement:canvasEvents}})}}
 const {ProbeScene3D}=require('./src/features/phenotype/ProbeScene3D.js')
 if(originalFiber)require.cache[fiberFile]=originalFiber;else delete require.cache[fiberFile]
-const dom=new JSDOM('<!doctype html><main id="root"></main>',{url:'http://probe.test/'})
 const globalKeys=['window','document','navigator','IS_REACT_ACT_ENVIRONMENT','probeTestLocale']
-const originals=Object.fromEntries(globalKeys.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
-for(const k of ['window','document','navigator'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
-globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.probeTestLocale='en'
-dom.window.HTMLCanvasElement.prototype.getContext=()=>({getExtension:()=>({loseContext(){}})})
 const props={reports,subjects,seed:42,time:0,fallback:React.createElement('svg',{'data-plan':true})}
 const button=text=>[...document.querySelectorAll('button')].find(b=>b.textContent===text)
-let root=null
+let root=null,dom=null
 async function mount(overrides={}){await act(async()=>root.render(React.createElement(ProbeScene3D,{...props,...overrides})))}
 async function click(text){await act(async()=>button(text).click())}
-const uiTest=(name,fn)=>test(name,{concurrency:false},async()=>{
- root=createRoot(document.getElementById('root'));canvasProps=null;canvasFailure=false;globalThis.probeTestLocale='en';delete dom.window.WebGL2RenderingContext
- try{await fn()}finally{
-  await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=null;canvasProps=null;canvasFailure=false;globalThis.probeTestLocale='en';delete dom.window.WebGL2RenderingContext
+async function withDom(fn){
+ const originals=Object.fromEntries(globalKeys.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+ dom=new JSDOM('<!doctype html><main id="root"></main>',{url:'http://probe.test/'})
+ try{
+  for(const k of ['window','document','navigator'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
+  globalThis.IS_REACT_ACT_ENVIRONMENT=true;globalThis.probeTestLocale='en'
+  dom.window.HTMLCanvasElement.prototype.getContext=()=>({getExtension:()=>({loseContext(){}})})
+  root=createRoot(document.getElementById('root'));canvasProps=null;canvasFailure=false
+  await fn()
+ }finally{
+  try{if(root)await act(async()=>root.unmount())}finally{
+   dom.window.close();root=null;dom=null;canvasProps=null;canvasFailure=false
+   for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}
+  }
  }
+}
+const uiTest=(name,fn)=>test(name,{concurrency:false},()=>withDom(fn))
+test.after(()=>fs.rmSync(out,{recursive:true,force:true}))
+
+test('UI fixture restores global descriptors even when a mounted test fails',async()=>{
+ const originals=globalKeys.map(k=>Object.getOwnPropertyDescriptor(globalThis,k))
+ await assert.rejects(withDom(async()=>{await mount();throw Error('TEST assertion failure')}),/TEST assertion failure/)
+ assert.deepEqual(globalKeys.map(k=>Object.getOwnPropertyDescriptor(globalThis,k)),originals)
+ assert.equal(root,null);assert.equal(dom,null)
 })
-test.after(async()=>{dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
 
 uiTest('view automatically falls back to the 2D slot when WebGL is absent',async()=>{
  await mount();assert.ok(document.querySelector('[data-plan]'));assert.equal(button('3D').disabled,true)
