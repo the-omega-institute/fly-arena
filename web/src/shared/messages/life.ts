@@ -1,4 +1,9 @@
 export const lifeMessages={
+  "Founder design; no parent design was recorded.":{"en":"Founder design; no parent design was recorded.","zh-CN":"创始设计；未记录亲代设计。"},
+  "Recorded changes relative to the parent FlySpec.":{"en":"Recorded changes relative to the parent FlySpec.","zh-CN":"已记录相对亲代 FlySpec 的设计变化。"},
+  "No design change relative to the parent FlySpec was recorded.":{"en":"No design change relative to the parent FlySpec was recorded.","zh-CN":"未记录相对亲代 FlySpec 的设计变化。"},
+  "Parent design is private; the relative delta is unavailable.":{"en":"Parent design is private; the relative delta is unavailable.","zh-CN":"亲代设计为私有；无法查看相对差分。"},
+  "Design delta unavailable.":{"en":"Design delta unavailable.","zh-CN":"设计差分不可用。"},
   "Lineage tree":{"en":"Lineage tree","zh-CN":"生命谱系树"},
   "Recorded lineage derived from immutable parent links and evidence":{"en":"Recorded lineage derived from immutable parent links and evidence","zh-CN":"谱系来自不可变亲代链接与已记录证据"},
   "Ancestor":{"en":"Ancestor","zh-CN":"祖先"},

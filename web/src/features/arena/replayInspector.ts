@@ -11,6 +11,13 @@ export const replayInspectionSteps = [
 
 export type ReplayInspectionStep = typeof replayInspectionSteps[number]
 
+type ScreenRect={left:number;right:number;top:number;bottom:number}
+/** Hide screen-space labels outside the scene or underneath its measured HUD. */
+export function replayLabelHidden(label:ScreenRect,canvas:ScreenRect,hud?:ScreenRect|null){
+  return label.left<canvas.left||label.right>canvas.right||label.top<canvas.top||label.bottom>canvas.bottom||
+    !!(hud&&label.left<hud.right+4&&label.right>hud.left-4&&label.top<hud.bottom+4&&label.bottom>hud.top-4)
+}
+
 /** Select the recorded participant without inventing a fallback identity. */
 export function selectedReplaySlot(scene:Pick<Scene,'flies'>,selectedId:string|undefined,current=0){
   const selected=scene.flies.findIndex(fly=>fly.id===selectedId)
@@ -52,4 +59,3 @@ export function recordedOutcome(frames:Pick<Frame,'time'|'scores'|'energy'>[],sl
   const hasSample=frames.length>0
   return {score:typeof score==='number'&&Number.isFinite(score)?score:null,energy:typeof energy==='number'&&Number.isFinite(energy)?energy:null,duration,status:hasSample?'recorded':'unavailable'}
 }
-

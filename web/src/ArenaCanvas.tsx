@@ -1,5 +1,6 @@
 import {ReplayCamera} from './features/arena/ReplayCamera'
 import {ArenaWorldLabel} from './features/arena/ArenaWorldLabel'
+import {replayLabelHidden} from './features/arena/replayInspector'
 import {useEffect,useMemo,useRef} from 'react'
 import {Canvas,useFrame,useThree} from '@react-three/fiber'
 import {OrbitControls,Grid,Html} from '@react-three/drei'
@@ -15,7 +16,12 @@ import {previewSceneFraming,sceneFraming,sceneGrid,recordedCameraTarget,replayLa
 function ReplayLabel({fly,slot,frame,next,alpha,selected,identity,follow}:{fly:Scene['flies'][number];slot:number;frame:Frame;next?:Frame;alpha:number;selected:boolean;identity?:string;follow:boolean}){
  const label=useRef<HTMLDivElement>(null),point=useMemo(()=>new THREE.Vector3(),[])
  const position=recordedCameraTarget(frame,next,alpha,slot)
- useFrame(({camera})=>{if(label.current&&position)label.current.style.opacity=String(replayLabelOpacity(camera.position.distanceTo(point.set(...position)),follow))})
+ useFrame(({camera,gl})=>{
+  if(!label.current||!position)return
+  const hud=gl.domElement.closest('.arena-stage')?.querySelector('.score-overlay')
+  label.current.style.visibility=replayLabelHidden(label.current.getBoundingClientRect(),gl.domElement.getBoundingClientRect(),hud?.getBoundingClientRect())?'hidden':'visible'
+  label.current.style.opacity=String(replayLabelOpacity(camera.position.distanceTo(point.set(...position)),follow))
+ })
  if(!position)return null
  return <Html position={position} style={{pointerEvents:'none'}}><div ref={label} className="replay-label-anchor"><ArenaWorldLabel fly={fly} slot={slot} selected={selected} identity={identity} compact/></div></Html>
 }

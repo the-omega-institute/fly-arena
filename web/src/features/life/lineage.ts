@@ -15,3 +15,12 @@ export function lineageLayout(nodes:LineageNode[],edges:LineageEdge[],centerId:s
 }
 
 export const layoutLineage=lineageLayout
+
+/** The UI translates stable codes; API prose is retained only for older clients. */
+export function lineageDeltaMessage(delta?:{code?:string;summary?:string;changed:boolean|null}|null){
+ const messages:Record<string,string>={founder:'Founder design; no parent design was recorded.',changed:'Recorded changes relative to the parent FlySpec.',unchanged:'No design change relative to the parent FlySpec was recorded.',parent_unavailable:'Parent design is private; the relative delta is unavailable.'}
+ if(delta?.code&&messages[delta.code])return messages[delta.code]
+ // Older servers used these exact summaries, so localize those as well.
+ if(delta?.summary&&Object.values(messages).includes(delta.summary))return delta.summary
+ return 'Design delta unavailable.'
+}

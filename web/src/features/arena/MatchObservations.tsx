@@ -33,22 +33,6 @@ function tracePath(frames:Frame[],read:(frame:Frame)=>number|undefined,max:numbe
 }
 function shown(value:number|undefined,digits=1){return value===undefined?'—':value.toFixed(digits)}
 
-function deriveEvents(frames:Frame[],slot:number):ReplayEvent[] {
-  const result:ReplayEvent[]=[]; let prior={odor:false,visual:false,touch:false,score:0}
-  for(const frame of frames){
-    const sense=frame.senses?.[slot]; const odor=!!sense&&sense.odor.reduce((a,b)=>a+b,0)>.04
-    const visual=!!sense&&Math.max(...sense.visual)>.05; const touch=!!sense&&(sense.contact_food!==undefined?sense.contact_food.length>0:sense.touch>0)
-    const tick=frame.tick??Math.round(frame.time/.0001)
-    if(odor&&!prior.odor)result.push({type:'odor_detected',tick,slot,values:sense?.odor})
-    if(visual&&!prior.visual)result.push({type:'visual_target_detected',tick,slot,values:sense?.visual})
-    if(touch&&!prior.touch)result.push({type:'food_contact',tick,slot,mouth_distance:sense?.mouth_distance??undefined})
-    const score=frame.scores?.[slot]||0
-    if(score>prior.score+.00001)result.push({type:'intake',tick,slot,amount:score-prior.score})
-    prior={odor,visual,touch,score}
-  }
-  return result
-}
-
 type Graph=NeuralGraph
 type ReplayReceipt={replay_policy?:{event_ticks?:number};schema?:string;sha256?:string;connectome_sha256?:string;neuron_count?:number;edge_count?:number;request?:{bridge_profile?:string;sensory_profile?:string};runtime?:{rules?:{id?:string;feeding_contact?:string;physics_dt?:number;sense_ticks?:number};machine?:string;python?:string;mujoco?:string;bridge_profile?:string;readout_weights_sha256?:string;model?:{id?:string};sensory_profile?:{id?:string}}}
 type BrainView='region'|'class'|'local'|'anatomy'
@@ -110,6 +94,11 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
   const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),environment_contact:t('Environment contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact'),territory:locale==='zh-CN'?'独占领地计分':'Exclusive territory control'}[e.type]||e.type)
   useEffect(()=>setSelectedEvent(null),[slot,frames])
   return <section className="brain-theater panel" ref={brainHeading}>
+    <LifeEventTimeline events={events} slot={slot} time={frame?.time??0} label={eventName} onSelect={event=>{
+      setSelectedEvent(event)
+      const window=eventSampleWindow(frames,event,responseMs)
+      if(window)onSeek(window.after.time)
+    }}/>
     <div className="panel-heading"><span><AudioLines size={16}/>{t('Neural theatre')}</span><small>{t('Recorded activity · selectable circuit')}</small></div>
     <div className="brain-circuit-tabs">{circuits.map(c=><button key={c.id} className={circuit===c.id&&!(view==='anatomy'&&spatialAll)?'active':''} onClick={()=>selectCircuit(c.id)} style={{color:c.color}}>{t(c.label)}{edited&&circuit===c.id?<small> · {t('edited')}</small>:null}</button>)}</div>
     <div className="brain-layer-tabs" role="tablist" aria-label={t('Brain view')}><button className={view==='region'?'active':''} onClick={()=>setView('region')}>{t('Functional region')}</button><button className={view==='class'?'active':''} onClick={()=>setView('class')}>{t('Neuron class')}</button><button className={view==='local'?'active':''} onClick={()=>setView('local')}>{t('Local graph')}</button><button className={view==='anatomy'?'active':''} onClick={()=>{setSpatialAll(true);setView('anatomy')}}>{locale==='zh-CN'?'解剖空间 · 3D':'Anatomical space · 3D'}</button></div>
@@ -128,12 +117,6 @@ export function BrainTheater({frame,frames,season,fly,slot,events,onSeek,activit
     {frame?.senses?.[slot]?.contact_support!==undefined&&<div className="sensory-strip support-contact" aria-label={locale==='zh-CN'?'支撑与侧向接触':'Support and lateral contact'}><div><span>{locale==='zh-CN'?'足部向上支撑':'Upward foot support'}</span><strong>{frame.senses[slot].contact_support?.join(' · ')||t('No contact')}</strong><small>{locale==='zh-CN'?'实际地形接触；这一模式不把支撑送入左右避障触觉。':'Actual terrain contact; this profile excludes support from lateral avoidance input.'}</small></div><div><span>{locale==='zh-CN'?'送入左右触觉的接触':'Contacts sent to lateral touch'}</span><strong>{[...new Set(Object.values(frame.senses[slot].contact_environment_sides||{}).flat())].join(' · ')||t('No contact')}</strong><small>{locale==='zh-CN'?'侧撞、下表面卡住、身体与对手接触仍保留。':'Side, underside, non-foot and opponent contact remain.'}</small></div></div>}
     {frame?.senses?.[slot]?.contact_activity&&<div className="sensory-strip contact-context" aria-label={t('Separate contact responses')}>{(['taste','touch_left','touch_right'] as const).map(key=>{const sense=frame.senses![slot],value=sense.contact_activity?.[key];return <div key={key}><span>{t({taste:'Food taste',touch_left:'Left environmental touch',touch_right:'Right environmental touch'}[key])}</span><strong>{value==null?'—':value.toFixed(3)}</strong><small>{t('Recorded population mean · model activity')} · {t('Input')} {sense[key]===undefined?'—':sense[key].toFixed(0)}</small></div>})}</div>}
     {selectedEvent&&(()=>{const window=eventSampleWindow(frames,selectedEvent,responseMs);if(!window)return null;const before=window.before,after=window.after;const changes=circuits.map(c=>({id:c.id,label:c.label,color:c.color,before:before.traces?.[slot]?.[c.id],after:after.traces?.[slot]?.[c.id]})).filter(c=>c.before!==undefined||c.after!==undefined);const beforeSense=before.senses?.[slot],afterSense=after.senses?.[slot];const delta=(a:number|undefined,b:number|undefined)=>a===undefined||b===undefined?'—':`${b-a>=0?'+':''}${(b-a).toFixed(2)}`;const eventName=(e:ReplayEvent)=>({odor_detected:t('Odor detected'),visual_target_detected:t('Visual target detected'),food_contact:t('Food contact'),environment_contact:t('Environment contact'),intake:t('Food intake'),exit:t('Boundary exit'),contact:t('Fly contact'),territory:locale==='zh-CN'?'独占领地计分':'Exclusive territory control'}[e.type]||e.type);return <div className="event-response"><div className="event-response-heading"><span><strong>{eventName(selectedEvent)}</strong><small>{locale==='zh-CN'?'记录响应窗口':'Recorded response window'} · {(selectedEvent.tick*.0001).toFixed(2)}s</small></span><button onClick={()=>setSelectedEvent(null)}>×</button></div><label className="event-response-window"><span>{locale==='zh-CN'?'响应观察窗口':'Response observation window'}</span><select aria-label={locale==='zh-CN'?'响应观察窗口':'Response observation window'} value={responseMs} onChange={e=>{const delay=Number(e.target.value);setResponseMs(delay);const range=eventSampleWindow(frames,selectedEvent,delay);if(range)onSeek(range.after.time)}}>{[0,100,500].map(ms=><option key={ms} value={ms}>{ms===0?(locale==='zh-CN'?'事件后首次采样':'First post-event sample'):`${ms} ms`}</option>)}</select></label><div className="event-response-times"><span>{locale==='zh-CN'?'事件前':'Before'} <b>{before.time.toFixed(2)}s</b></span><span>{locale==='zh-CN'?'事件后':'After'} <b>{after.time.toFixed(2)}s</b></span></div><div className="event-response-grid">{changes.slice(0,8).map(c=><div key={c.id}><span style={{color:c.color}}>{t(c.label)}</span><b>{shown(c.before,2)} → {shown(c.after,2)}</b><small>Δ {delta(c.before,c.after)} Hz</small></div>)}</div>{(beforeSense||afterSense)&&<div className="event-sensor-delta"><span>{t('Odor L / R')} <b>{beforeSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.odor.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Visual L / R')} <b>{beforeSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'} → {afterSense?.visual.map(v=>v.toFixed(2)).join(' / ')||'—'}</b></span><span>{t('Touch')} <b>{beforeSense?.touch?'ON':'—'} → {afterSense?.touch?'ON':'—'}</b></span><span>{t('Tactile population activity')} <b>{shown(beforeSense?.tactile_activity??undefined,3)} → {shown(afterSense?.tactile_activity??undefined,3)}</b></span>{(beforeSense?.contact_activity||afterSense?.contact_activity)&&(['taste','touch_left','touch_right'] as const).map(key=><span key={key}>{t({taste:'Food taste',touch_left:'Left environmental touch',touch_right:'Right environmental touch'}[key])} <b>{shown(beforeSense?.contact_activity?.[key]??undefined,3)} → {shown(afterSense?.contact_activity?.[key]??undefined,3)}</b></span>)}<span>{t('Left / right motor drive')} <b>{before.drives?.[slot]?.map(v=>v.toFixed(3)).join(' / ')||'—'} → {after.drives?.[slot]?.map(v=>v.toFixed(3)).join(' / ')||'—'}</b></span></div>}<div className="event-body-resource-delta"><span>{t('Recorded body state')} <b>{before.positions?.[slot]?.map(v=>Number.isFinite(v)?v.toFixed(2):'—').join(' / ')||'—'} → {after.positions?.[slot]?.map(v=>Number.isFinite(v)?v.toFixed(2):'—').join(' / ')||'—'} mm</b></span><span>{t('Food collected')} <b>{shown(before.scores?.[slot],3)} → {shown(after.scores?.[slot],3)}</b></span><span>{t('Energy reserve')} <b>{shown(before.energy?.[slot],3)} → {shown(after.energy?.[slot],3)}</b></span><span>{t('Shared food and resource history')} <b>{before.food?.map(v=>Number.isFinite(v)?v.toFixed(3):'—').join(' · ')||'—'} → {after.food?.map(v=>Number.isFinite(v)?v.toFixed(3):'—').join(' · ')||'—'}</b></span></div><EventNeuralResponse before={before} after={after} slot={slot} time={frame?.time??0} graph={anatomyGraph||graph} onSeek={onSeek} onInspect={id=>{setFocusId(id);setSelectedClass(null);setSpatialAll(true);const node=(anatomyGraph||graph)?.neurons.find(n=>n.id===id);setView(morphologyIds.includes(id)||node?.position?.length===3?'anatomy':'local');brainHeading.current?.scrollIntoView?.({block:'start',behavior:'smooth'})}}/><small className="event-response-note">{locale==='zh-CN'?'这些数值来自事件前及所选响应窗口的实际采样；它们描述时间上的观测变化，不自动宣称因果。':'Values are the actual samples in the selected response window; they describe an observed temporal change and do not by themselves claim causality.'}</small></div>})()}
-    <LifeEventTimeline events={events} slot={slot} time={frame?.time??0} label={eventName} onSelect={event=>{
-      setSelectedEvent(event)
-      const window=eventSampleWindow(frames,event,responseMs)
-      if(window)onSeek(window.after.time)
-    }}/>
-
   </section>
 }
 
@@ -167,7 +150,8 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     }
     return {region,node}
   },[frames])
-  const visibleEvents=useMemo(()=>events.length?events:scene.flies.flatMap((_,index)=>deriveEvents(frames,index)),[events,frames,scene.flies])
+  // Event receipts stay distinct from changes inferred from sampled traces.
+  const visibleEvents=events
   function download(){
     const payload={schema_version:'match-observations/v2',match_id:match?.id,request:match?.request,result:match?.result,
       receipt_sha256:match?.result?.receipt_sha256||null,events:visibleEvents,
@@ -233,6 +217,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
   const request=match?.request
   const runtime=receipt?.runtime
   return <section className="trace-panel panel observations">
+
     <div className="panel-heading"><span><AudioLines size={16}/>{t('Neural & behavior records')}</span><small>{t('Recorded replay flow')}</small></div>
     <div className="observation-subjects" role="group" aria-label={t('Observed fly')}>{scene.flies.map((entry,i)=><button key={i} className={!compare&&slot===i?'active':''} aria-pressed={!compare&&slot===i} onClick={()=>{setCompare(false);setSlot(i);onObserveFly?.(entry.id)}}><i style={{background:colors[entry.color]}}/>{t('Slot')} {i+1} · {entry.name}<small>{entry.id.slice(0,8)}</small></button>)}{scene.flies.length>1&&<button className={'comparison-toggle '+(compare?'active':'')} aria-pressed={compare} onClick={()=>setCompare(value=>!value)}>{compare?t('Focus one fly'):t('Compare participants')}</button>}</div>
     {compare?<details className="replay-comparison-disclosure" open><summary>{t('Compare participants')}</summary><div className="observation-comparison">{scene.flies.map((_,index)=>participantCard(index))}</div></details>:participantCard(slot)}

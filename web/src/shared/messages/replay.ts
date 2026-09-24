@@ -1,4 +1,5 @@
 export const replayMessages = {
+  "No event receipts were recorded for this participant. Sampled behavior remains available below.": {en: "No event receipts were recorded for this participant. Sampled behavior remains available below.", "zh-CN": "未记录该个体的事件凭据。下方仍可查看采样行为。"},
   "Recorded outcome": {en: "Recorded outcome", "zh-CN": "已记录结果"},
   "Recorded replay flow": {en: "Recorded replay flow", "zh-CN": "已记录回放流程"},
   "Inspect recorded detail": {en: "Inspect recorded detail", "zh-CN": "查看已记录细节"},

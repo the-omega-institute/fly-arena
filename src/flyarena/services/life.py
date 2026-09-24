@@ -180,7 +180,8 @@ class LifeLedger:
             return {'relative_to_parent':None,'changed':False,'changed_circuits':[],
                     'changed_parameters':[],'edge_changes':{'count':0,'edges':[]},
                     'intervention_changes':{'count':0,'items':[]},
-                           'summary':'Founder design; no parent design was recorded.'}
+                    'code':'founder',
+                    'summary':'Founder design; no parent design was recorded.'}
         changed_circuits=[];circuit_scales=[]
         parent_mut={m['selector']:m['scale'] for m in parent.get('weight_mutations',[])}
         child_mut={m['selector']:m['scale'] for m in child.get('weight_mutations',[])}
@@ -210,6 +211,7 @@ class LifeLedger:
                 'changed_parameters':changed_parameters,
                 'edge_changes':{'count':len(edge_changes),'edges':edge_changes[:128]},
                 'intervention_changes':{'count':len(intervention_items),'items':intervention_items[:64]},
+                'code':'changed' if changed else 'unchanged',
                 'summary':('Recorded changes relative to the parent FlySpec.' if changed else
                            'No design change relative to the parent FlySpec was recorded.')}
 
@@ -264,6 +266,7 @@ class LifeLedger:
                    {'relative_to_parent':None,'available':False,'changed':None,'changed_circuits':[],
                     'changed_parameters':[],'edge_changes':{'count':None,'edges':[]},
                     'intervention_changes':{'count':None,'items':[]},
+                    'code':'parent_unavailable',
                     'summary':'Parent design is private; the relative delta is unavailable.'})
             node={'id':node_id,'label':fly.get('name') or node_id,'name':fly.get('name') or node_id,
                   'redacted':False,'marker':False,'relation':relation,'depth':relative_depth,

@@ -36,3 +36,14 @@ test('shared playhead chooses a recorded sample and preserves missing outcome fi
  const outcome=module.recordedOutcome([{time:0,scores:[0]},{time:1,scores:[]}],0)
  assert.deepEqual(outcome,{score:null,energy:null,duration:1,status:'recorded'})
 })
+
+test('world labels hide under measured HUD cards and reappear in clear canvas space',()=>{
+ const canvas={left:0,right:600,top:0,bottom:500},hud={left:12,right:280,top:10,bottom:155}
+ assert.equal(module.replayLabelHidden({left:180,right:260,top:80,bottom:110},canvas,hud),true)
+ assert.equal(module.replayLabelHidden({left:282,right:360,top:80,bottom:110},canvas,hud),true)
+ assert.equal(module.replayLabelHidden({left:300,right:440,top:80,bottom:110},canvas,hud),false)
+ assert.equal(module.replayLabelHidden({left:100,right:240,top:180,bottom:210},canvas,hud),false)
+ assert.equal(module.replayLabelHidden({left:520,right:650,top:180,bottom:210},canvas,hud),true)
+ assert.equal(module.replayLabelHidden({left:10,right:140,top:-20,bottom:10},canvas),true)
+ assert.equal(module.replayLabelHidden({left:10,right:140,top:20,bottom:50},canvas),false)
+})
