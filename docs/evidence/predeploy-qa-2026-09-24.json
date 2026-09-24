@@ -1,74 +1,68 @@
 {
   "date": "2026-09-24",
+  "checked_at_utc": "2026-09-24T14:43:44.499117+00:00",
   "branch": "fix/predeploy-qa",
-  "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
-  "verdict": "incomplete",
-  "scope": "Pre-deploy integration QA for rounds 3+4, local disposable database, no worker. Not deployed.",
+  "base_source_commit": "c1a78507bc2477bba6d01c8969c6aac67e3aec24",
+  "verdict": "passed",
+  "scope": "Rounds 3+4 together against a disposable database and real Chromium via standalone Playwright, explicitly authorized by the user. Local worker disabled; created evaluations remain queued. Live deployment is a separate subsequent gate.",
+  "scientific_semantics": "No scientific, simulation, scoring, condition-matching or preregistered decision logic changed.",
   "checks": [
     {
-      "command": "cd web && npm test",
       "runtime": "Node v26.3.0",
       "status": "passed",
       "passed": 259,
       "failed": 0,
-      "skipped": 0,
-      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-node26.log"
+      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/node26-final.log"
     },
     {
-      "command": "cd web; TEST_FILES=$(node -p 'JSON.parse(require(\"node:fs\").readFileSync(\"package.json\", \"utf8\")).scripts.test.replace(/^node --test /, \"\")'); /private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/node22/node_modules/.bin/node --test ${=TEST_FILES}",
-      "shell": "zsh",
       "runtime": "Node v22.23.3",
       "status": "passed",
       "passed": 259,
       "failed": 0,
-      "skipped": 0,
-      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-node22.log"
+      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/node22-final.log"
     },
     {
-      "command": "cd web && npm run test:journeys",
-      "runtime": "Node v26.3.0",
+      "runtime": "Node v26.3.0 / JSDOM",
       "status": "passed",
       "passed": 74,
       "failed": 0,
-      "skipped": 0,
-      "scope": "React controls in JSDOM; not a real browser or GPU test",
-      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-journeys.log"
+      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/journeys-final.log"
     },
     {
-      "command": "cd web && npm run build",
-      "runtime": "Node v26.3.0",
+      "command": "npm run build",
       "status": "passed",
-      "warning": "Main JS chunk is 1660.66 kB minified (487.24 kB gzip), above the configured 1100 kB warning threshold. No browser performance impact was measured.",
-      "log": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/predeploy-build.log"
-    }
-  ],
-  "incidents": [
-    {
-      "severity": "validation-blocker",
-      "where": "Backend startup, 127.0.0.1:8193",
-      "status": "resolved in follow-up: process successfully bound and served real HTTP",
-      "evidence": "Uvicorn completed application startup, then exited 3: [Errno 1] error while attempting to bind on address (127.0.0.1, 8193): operation not permitted. Application shutdown completed.",
-      "classification": "Sandbox execution restriction; not established as an application defect."
+      "warning": "Existing bundle-size warning: main JS 1660.70 kB, gzip 487.25 kB."
     },
     {
-      "severity": "validation-blocker",
-      "where": "Vite startup, 127.0.0.1:5599",
-      "status": "resolved in follow-up: process successfully bound and served real HTTP",
-      "evidence": "Vite exited 1: listen EPERM: operation not permitted 127.0.0.1:5599.",
-      "classification": "Sandbox execution restriction; not established as an application defect."
-    },
-    {
-      "severity": "validation-blocker",
-      "where": "Browser plugin control connection",
-      "status": "unresolved",
-      "evidence": "unsupported Codex auth method: apikey; nameSession and tabs.list rejected, including a retry. Chrome running, extension installed/enabled, native-host manifest valid.",
-      "classification": "Browser tool authentication restriction; not established as an application defect."
+      "command": "pytest -q -m 'not integration'",
+      "status": "passed",
+      "passed": 909,
+      "skipped": 11,
+      "deselected": 3,
+      "failed": 0,
+      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/backend-final.log"
     }
   ],
-  "product_defects": [],
-  "product_defects_note": "No product defect established by completed checks. Browser defect discovery was blocked; this is not a claim that the product is defect-free.",
+  "product_defects": [
+    {
+      "id": "QA-2D-LABELS",
+      "problem": "SVG text halos scaled in map units, obscuring small labels in the phone 2D replay.",
+      "fix": "Use a non-scaling pixel stroke, larger slot/spawn/food labels, and full participant names in the legend. Geometry, trajectories, numbers and missing-data states are unchanged.",
+      "before": "predeploy-qa-20260924/390-en-replay-2d.png",
+      "after": "predeploy-qa-20260924/390-en-replay-2d-fixed.png",
+      "status": "fixed and checked in all four combinations"
+    },
+    {
+      "id": "QA-TRAINING-MOBILE",
+      "problem": "The mobile training grid expanded to 740 px on a 390 px screen; generic text-input styles also expanded optimizer radio buttons.",
+      "fix": "Allow the mobile grid and its content to shrink, wrap continuation evidence, exclude radio inputs from full-width training controls, and size optimizer radio inputs explicitly.",
+      "before": "predeploy-qa-20260924/390-en-continue.png",
+      "after": "predeploy-qa-20260924/390-en-continue-fixed.png",
+      "status": "fixed; 390 px document width in both languages with conditions collapsed and expanded"
+    }
+  ],
   "browser_coverage": {
-    "status": "not run",
+    "engine": "Playwright Chromium, headless, real local HTTP and real WebGL",
     "viewports": [
       {
         "width": 1440,
@@ -80,295 +74,890 @@
       }
     ],
     "locales": [
-      "zh-CN",
-      "en"
+      "en",
+      "zh-CN"
     ],
-    "pending": [
-      "First-visit guide next action, clone WT, edit and save design, local registration/login",
-      "WT preset, submission, queued series and observation states with no worker",
-      "Series deep link",
-      "Life ledger lineage, continue evolution plan, public fly challenge with own fly",
-      "Existing replay aca9ac97af8a4cfcb863c3b45da5e857: 3D/2D toggle, sticky scene, event navigator, comparison context",
-      "Lab 3D",
-      "Brain anatomy and forced WebGL failure fallback",
-      "Each tab mobile layout",
-      "Browser console errors"
+    "journey_results": [
+      {
+        "label": "1440-en",
+        "checks": [
+          "Fresh first-visit guide ready",
+          "WT edit/save and paired queued series: two legs, zero verified, no conclusion",
+          "Three queued solo observations, no outcome column",
+          "Series reload/deep link retains schedule",
+          "Lineage parent delta and continuation reviewed without starting work",
+          "Public fly challenge uses own saved fly and only prepares plan",
+          "Recorded event seeks body/brain; 3D/2D preserve clock; anatomical inspection",
+          "Comparison displays differing actual receipt conditions",
+          "Lab real three-subject scene and recorded trajectories at shared time",
+          "Forced GPU context loss retains time/data and shows labeled fallback"
+        ],
+        "errors": [],
+        "consoleErrors": [],
+        "overflows": [],
+        "screenshots": [
+          "shots/1440-en-first.png",
+          "shots/1440-en-queued-series.png",
+          "shots/1440-en-observation.png",
+          "shots/1440-en-lineage.png",
+          "shots/1440-en-continue.png",
+          "shots/1440-en-challenge.png",
+          "shots/1440-en-replay-2d.png",
+          "shots/1440-en-replay-3d.png",
+          "shots/1440-en-anatomy.png",
+          "shots/1440-en-comparison.png",
+          "shots/1440-en-lab-3d.png",
+          "shots/1440-en-lab-2d.png",
+          "shots/1440-en-lab-webgl-failure.png"
+        ],
+        "series": "db3020fb965b4fd69742b484e00ab0b0",
+        "fly": "2e1833db9fe84454aee54b6964235401",
+        "observation": "c4585cbade3a4ee6aa3665f52da2e176",
+        "status": "passed"
+      },
+      {
+        "label": "1440-zh-CN",
+        "checks": [
+          "Fresh first-visit guide ready",
+          "WT edit/save and paired queued series: two legs, zero verified, no conclusion",
+          "Three queued solo observations, no outcome column",
+          "Series reload/deep link retains schedule",
+          "Lineage parent delta and continuation reviewed without starting work",
+          "Public fly challenge uses own saved fly and only prepares plan",
+          "Recorded event seeks body/brain; 3D/2D preserve clock; anatomical inspection",
+          "Comparison displays differing actual receipt conditions",
+          "Lab real three-subject scene and recorded trajectories at shared time",
+          "Forced GPU context loss retains time/data and shows labeled fallback"
+        ],
+        "errors": [],
+        "consoleErrors": [],
+        "overflows": [],
+        "screenshots": [
+          "shots/1440-zh-CN-first.png",
+          "shots/1440-zh-CN-queued-series.png",
+          "shots/1440-zh-CN-observation.png",
+          "shots/1440-zh-CN-lineage.png",
+          "shots/1440-zh-CN-continue.png",
+          "shots/1440-zh-CN-challenge.png",
+          "shots/1440-zh-CN-replay-2d.png",
+          "shots/1440-zh-CN-replay-3d.png",
+          "shots/1440-zh-CN-anatomy.png",
+          "shots/1440-zh-CN-comparison.png",
+          "shots/1440-zh-CN-lab-3d.png",
+          "shots/1440-zh-CN-lab-2d.png",
+          "shots/1440-zh-CN-lab-webgl-failure.png"
+        ],
+        "series": "ebe278c0dc264b2dad8f7ded374ab14e",
+        "fly": "1deba3dcd80546908eb4d023177cbd2a",
+        "observation": "421b6a3cf44d4b1b89793f211825758e",
+        "status": "passed"
+      },
+      {
+        "label": "390-en",
+        "checks": [
+          "Fresh first-visit guide ready",
+          "WT edit/save and paired queued series: two legs, zero verified, no conclusion",
+          "Three queued solo observations, no outcome column",
+          "Series reload/deep link retains schedule",
+          "Lineage parent delta and continuation reviewed without starting work",
+          "Public fly challenge uses own saved fly and only prepares plan",
+          "Recorded event seeks body/brain; 3D/2D preserve clock; anatomical inspection",
+          "Comparison displays differing actual receipt conditions",
+          "Lab real three-subject scene and recorded trajectories at shared time",
+          "Forced GPU context loss retains time/data and shows labeled fallback"
+        ],
+        "errors": [],
+        "consoleErrors": [],
+        "overflows": [
+          {
+            "name": "continue",
+            "width": 390,
+            "scroll": 740
+          }
+        ],
+        "screenshots": [
+          "shots/390-en-first.png",
+          "shots/390-en-queued-series.png",
+          "shots/390-en-observation.png",
+          "shots/390-en-lineage.png",
+          "shots/390-en-continue.png",
+          "shots/390-en-challenge.png",
+          "shots/390-en-replay-2d.png",
+          "shots/390-en-replay-3d.png",
+          "shots/390-en-anatomy.png",
+          "shots/390-en-comparison.png",
+          "shots/390-en-lab-3d.png",
+          "shots/390-en-lab-2d.png",
+          "shots/390-en-lab-webgl-failure.png"
+        ],
+        "series": "c7eab6ab81984b4fb683f9f3f79a2f5f",
+        "fly": "c4faafcd82e749e1b393ec0b9d2b60fc",
+        "observation": "14135fe9aacc4820a15ef0e32587cbf2",
+        "status": "passed"
+      },
+      {
+        "label": "390-zh-CN",
+        "checks": [
+          "Fresh first-visit guide ready",
+          "WT edit/save and paired queued series: two legs, zero verified, no conclusion",
+          "Three queued solo observations, no outcome column",
+          "Series reload/deep link retains schedule",
+          "Lineage parent delta and continuation reviewed without starting work",
+          "Public fly challenge uses own saved fly and only prepares plan",
+          "Recorded event seeks body/brain; 3D/2D preserve clock; anatomical inspection",
+          "Comparison displays differing actual receipt conditions",
+          "Lab real three-subject scene and recorded trajectories at shared time",
+          "Forced GPU context loss retains time/data and shows labeled fallback"
+        ],
+        "errors": [],
+        "consoleErrors": [],
+        "overflows": [
+          {
+            "name": "continue",
+            "width": 390,
+            "scroll": 740
+          }
+        ],
+        "screenshots": [
+          "shots/390-zh-CN-first.png",
+          "shots/390-zh-CN-queued-series.png",
+          "shots/390-zh-CN-observation.png",
+          "shots/390-zh-CN-lineage.png",
+          "shots/390-zh-CN-continue.png",
+          "shots/390-zh-CN-challenge.png",
+          "shots/390-zh-CN-replay-2d.png",
+          "shots/390-zh-CN-replay-3d.png",
+          "shots/390-zh-CN-anatomy.png",
+          "shots/390-zh-CN-comparison.png",
+          "shots/390-zh-CN-lab-3d.png",
+          "shots/390-zh-CN-lab-2d.png",
+          "shots/390-zh-CN-lab-webgl-failure.png"
+        ],
+        "series": "63bcfa71dd6f49f899242e6c3c878814",
+        "fly": "ae9377abb05c47aca477a3fb2631b649",
+        "observation": "4debfd96cdc74a1d9e38ace3fd46121d",
+        "status": "passed"
+      }
     ],
-    "screenshots": [],
-    "screenshot_directory": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/shots"
-  },
-  "changes": "QA evidence report only; no application or scientific source changes. Initial port restrictions resolved; browser acceptance remains incomplete.",
-  "python_tests": "Follow-up: 909 passed, 11 skipped, 3 deselected; complete non-integration suite.",
-  "cleanup": "Follow-up local backend and Vite stopped after HTTP checks. Original Mac Studio study subsequently completed all ten runs.",
-  "log_ref": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/log-qa.jsonl",
-  "follow_up": {
-    "checked_at_utc": "2026-09-24T10:38:05.549669+00:00",
-    "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
-    "backend": {
-      "command": "PYTHONPATH=src python -m pytest -q -m \"not integration\"",
-      "passed": 909,
-      "skipped": 11,
-      "deselected": 3,
-      "failed": 0,
-      "seconds": 243.7
-    },
-    "frontend": {
-      "node26": "259 passed, 0 failed",
-      "node22": "259 passed, 0 failed",
-      "journeys": "74 passed, 0 failed; JSDOM",
-      "build": "passed; unchanged main bundle size warning"
-    },
-    "http_smoke": {
-      "checked_at_utc": "2026-09-24T10:34:48Z",
-      "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
-      "scope": "Real HTTP against disposable database; worker disabled. No browser rendering or simulation asserted.",
-      "checks": [
-        "Clone canonical WT, edit olfactory weight, compile and save via real API",
-        "WT preset creates four queued, slot-swapped legs; no standings/outcomes; detail and idempotent retry agree",
-        "Maze preset creates three queued solo observations, no ranking and no fabricated arrival/result",
-        "Saved edited design has real WT parent in lineage API",
-        "Existing verified replay serves scene, frames, events and receipt through actual HTTP",
-        "Scarcity, labyrinth and duel geometry previews respond successfully"
-      ],
-      "fly_id": "71c9589a41b444359cfffd6627a594b0",
-      "tournament_id": "87b20b74d0b84d7f8bdcd57e9de6d25d",
-      "observation_series_id": "082f4dce820a49a68a2ee2de658daa58",
-      "replay_id": "aca9ac97af8a4cfcb863c3b45da5e857",
-      "tournament": null,
-      "observation": null
-    },
-    "live_series_projection": {
-      "scope": "Read-only snapshots of real live tournament data evaluated by rounds 3+4 projection code; not a live browser verification",
-      "series": [
+    "matrix_note": "All functional journeys passed. The recorded original mobile continuation overflow was subsequently fixed and independently rechecked below.",
+    "display_fix_recheck": {
+      "status": "passed",
+      "results": [
         {
-          "id": "c9f17c6991a941e59c90cc772b78c762",
-          "legacy_status": "complete",
-          "projection": {
-            "protocol_id": "paired-series/v1",
-            "status": "complete",
-            "schedule": [
-              {
-                "seed": 42,
-                "spawn_order": 1,
-                "fly_ids": [
-                  "2e3654f3feac453b805cb9e1c8f3d6a1",
-                  "0c136a17a43c84c2eb32539454285783"
-                ],
-                "status": "verified",
-                "match_ids": [
-                  "0b6e41a4ec824d509b94d19f0c4ca8df"
-                ],
-                "outcomes": [
-                  {
-                    "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
-                    "score": 0.0,
-                    "outcome": "loss"
-                  },
-                  {
-                    "fly_id": "0c136a17a43c84c2eb32539454285783",
-                    "score": 0.2488,
-                    "outcome": "win"
-                  }
-                ],
-                "issues": [],
-                "errors": []
-              },
-              {
-                "seed": 42,
-                "spawn_order": 2,
-                "fly_ids": [
-                  "0c136a17a43c84c2eb32539454285783",
-                  "2e3654f3feac453b805cb9e1c8f3d6a1"
-                ],
-                "status": "verified",
-                "match_ids": [
-                  "54ab533fc5364044ab783dc0352254f3"
-                ],
-                "outcomes": [
-                  {
-                    "fly_id": "0c136a17a43c84c2eb32539454285783",
-                    "score": 0.4032,
-                    "outcome": "win"
-                  },
-                  {
-                    "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
-                    "score": 0.0,
-                    "outcome": "loss"
-                  }
-                ],
-                "issues": [],
-                "errors": []
-              }
-            ],
-            "expected_matches": 2,
-            "verified_matches": 2,
-            "unexpected_match_ids": [],
-            "issues": [],
-            "standings": [
-              {
-                "fly_id": "0c136a17a43c84c2eb32539454285783",
-                "points": 6,
-                "played": 2,
-                "wins": 2,
-                "draws": 0,
-                "losses": 0
-              },
-              {
-                "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
-                "points": 0,
-                "played": 2,
-                "wins": 0,
-                "draws": 0,
-                "losses": 2
-              }
-            ],
-            "ranking_policy": "ranking/v1",
-            "sandbox": false,
-            "ranking_error": null
-          },
-          "match_count": 2
+          "width": 1440,
+          "locale": "en",
+          "check": "Continuation and expanded evidence fit viewport; optimizer radio size",
+          "viewport": 1440,
+          "scroll": 1440,
+          "radio": 14
         },
         {
-          "id": "836ddf7654554deaa413a400fef74d90",
-          "legacy_status": "complete",
-          "projection": {
-            "protocol_id": "paired-series/v1",
-            "status": "complete",
-            "schedule": [
-              {
-                "seed": 42,
-                "spawn_order": 1,
-                "fly_ids": [
-                  "8d5c54c75af64954ac667fbbd2724de3",
-                  "c38f62c6cab74ef0a2ddec834c72128b"
-                ],
-                "status": "verified",
-                "match_ids": [
-                  "35c36aea32fc4ed495eb902f07af34bd"
-                ],
-                "outcomes": [
-                  {
-                    "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
-                    "score": 0.2048,
-                    "outcome": "loss"
-                  },
-                  {
-                    "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
-                    "score": 1.3112,
-                    "outcome": "win"
-                  }
-                ],
-                "issues": [],
-                "errors": []
-              },
-              {
-                "seed": 42,
-                "spawn_order": 2,
-                "fly_ids": [
-                  "c38f62c6cab74ef0a2ddec834c72128b",
-                  "8d5c54c75af64954ac667fbbd2724de3"
-                ],
-                "status": "verified",
-                "match_ids": [
-                  "203662494e034a2c989831a60c4b07cd"
-                ],
-                "outcomes": [
-                  {
-                    "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
-                    "score": 1.2708,
-                    "outcome": "win"
-                  },
-                  {
-                    "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
-                    "score": 0.1444,
-                    "outcome": "loss"
-                  }
-                ],
-                "issues": [],
-                "errors": []
-              }
-            ],
-            "expected_matches": 2,
-            "verified_matches": 2,
-            "unexpected_match_ids": [],
-            "issues": [],
-            "standings": [
-              {
-                "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
-                "points": 6,
-                "played": 2,
-                "wins": 2,
-                "draws": 0,
-                "losses": 0
-              },
-              {
-                "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
-                "points": 0,
-                "played": 2,
-                "wins": 0,
-                "draws": 0,
-                "losses": 2
-              }
-            ],
-            "ranking_policy": "ranking/v1",
-            "sandbox": false,
-            "ranking_error": null
-          },
-          "match_count": 2
+          "width": 1440,
+          "locale": "zh-CN",
+          "check": "Continuation and expanded evidence fit viewport; optimizer radio size",
+          "viewport": 1440,
+          "scroll": 1440,
+          "radio": 14
+        },
+        {
+          "width": 390,
+          "locale": "en",
+          "check": "Continuation and expanded evidence fit viewport; optimizer radio size",
+          "viewport": 390,
+          "scroll": 390,
+          "radio": 14
+        },
+        {
+          "width": 390,
+          "locale": "zh-CN",
+          "check": "Continuation and expanded evidence fit viewport; optimizer radio size",
+          "viewport": 390,
+          "scroll": 390,
+          "radio": 14
+        },
+        {
+          "width": 1440,
+          "locale": "en",
+          "check": "Readable numbered positions, full-name legend and fixed-width text halo",
+          "labels": [
+            "1",
+            "2"
+          ],
+          "stroke": "non-scaling-stroke"
+        },
+        {
+          "width": 1440,
+          "locale": "zh-CN",
+          "check": "Readable numbered positions, full-name legend and fixed-width text halo",
+          "labels": [
+            "1",
+            "2"
+          ],
+          "stroke": "non-scaling-stroke"
+        },
+        {
+          "width": 390,
+          "locale": "en",
+          "check": "Readable numbered positions, full-name legend and fixed-width text halo",
+          "labels": [
+            "1",
+            "2"
+          ],
+          "stroke": "non-scaling-stroke"
+        },
+        {
+          "width": 390,
+          "locale": "zh-CN",
+          "check": "Readable numbered positions, full-name legend and fixed-width text halo",
+          "labels": [
+            "1",
+            "2"
+          ],
+          "stroke": "non-scaling-stroke"
         }
-      ]
-    },
-    "evidence_directory": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924",
-    "browser_status": "not run: control connection authentication failed",
-    "screenshots": [],
-    "deployment": "not performed: real browser acceptance incomplete; #82 study has finished"
-  },
-  "completion_follow_up": {
-    "checked_at_utc": "2026-09-24T13:38:14.081109+00:00",
-    "study": {
-      "status": "complete",
-      "verdict": "negative",
-      "improved_seeds": [
-        43,
-        44
       ],
-      "negative_seeds": [
-        42,
-        45,
-        46
-      ],
-      "runs_verified": 10,
-      "receipt_bound_files_reverified": 60,
-      "wall_seconds": 21892.84,
-      "study_sha256": "93659137407be6a093d51842adebc738ac0e4a2166050b99620a69fd5d10394b"
+      "errors": []
     },
-    "backup": {
-      "created_at_utc": "20260924T133626Z",
-      "backup_directory": "/Users/macstudio/fly-arena-backups/pre-rounds34-20260924T133626Z",
-      "scope": "Preparation snapshot while service remains live. Refresh SQLite backup in the final maintenance window before deployment.",
-      "sqlite_integrity_check": "ok",
-      "sqlite_sha256": "b06c960f4a5dac50e76dd25467f26e5c80bbc7653fca582a000ff9c1a06f9377",
-      "archive_sha256": "af3f7c9786266f23c55a3fb3be222869b859397b9ac78bbaa0ec3baf4f717d36",
-      "archive_bytes": 607864884,
-      "queue_states": {
-        "matches": [
-          [
-            "verified",
-            35
-          ]
-        ],
-        "experiments": [],
-        "training_runs": [
-          [
-            "complete",
-            4
-          ]
-        ]
+    "additional_gpu_failure_recheck": {
+      "status": "passed",
+      "results": [
+        {
+          "width": 1440,
+          "locale": "en",
+          "check": "Anatomy context loss: selected neuron/edge and recorded time retained; local graph usable",
+          "time": "0.8",
+          "selection": "6536787"
+        },
+        {
+          "width": 1440,
+          "locale": "zh-CN",
+          "check": "Anatomy context loss: selected neuron/edge and recorded time retained; local graph usable",
+          "time": "0.8",
+          "selection": "6536787"
+        },
+        {
+          "width": 390,
+          "locale": "en",
+          "check": "Anatomy context loss: selected neuron/edge and recorded time retained; local graph usable",
+          "time": "0.8",
+          "selection": "6536787"
+        },
+        {
+          "width": 390,
+          "locale": "zh-CN",
+          "check": "Anatomy context loss: selected neuron/edge and recorded time retained; local graph usable",
+          "time": "0.8",
+          "selection": "6536787"
+        },
+        {
+          "check": "Retry remounts anatomy GPU scene and preserves selection/time"
+        },
+        {
+          "width": 1440,
+          "locale": "en",
+          "check": "Initial WebGL unavailable: replay 2D fallback and event navigation remain usable"
+        },
+        {
+          "width": 1440,
+          "locale": "zh-CN",
+          "check": "Initial WebGL unavailable: replay 2D fallback and event navigation remain usable"
+        },
+        {
+          "width": 390,
+          "locale": "en",
+          "check": "Initial WebGL unavailable: replay 2D fallback and event navigation remain usable"
+        },
+        {
+          "width": 390,
+          "locale": "zh-CN",
+          "check": "Initial WebGL unavailable: replay 2D fallback and event navigation remain usable"
+        }
+      ],
+      "errors": []
+    },
+    "screenshots": [
+      "390-en-continue.png",
+      "390-en-continue-fixed.png",
+      "390-zh-CN-continue-fixed.png",
+      "390-en-replay-2d.png",
+      "390-en-replay-2d-fixed.png",
+      "390-zh-CN-replay-2d-fixed.png",
+      "1440-en-comparison.png",
+      "390-zh-CN-lab-webgl-failure.png",
+      "390-en-anatomy-failure.png",
+      "390-zh-CN-webgl-unavailable.png"
+    ],
+    "all_screenshot_manifest": {
+      "shots/1440-en-anatomy-failure.png": {
+        "sha256": "4670f358fdb966bdaee93de5518319230141c85bf5ee26517232230e47d921ac",
+        "bytes": 184757
       },
-      "service_stopped": false,
-      "deployment_performed": false,
-      "verified_file_count": 556
+      "shots/1440-en-anatomy.png": {
+        "sha256": "2dc33a2e79bb21692208941d6671d5e8e27bf804378810b29bcc9ee2aaf08eb6",
+        "bytes": 163585
+      },
+      "shots/1440-en-challenge.png": {
+        "sha256": "302a90da64347c715b3f2e213878dd50b0829baa0a00367737a7e7fd9bf5506e",
+        "bytes": 109420
+      },
+      "shots/1440-en-comparison.png": {
+        "sha256": "153d0665cc93f8fa56feee79edab540d6bf25a7ab8a329d6a84d314abde07c0f",
+        "bytes": 167203
+      },
+      "shots/1440-en-continue-fixed.png": {
+        "sha256": "86efb0395092a27129ddbea69079d2fbb07cad7aaf6c31622ac39cd43cc4f5f7",
+        "bytes": 209934
+      },
+      "shots/1440-en-continue.png": {
+        "sha256": "155e9504966cb15ae9f0b890550ff4c1cb80bdc74b5e1bedbe19e0dba693fa8e",
+        "bytes": 209553
+      },
+      "shots/1440-en-failure.png": {
+        "sha256": "8e3ca54c555d32906c47e7319c7782d157537d0da6fd75f67796a1e91b8ce54e",
+        "bytes": 211939
+      },
+      "shots/1440-en-first.png": {
+        "sha256": "d08f7774b83fc2ae8ae03477e11174f68e7f3e8e97b2d75bde5a6626ccc83f6c",
+        "bytes": 106765
+      },
+      "shots/1440-en-lab-2d.png": {
+        "sha256": "2ef8c2ec6595e06f0441ee86a47cc692139e5ebb1ce417d78188d1823db9107e",
+        "bytes": 61281
+      },
+      "shots/1440-en-lab-3d.png": {
+        "sha256": "943dbfbc733bf923eedf2e709563faec73e5fb0e033a0c5d03643368026a7871",
+        "bytes": 238741
+      },
+      "shots/1440-en-lab-webgl-failure.png": {
+        "sha256": "3738e80bf6a47316c24414d372f9a9dbc3f44d7ac4b4c1e8bc1ad0a118e14c01",
+        "bytes": 58813
+      },
+      "shots/1440-en-lineage.png": {
+        "sha256": "e9ecdef472490f32b76c17d542df2bae97b34b99788d424de0781dc32a38d4f6",
+        "bytes": 95996
+      },
+      "shots/1440-en-observation.png": {
+        "sha256": "82679679e32d06ec0e96d54fc6eeb8ed51bafc3c1017f3b08a155943efacb432",
+        "bytes": 120446
+      },
+      "shots/1440-en-queued-series.png": {
+        "sha256": "93b8e341d965ddfe927cd15ab1d21c41122e9408567a123ffdb323840382f80e",
+        "bytes": 122130
+      },
+      "shots/1440-en-replay-2d-fixed.png": {
+        "sha256": "cb4a58c2d5f1a20c5aa31e977e783018266ff6adc4b177230442442dd54c9402",
+        "bytes": 160610
+      },
+      "shots/1440-en-replay-2d.png": {
+        "sha256": "9a0cd14d17b58c0a1922fd386ae9f432bf555eb70f7b451e8b4e1f6c1b04c4f0",
+        "bytes": 168666
+      },
+      "shots/1440-en-replay-3d.png": {
+        "sha256": "bd0e6544969df0885d887139b72302ae4637837b3b4c1fa1016f970216e74b21",
+        "bytes": 134457
+      },
+      "shots/1440-en-webgl-unavailable.png": {
+        "sha256": "c995024784244780f74f5b605ad87f4f3a0b32945063eb670bd26ee7c7dc2ca5",
+        "bytes": 175471
+      },
+      "shots/1440-zh-CN-anatomy-failure.png": {
+        "sha256": "af96ccd22fe79f2f98382bf447fce771c32c9a6e78d6a80db381a8ca2df8838d",
+        "bytes": 198024
+      },
+      "shots/1440-zh-CN-anatomy.png": {
+        "sha256": "1d81497bb9316fa70920c32139218d2ac6c74d48f5e865a2f59bb8d0e48e3573",
+        "bytes": 173768
+      },
+      "shots/1440-zh-CN-challenge.png": {
+        "sha256": "2bee5a54078cb09c4432de7b66afec3819ccbdd03192cb741a4059115374401b",
+        "bytes": 125706
+      },
+      "shots/1440-zh-CN-comparison.png": {
+        "sha256": "f7c0060f88f3e0ee2fa27505eb8ff79409705f4fda4c37f67c6e32a34aa66549",
+        "bytes": 162108
+      },
+      "shots/1440-zh-CN-continue-fixed.png": {
+        "sha256": "659cc0e3cecf7371c87908e671e791c538ba73558985a5f273a9bc267e324674",
+        "bytes": 258207
+      },
+      "shots/1440-zh-CN-continue.png": {
+        "sha256": "d2fa827092b7439c8a8721af15484d37afa43297f8942e4e5aac87b10f03169b",
+        "bytes": 250183
+      },
+      "shots/1440-zh-CN-failure.png": {
+        "sha256": "363a53d9b337048d5525f024c449816a233889d103603eea5a5c28802b17e94b",
+        "bytes": 228689
+      },
+      "shots/1440-zh-CN-first.png": {
+        "sha256": "074d67c2dc407840a60254e3bf21f6aae93cc652bd5bc84fedcc68e5ba331999",
+        "bytes": 140205
+      },
+      "shots/1440-zh-CN-lab-2d.png": {
+        "sha256": "a09221a7c4f7bb172bb2f56ea6127d3e68cd609f0b796eff4b789176e379a58b",
+        "bytes": 69276
+      },
+      "shots/1440-zh-CN-lab-3d.png": {
+        "sha256": "6e5eef8a0db6dc7947ea2e65544e83ab187f244f02311a78f5f856518f640974",
+        "bytes": 245869
+      },
+      "shots/1440-zh-CN-lab-webgl-failure.png": {
+        "sha256": "2efaa0f67c984553a6506b94560d09bb2701be57705c4713ccfe2c3b80667014",
+        "bytes": 65138
+      },
+      "shots/1440-zh-CN-lineage.png": {
+        "sha256": "24f0eea8a327fbf6324aa20c1e2b715ad6971ed18623a233ed69c30436e0974f",
+        "bytes": 102484
+      },
+      "shots/1440-zh-CN-observation.png": {
+        "sha256": "fa441316f0a444f84990f5cf685b6a7e4175e0d4c9c5ea667db66df25b3c06a3",
+        "bytes": 136847
+      },
+      "shots/1440-zh-CN-queued-series.png": {
+        "sha256": "1aaa19a0d431e813022f68ea92e511a56353a5d561660a78a0af88a175071f73",
+        "bytes": 138187
+      },
+      "shots/1440-zh-CN-replay-2d-fixed.png": {
+        "sha256": "21855ebcaceb15127e1776720a909065f5327a9f9965601c8f3bc08a00072125",
+        "bytes": 166862
+      },
+      "shots/1440-zh-CN-replay-2d.png": {
+        "sha256": "79d149a03bea2ed1d7fd904c9f5cb0c21ae268c84d1cf798bf61ebc650350507",
+        "bytes": 180531
+      },
+      "shots/1440-zh-CN-replay-3d.png": {
+        "sha256": "a1d4b0b9efac264e97c0080b542a7c5aa1b3585f20c5fd31f18aeb418532a3f2",
+        "bytes": 141990
+      },
+      "shots/1440-zh-CN-webgl-unavailable.png": {
+        "sha256": "78f462a0818390fdcee5d8b57274bd4c88fed42c21deec19a4c8da4f8a25a806",
+        "bytes": 188330
+      },
+      "shots/390-en-anatomy-failure.png": {
+        "sha256": "d33b025c771bd1e1e78ee5d22da2f4eaeb5c0dd67a84880bc8df5628e1137ac9",
+        "bytes": 61535
+      },
+      "shots/390-en-anatomy.png": {
+        "sha256": "7a3bd70cb7460d084500f4d53abd290fa4f25fe393d6a0d11dc21c80fce7ddbc",
+        "bytes": 59667
+      },
+      "shots/390-en-challenge.png": {
+        "sha256": "33e798e4b84a47cb79713af91901bb35ef017a6e95177d10247eefe8f400b3d8",
+        "bytes": 3454
+      },
+      "shots/390-en-comparison.png": {
+        "sha256": "bb5a37df8647427ea8730860cfdabda30908117a262fda93ddcfa3e372dd8b10",
+        "bytes": 77664
+      },
+      "shots/390-en-continue-fixed.png": {
+        "sha256": "5a9d636283b9e53962465ee9e604f9beb64d2e414ddf84f6730209159bce68f6",
+        "bytes": 76401
+      },
+      "shots/390-en-continue-overflow.png": {
+        "sha256": "f1893e62736f5f8e8e51ff9692f3408ae1b186b23a574cc19928f872f4ca948a",
+        "bytes": 748195
+      },
+      "shots/390-en-continue.png": {
+        "sha256": "284d2450ba91006b1848f7cfb74cd07d5647c3838d62784c4c0178ca8c1f5ecc",
+        "bytes": 54311
+      },
+      "shots/390-en-failure.png": {
+        "sha256": "775b96838d603eab440351039973e2b8129ac5433f6f2d8fa2e6fe05778b7b10",
+        "bytes": 62472
+      },
+      "shots/390-en-first.png": {
+        "sha256": "679be5d7c4f96216c3e211b8180ad3ed28c271019b845bb6a263ba3c70902391",
+        "bytes": 58053
+      },
+      "shots/390-en-lab-2d.png": {
+        "sha256": "314877a81c272d72ebcbe82623f126a83e135a6b5b47a6509f24f8c35a06d24d",
+        "bytes": 43789
+      },
+      "shots/390-en-lab-3d.png": {
+        "sha256": "0ccd5b854a4a27eaf9e43fc9edb7b1b3a4d7eb41af41be623ae8067198ff3d98",
+        "bytes": 104131
+      },
+      "shots/390-en-lab-webgl-failure.png": {
+        "sha256": "7b34ffa9290880851cd7a9d3c79af56049e62dd7645ccff1697fb4f31686842f",
+        "bytes": 43436
+      },
+      "shots/390-en-lineage.png": {
+        "sha256": "ba989e688b3cbb6d7d79794ece34fc98df3589d9920dad7bf417995932029966",
+        "bytes": 29910
+      },
+      "shots/390-en-observation.png": {
+        "sha256": "a43977e674f0846a438debd2298f1bdc7d72457820a85df9854142ec82c74526",
+        "bytes": 70996
+      },
+      "shots/390-en-queued-series.png": {
+        "sha256": "0574683848b9de5e38b7c1bffd88650ac3cdd0ded60f296bfaed76deaca5403b",
+        "bytes": 56649
+      },
+      "shots/390-en-replay-2d-fixed.png": {
+        "sha256": "72525968e81e0f52746014bff26a30a0e63189afac00b2867830a1d3966e1ba2",
+        "bytes": 62397
+      },
+      "shots/390-en-replay-2d.png": {
+        "sha256": "8cce14cfc2d8e8e1bcb6f6964c57e988408c57e74f01477279c73c340eaafd00",
+        "bytes": 60751
+      },
+      "shots/390-en-replay-3d.png": {
+        "sha256": "eec131b6b3dfd10dad91f502f392ac219e013517957e4b8955ed839df17f198d",
+        "bytes": 44675
+      },
+      "shots/390-en-webgl-unavailable.png": {
+        "sha256": "bc21d81a019db6531a1ba33d20c8602ddb5d9cac88a2bc7769e4d44b7a1dbf17",
+        "bytes": 64142
+      },
+      "shots/390-zh-CN-anatomy-failure.png": {
+        "sha256": "434f104359c21e0cca3603d5892e6c17adb5344eaab1987f7e0ca3e2374606f2",
+        "bytes": 73295
+      },
+      "shots/390-zh-CN-anatomy.png": {
+        "sha256": "8e21bc6f2e7efb2ef29a621952328cc4780bc1433b852434a94781e75908e082",
+        "bytes": 66742
+      },
+      "shots/390-zh-CN-challenge.png": {
+        "sha256": "b3d7f07f4b0267c479687c6399724ccc4515db8e6c3206ebef0e97c687bbe040",
+        "bytes": 80960
+      },
+      "shots/390-zh-CN-comparison.png": {
+        "sha256": "aaecbfc44d73d3d348909d6778cebf8d89fcb63b482cef4f6f2377e1e41d7b3f",
+        "bytes": 75927
+      },
+      "shots/390-zh-CN-continue-fixed.png": {
+        "sha256": "8a61026e97ae7faf6c414f7485029b295c0aa21e3141e91421d29398c79a5a92",
+        "bytes": 97308
+      },
+      "shots/390-zh-CN-continue-overflow.png": {
+        "sha256": "c932369d4bcd95da0cda9186970c1ae6ac017483531fd6c8a7d9f896f1332b30",
+        "bytes": 824772
+      },
+      "shots/390-zh-CN-continue.png": {
+        "sha256": "87659a52e4a4ee4e6ff8887298d8c9904bce9e809b3f64666f8fcd4285f0a751",
+        "bytes": 68571
+      },
+      "shots/390-zh-CN-failure.png": {
+        "sha256": "6493ed9016b04b4180d5c35a63006a9c0d99331ab5f73dcdbcf1eb20da47efd6",
+        "bytes": 99440
+      },
+      "shots/390-zh-CN-first.png": {
+        "sha256": "54bb0c61168d00cc5e67a589ce468a4edf39ac138311af83e520d71dd7351343",
+        "bytes": 66947
+      },
+      "shots/390-zh-CN-lab-2d.png": {
+        "sha256": "499970c02a1be1c770cd28639efa784e4576d6bdfa845ccf80615b0f5ac47bea",
+        "bytes": 50266
+      },
+      "shots/390-zh-CN-lab-3d.png": {
+        "sha256": "9e48efaa0834e950395fc0a05d05b69a750174e5625ac9c0ec1282e7731b9bfc",
+        "bytes": 49347
+      },
+      "shots/390-zh-CN-lab-webgl-failure.png": {
+        "sha256": "1ab756c5718e36a9735cbcf2445f761297de62e42d81ac6ed0c1cc7c8fd09947",
+        "bytes": 47529
+      },
+      "shots/390-zh-CN-lineage.png": {
+        "sha256": "c1090d0ce5bdecd89ca5c0adc63b0b7e75ec554a49fe58c7c8755d19e785fe7c",
+        "bytes": 37832
+      },
+      "shots/390-zh-CN-observation.png": {
+        "sha256": "596abf38300c3ef4feb327717493387dacae1bfd5a44d58bd3af6befff3f466a",
+        "bytes": 86618
+      },
+      "shots/390-zh-CN-queued-series.png": {
+        "sha256": "ac88efbd6258102d70580237ac3bcd3ac4c26e5fd3ccb375bb955bc8c4f96165",
+        "bytes": 63809
+      },
+      "shots/390-zh-CN-replay-2d-fixed.png": {
+        "sha256": "9704e03b575711ad7cf482dcb6474c7913824bc83de45e476900a22fc56d887e",
+        "bytes": 67991
+      },
+      "shots/390-zh-CN-replay-2d.png": {
+        "sha256": "f010061c26c36982530f6ec5a2dcc6187919ee0748a27e8a6bcff15734fdef1e",
+        "bytes": 66123
+      },
+      "shots/390-zh-CN-replay-3d.png": {
+        "sha256": "3c264d21dcf7d5a52f00bb4a84e541e95f833c21c8241eb29f0e0ea5b1761c1f",
+        "bytes": 45672
+      },
+      "shots/390-zh-CN-webgl-unavailable.png": {
+        "sha256": "8e0a8da2cbbfc0022af672bd8683060762b86247caeac1d9272341248c1ddba1",
+        "bytes": 70368
+      },
+      "shots/desktop-en-brain.png": {
+        "sha256": "ba78caff7129bcc253e4c2e273a07d7ca80634cbf34838326f0909874ffcd8d9",
+        "bytes": 498523
+      },
+      "shots/desktop-en-comparison.png": {
+        "sha256": "56d2b019969703a6e1fca8efec6005a56ee3f7550b530d8b47a8cae648aac5b4",
+        "bytes": 167911
+      },
+      "shots/desktop-en-continuation.png": {
+        "sha256": "014da78498d75c2a64914989420acc4b7482e06f73a330ccaa7f3a5c252e1f2b",
+        "bytes": 193013
+      },
+      "shots/desktop-en-first.png": {
+        "sha256": "b1f27ad01f16893534e004e0ba284f9ee7caafb2c1b57ea01bdd1df9840019c8",
+        "bytes": 453316
+      },
+      "shots/desktop-en-lab.png": {
+        "sha256": "87bf80d1bd8e9f8c5d1cb9d8e870b34db1007de501cacc082c4d4efb5dd107c5",
+        "bytes": 234600
+      },
+      "shots/desktop-en-lineage.png": {
+        "sha256": "c4a611c51613fc013da78c41a7399f22e9b703362f4260b87ad2399c93fbf9cb",
+        "bytes": 580031
+      },
+      "shots/desktop-en-observation-report.png": {
+        "sha256": "20e6e787ff1fda2fb01b808fe3deb3303cbd13454fe30b25057be02a0f3ed6b1",
+        "bytes": 59194
+      },
+      "shots/desktop-en-queued-observation.png": {
+        "sha256": "6ea1abe99bfcb06d5339ebd92d1e1ce141132ecf9a6b515b7fb4946cb8347582",
+        "bytes": 486937
+      },
+      "shots/desktop-en-queued-series.png": {
+        "sha256": "8fca5d5186b44e216adf8c4608567ec9bd00794b505d3a7c874329e5109b23bb",
+        "bytes": 466575
+      },
+      "shots/desktop-en-replay-2d.png": {
+        "sha256": "f1d7f333d5135bd7e01b809b55b8063e6abdf1c7b1ba1826ca706021fa2b791f",
+        "bytes": 69013
+      },
+      "shots/phone-en-lab.png": {
+        "sha256": "2086473f5e58bb9f3e3837455878332985ce6636627fb495c84ce4f1adf79555",
+        "bytes": 104018
+      }
     },
-    "remaining_gate": "Real-browser acceptance at 1440/390 in en/zh-CN, including forced WebGL failure. Browser connection rejects current authentication method. No screenshot evidence exists."
-  }
+    "artifact_directory": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/browser",
+    "limitations": "Chromium coverage; not Safari/Firefox or physical phone hardware. No local simulations were run or fabricated; queued records and existing recorded runs were used."
+  },
+  "historical_incidents": [
+    {
+      "where": "Local port binding",
+      "status": "resolved; backend 8193 and Vite 5599 served actual HTTP"
+    },
+    {
+      "where": "Browser plugin",
+      "error": "unsupported Codex auth method: apikey",
+      "status": "Resolved for this task through user-authorized standalone Playwright; application authentication unchanged"
+    }
+  ],
+  "study": {
+    "issue": 82,
+    "completed_runs": 10,
+    "verdict": "negative",
+    "improved_seeds": [
+      43,
+      44
+    ],
+    "negative_seeds": [
+      42,
+      45,
+      46
+    ],
+    "candidate_promoted": false,
+    "evidence_pr": 90
+  },
+  "prior_http_checks": {
+    "checked_at_utc": "2026-09-24T10:34:48Z",
+    "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
+    "scope": "Real HTTP against disposable database; worker disabled. No browser rendering or simulation asserted.",
+    "checks": [
+      "Clone canonical WT, edit olfactory weight, compile and save via real API",
+      "WT preset creates four queued, slot-swapped legs; no standings/outcomes; detail and idempotent retry agree",
+      "Maze preset creates three queued solo observations, no ranking and no fabricated arrival/result",
+      "Saved edited design has real WT parent in lineage API",
+      "Existing verified replay serves scene, frames, events and receipt through actual HTTP",
+      "Scarcity, labyrinth and duel geometry previews respond successfully"
+    ],
+    "fly_id": "71c9589a41b444359cfffd6627a594b0",
+    "tournament_id": "87b20b74d0b84d7f8bdcd57e9de6d25d",
+    "observation_series_id": "082f4dce820a49a68a2ee2de658daa58",
+    "replay_id": "aca9ac97af8a4cfcb863c3b45da5e857",
+    "tournament": null,
+    "observation": null
+  },
+  "live_series_projection": {
+    "scope": "Read-only snapshots of real live tournament data evaluated by rounds 3+4 projection code; not a live browser verification",
+    "series": [
+      {
+        "id": "c9f17c6991a941e59c90cc772b78c762",
+        "legacy_status": "complete",
+        "projection": {
+          "protocol_id": "paired-series/v1",
+          "status": "complete",
+          "schedule": [
+            {
+              "seed": 42,
+              "spawn_order": 1,
+              "fly_ids": [
+                "2e3654f3feac453b805cb9e1c8f3d6a1",
+                "0c136a17a43c84c2eb32539454285783"
+              ],
+              "status": "verified",
+              "match_ids": [
+                "0b6e41a4ec824d509b94d19f0c4ca8df"
+              ],
+              "outcomes": [
+                {
+                  "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
+                  "score": 0.0,
+                  "outcome": "loss"
+                },
+                {
+                  "fly_id": "0c136a17a43c84c2eb32539454285783",
+                  "score": 0.2488,
+                  "outcome": "win"
+                }
+              ],
+              "issues": [],
+              "errors": []
+            },
+            {
+              "seed": 42,
+              "spawn_order": 2,
+              "fly_ids": [
+                "0c136a17a43c84c2eb32539454285783",
+                "2e3654f3feac453b805cb9e1c8f3d6a1"
+              ],
+              "status": "verified",
+              "match_ids": [
+                "54ab533fc5364044ab783dc0352254f3"
+              ],
+              "outcomes": [
+                {
+                  "fly_id": "0c136a17a43c84c2eb32539454285783",
+                  "score": 0.4032,
+                  "outcome": "win"
+                },
+                {
+                  "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
+                  "score": 0.0,
+                  "outcome": "loss"
+                }
+              ],
+              "issues": [],
+              "errors": []
+            }
+          ],
+          "expected_matches": 2,
+          "verified_matches": 2,
+          "unexpected_match_ids": [],
+          "issues": [],
+          "standings": [
+            {
+              "fly_id": "0c136a17a43c84c2eb32539454285783",
+              "points": 6,
+              "played": 2,
+              "wins": 2,
+              "draws": 0,
+              "losses": 0
+            },
+            {
+              "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
+              "points": 0,
+              "played": 2,
+              "wins": 0,
+              "draws": 0,
+              "losses": 2
+            }
+          ],
+          "ranking_policy": "ranking/v1",
+          "sandbox": false,
+          "ranking_error": null
+        },
+        "match_count": 2
+      },
+      {
+        "id": "836ddf7654554deaa413a400fef74d90",
+        "legacy_status": "complete",
+        "projection": {
+          "protocol_id": "paired-series/v1",
+          "status": "complete",
+          "schedule": [
+            {
+              "seed": 42,
+              "spawn_order": 1,
+              "fly_ids": [
+                "8d5c54c75af64954ac667fbbd2724de3",
+                "c38f62c6cab74ef0a2ddec834c72128b"
+              ],
+              "status": "verified",
+              "match_ids": [
+                "35c36aea32fc4ed495eb902f07af34bd"
+              ],
+              "outcomes": [
+                {
+                  "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+                  "score": 0.2048,
+                  "outcome": "loss"
+                },
+                {
+                  "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+                  "score": 1.3112,
+                  "outcome": "win"
+                }
+              ],
+              "issues": [],
+              "errors": []
+            },
+            {
+              "seed": 42,
+              "spawn_order": 2,
+              "fly_ids": [
+                "c38f62c6cab74ef0a2ddec834c72128b",
+                "8d5c54c75af64954ac667fbbd2724de3"
+              ],
+              "status": "verified",
+              "match_ids": [
+                "203662494e034a2c989831a60c4b07cd"
+              ],
+              "outcomes": [
+                {
+                  "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+                  "score": 1.2708,
+                  "outcome": "win"
+                },
+                {
+                  "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+                  "score": 0.1444,
+                  "outcome": "loss"
+                }
+              ],
+              "issues": [],
+              "errors": []
+            }
+          ],
+          "expected_matches": 2,
+          "verified_matches": 2,
+          "unexpected_match_ids": [],
+          "issues": [],
+          "standings": [
+            {
+              "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+              "points": 6,
+              "played": 2,
+              "wins": 2,
+              "draws": 0,
+              "losses": 0
+            },
+            {
+              "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+              "points": 0,
+              "played": 2,
+              "wins": 0,
+              "draws": 0,
+              "losses": 2
+            }
+          ],
+          "ranking_policy": "ranking/v1",
+          "sandbox": false,
+          "ranking_error": null
+        },
+        "match_count": 2
+      }
+    ]
+  },
+  "cleanup": "Only disposable local identities/designs/queued jobs were created. Local services are stopped after final deployment verification; no job executes locally."
 }
