@@ -195,6 +195,10 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
         return ledger.discover(owner,query=query,reference_kind=reference_kind,has_descendants=has_descendants,
                                offset=offset,limit=limit,scope=scope)
 
+    @app.get('/api/v1/lives/saved')
+    def life_saved(owner=Depends(optional_identity)):
+        return ledger.saved(owner)
+
     @app.get('/api/v1/lives/{ident}')
     def life_get(ident: str, owner=Depends(optional_identity)):
         result=ledger.get(ident,owner)
@@ -212,6 +216,21 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     def life_lineage(ident: str, depth: int = Query(default=3, ge=0, le=6), owner=Depends(optional_identity)):
         result=ledger.lineage(ident,owner,depth)
         if result is None:raise HTTPException(404,'Life record not found')
+        return result
+
+    @app.get('/api/v1/life/{ident}/slice')
+    def life_slice(ident: str, direction: Literal['ancestors','descendants','siblings'] = 'descendants',
+                   offset: int = Query(default=0,ge=0,le=10000), owner=Depends(optional_identity)):
+        result=ledger.lineage_slice(ident,owner,direction=direction,offset=offset)
+        if result is None:raise HTTPException(404,'Life record not found')
+        return result
+
+    @app.get('/api/v1/life/{ident}/comparison')
+    def life_comparison(ident: str, relative: str | None = None,
+                        offset: int = Query(default=0,ge=0,le=10000), owner=Depends(optional_identity)):
+        from .services.life_comparison import LifeComparison
+        result=LifeComparison(ledger).get(ident,owner,relative=relative,offset=offset)
+        if result is None:raise HTTPException(404,'Related life record not found')
         return result
 
     @app.post('/api/v1/lives/{ident}/notes',status_code=201)

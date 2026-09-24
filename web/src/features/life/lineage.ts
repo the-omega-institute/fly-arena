@@ -1,4 +1,4 @@
-export type LineageNode={id:string;label:string;depth:number;relation:string;marker?:boolean;redacted?:boolean}
+export type LineageNode={id:string;label:string;depth:number;relation:string;marker?:boolean;continuation?:string;redacted?:boolean}
 export type LineageEdge={from:string;to:string;relation:string}
 export type LineagePoint={x:number;y:number;width:number;height:number;node:LineageNode}
 
