@@ -47,6 +47,7 @@ export default function App(){
   const selectedSensoryProfile=sensoryProfile
   const [season,setSeason]=useState<Season|null>(null)
   const [branchFly,setBranchFly]=useState<Fly|null>(null)
+  const [lifeComparisonFlies,setLifeComparisonFlies]=useState<Fly[]>([])
   const [flies,setFlies]=useState<Fly[]>([])
   const [maps,setMaps]=useState<ArenaMap[]>([])
   const [matches,setMatches]=useState<Match[]>([])
@@ -91,7 +92,7 @@ export default function App(){
   const [inspectOpen,setInspectOpen]=useState(false)
   const [inspectCircuit,setInspectCircuit]=useState('descending')
   const fileInput=useRef<HTMLInputElement>(null)
-  const availableFlies=branchFly&&!flies.some(f=>f.id===branchFly.id)?[branchFly,...flies]:flies
+  const availableFlies=[...lifeComparisonFlies.filter(f=>!flies.some(item=>item.id===f.id)&&f.id!==branchFly?.id),...(branchFly&&!flies.some(f=>f.id===branchFly.id)?[branchFly,...flies]:flies)]
   const selectedFly=availableFlies.find(f=>f.id===selected)
   const [archivedMatch,setArchivedMatch]=useState<Match|null>(null)
   const [archiveError,setArchiveError]=useState<{id:string;message:string}|null>(null)
@@ -310,7 +311,7 @@ export default function App(){
 
       {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeedText(String(setup.seed));setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
-      {tab==='life'&&<LifeLedger identity={identity} selected={selected} onBranch={fly=>{setBranchFly(fly);setSelected(fly.id);setTab('train')}} onCompete={fly=>{setBranchFly(fly);setSelected(fly.id);const wt=matchingWildType(flies,fly);if(wt)setOpponent(wt.id);setMode('contest');setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
+      {tab==='life'&&<LifeLedger identity={identity} selected={selected} onBranch={fly=>{setBranchFly(fly);setSelected(fly.id);setTab('train')}} onCompete={(fly,rival)=>{setLifeComparisonFlies(rival?[fly,rival]:[fly]);setBranchFly(rival||fly);setSelected(fly.id);setOpponent(rival?.id||matchingWildType(flies,fly)?.id||'');setMode('contest');setMapId('orchard');setDuration(Math.min(30,duration));setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
       {tab==='lab'&&<PhenotypeLab flies={flies} identity={identity} selected={selected} experimentId={experimentId} onExperiment={openExperiment} onLogin={()=>setLogin(true)}/>}
 
