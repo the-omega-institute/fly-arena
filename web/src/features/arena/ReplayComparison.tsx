@@ -53,7 +53,7 @@ export function ReplayComparison({match,scene,frames,events,matches,season,selec
  const scales=useMemo(()=>comparisonActivityScales([frames,replay.frames]),[frames,replay.frames])
  const start=range?.start??0,end=range?.end??0,ready=replay.status==='ready'&&!!range
  const shownTime=Math.max(start,Math.min(end,time))
- const context=useMemo(()=>replayComparisonContext({match,receipt:receipts.left},{match:other,receipt:receipts.right}),[match,other,receipts])
+ const context=useMemo(()=>replayComparisonContext({match,receipt:receipts.left,participant:scene.flies.find(f=>f.id===leftId)||scene.flies[0]},{match:other,receipt:receipts.right,participant:replay.scene?.flies.find(f=>f.id===rightId)||replay.scene?.flies[0]}),[match,other,receipts,scene,replay.scene,leftId,rightId])
  useEffect(()=>{
   if(!playing||!ready)return
   let handle=0;const initial=shownTime,started=performance.now()
@@ -74,13 +74,13 @@ export function ReplayComparison({match,scene,frames,events,matches,season,selec
   return <article className="replay-comparison-pane" aria-label={side}>
    <header><strong>{side}</strong><small>{record.request.map_id} · seed {record.request.seed} · {record.request.duration_seconds}s</small></header>
    <label>{zh?'观察果蝇':'Observed individual'}<select aria-label={`${side} · ${zh?'观察果蝇':'Observed individual'}`} value={body?.id||''} onChange={e=>setChosen(e.target.value)}>{world.flies.map(f=><option key={f.id} value={f.id}>{f.name} · {f.id.slice(0,8)}</option>)}</select></label>
-   <div className="replay-comparison-canvas"><ArenaCanvas scene={world} {...selection} selectedId={body?.id} followSelected={follow}/></div>
+   <div className="replay-comparison-canvas"><ArenaCanvas scene={world} frames={samples} {...selection} selectedId={body?.id} followSelected={follow}/></div>
    <div className="replay-comparison-metrics"><span>{zh?'记录时刻':'Recorded sample'}<b>{frame?.time.toFixed(2)??'—'}s</b></span><span>{zh?'已摄取':'Consumed'}<b>{frame?.scores?.[slot]?.toFixed(3)??'—'}</b></span><span>{zh?'身体倾角':'Body tilt'}<b>{tilt===null?'—':`${tilt.toFixed(1)}°`}{tilt!==null&&tilt>90?(zh?' · 倒置':' · inverted'):''}</b></span></div>
    <small className="replay-comparison-context">{fly?.spec.model_profile||'—'} · {record.request.sensory_profile||'odor-only-v1'} · {record.request.bridge_profile||'legacy-v1'}</small>
    <BrainTheater playback={{playing,onToggle:()=>{if(shownTime>=end)setTime(start);setPlaying(!playing)}}} matchId={record.id} key={`${record.id}:${body?.id}`} frame={frame} frames={samples} season={season} fly={fly} slot={slot} events={ledger} onSeek={seek} activityScale={scales.region} nodeScale={scales.node}/>
   </article>
  }
- const contextLabels:Record<string,string>={map:'Map',seed:'Seed',horizon:'Horizon',bridgeReadout:'Bridge / readout',sensoryProfile:'Sensory profile',motorProfile:'Motor profile',runtimeSource:'Runtime / source identity',recordingPolicy:'Recording policy'}
+ const contextLabels:Record<string,string>={mode:'Match mode',participant:'Participant identity',opponents:'Opponent identities',map:'Map',seed:'Seed',horizon:'Horizon',bridgeReadout:'Bridge / readout',sensoryProfile:'Sensory profile',motorProfile:'Motor profile',runtimeSource:'Runtime / source identity',recordingPolicy:'Recording policy'}
  const contextStatement=context.hasDifferences?'Comparison receipts differ; this supports descriptive observations only and cannot attribute an observed difference to the design.':context.hasUnavailable?'Some receipt conditions are unavailable, so this comparison cannot establish an effect; keep the interpretation descriptive.':'The recorded conditions agree, supporting a descriptive comparison under this protocol. The receipts do not by themselves establish causality, generalization, or biological validity.'
  function conditionTable(){return <section className="replay-comparison-conditions" aria-label={t('Comparison conditions')}><h3>{t('Comparison conditions')}</h3><table><thead><tr><th>{t('Condition')}</th><th>{t('Current replay')}</th><th>{t('Comparison replay')}</th><th>{t('Status')}</th></tr></thead><tbody>{context.conditions.map(condition=><tr key={condition.id} className={'condition-'+condition.status}><th scope="row">{t(contextLabels[condition.id])}</th><td><code>{condition.left??t('Unavailable')}</code></td><td><code>{condition.right??t('Unavailable')}</code></td><td><span className={'condition-status '+condition.status}>{t(condition.status==='agree'?'Agree':condition.status==='differ'?'Differ':'Unavailable')}</span></td></tr>)}</tbody></table><p className="training-hint">{t(contextStatement)}</p></section>}
  return <section className="replay-comparison panel" aria-label={zh?'同步生命回放对照':'Synchronized life replays'}>

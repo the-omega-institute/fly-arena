@@ -1,8 +1,8 @@
 export type ReplayReceipt = {
  request?:Record<string,unknown>;runtime?:Record<string,unknown>;replay_policy?:Record<string,unknown>;recording_policy?:Record<string,unknown>;observation_motor?:Record<string,unknown>;[key:string]:unknown
 }
-export type ReplayEvidence = {match?:{request?:Record<string,unknown>};receipt?:ReplayReceipt|null;participant?:{spec?:Record<string,unknown>}}
-export type ComparisonConditionId='map'|'seed'|'horizon'|'bridgeReadout'|'sensoryProfile'|'motorProfile'|'runtimeSource'|'recordingPolicy'
+export type ReplayEvidence = {match?:{request?:Record<string,unknown>};receipt?:ReplayReceipt|null;participant?:{id?:string;spec?:Record<string,unknown>}}
+export type ComparisonConditionId='mode'|'participant'|'opponents'|'map'|'seed'|'horizon'|'bridgeReadout'|'sensoryProfile'|'motorProfile'|'runtimeSource'|'recordingPolicy'
 export type ComparisonCondition = {id:ComparisonConditionId;label:string;status:'agree'|'differ'|'unavailable';left:string|null;right:string|null}
 export type ReplayComparisonContext = {conditions:ComparisonCondition[];interpretation:'matched'|'descriptive'|'unavailable';hasDifferences:boolean;hasUnavailable:boolean}
 
@@ -31,8 +31,9 @@ function sensory(evidence:ReplayEvidence):string|null{
  return scalar(first(request(evidence).sensory_profile,profile?.id,run.sensory_profile))
 }
 function motor(evidence:ReplayEvidence):string|null{
- const receipt=evidence.receipt||{},run=runtime(evidence),profile=object(run.profile),motorProfile=object(run.motor_profile),motorManifest=object(receipt.observation_motor)
- return scalar(first(motorManifest?.profile_id,receipt.motor_profile,run.motor_profile,run.motor_id,motorProfile?.id,profile?.motor_id,motorProfile?.id))
+ const receipt=evidence.receipt||{},run=runtime(evidence),profile=object(run.profile),motorManifest=object(receipt.observation_motor)
+ const value=first(motorManifest?.profile_id,receipt.motor_profile,run.motor_profile,run.motor_id,profile?.motor_id)
+ return scalar(object(value)?.id??(typeof value==='string'?value:null))
 }
 function source(evidence:ReplayEvidence):string|null{
  const receipt=evidence.receipt||{},run=runtime(evidence),closure=object(run.closure),profile=object(run.profile),hashes=object(profile?.hashes)
@@ -49,7 +50,18 @@ function recording(evidence:ReplayEvidence):string|null{
  return stable(first(receipt.recording_policy,receipt.replay_policy,run.recording_policy,run.replay_policy))
 }
 
+function identities(evidence:ReplayEvidence,opponents=false):string|null{
+ const ids=request(evidence).fly_ids
+ if(!Array.isArray(ids)||!ids.length||!ids.every(id=>typeof id==='string'&&id.length>0))return null
+ const selected=evidence.participant?.id??ids[0]
+ if(!ids.includes(selected))return null
+ return opponents?stable(ids.filter(id=>id!==selected)):selected
+}
+
 const definitions:[ComparisonConditionId,string,(evidence:ReplayEvidence)=>string|null][]=[
+ ['mode','match mode',evidence=>field(evidence,'mode')],
+ ['participant','participant identity',evidence=>identities(evidence)],
+ ['opponents','opponent identities',evidence=>identities(evidence,true)],
  ['map','map',evidence=>field(evidence,'map_id')],
  ['seed','seed',evidence=>field(evidence,'seed')],
  ['horizon','horizon',evidence=>field(evidence,'duration_seconds')],

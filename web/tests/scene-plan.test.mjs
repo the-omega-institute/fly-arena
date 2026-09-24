@@ -149,3 +149,26 @@ uiTest('runtime rendering exceptions are caught outside the React render boundar
 uiTest('Chinese controls and failure notes come from the scene module',async({mount,button})=>{
  globalThis.sceneTestLocale='zh-CN';await mount();assert.ok(button('2D 平面图'));assert.match(document.body.textContent,/WebGL 不可用/);assert.match(document.body.textContent,/已记录的几何与轨迹/)
 })
+
+
+test('food markers stay compact at arena scale even with distant recorded positions',()=>{
+ for(const amount of [0,4,undefined]){
+  const html=renderToStaticMarkup(React.createElement(ScenePlanView,{world:{...world,task:{goal_food:'food-0'}},recorded:true,frame:frame(1,[],[amount]),frames:[frame(0,[[1000,1000,1]])]}))
+  const dom=new JSDOM(html),food=dom.window.document.querySelector('.scene-plan-food')
+  assert.ok(Number(food.querySelector('circle').getAttribute('r'))<world.size/100)
+  assert.equal(food.querySelector('text').textContent,amount===undefined?'?':String(amount))
+  assert.match(food.querySelector('title').textContent,/GOAL \/ physical contact/)
+  dom.window.close()
+ }
+})
+uiTest('2D stage places score cards in normal flow above the plan and removes food text outlines',async({dom,mount})=>{
+ const style=document.createElement('style');style.textContent='.score-overlay{position:absolute}'+fs.readFileSync(path.join(web,'src/features/arena/scenePresentation.css'),'utf8');document.head.append(style)
+ const stage=document.createElement('div');stage.className='arena-stage'
+ const canvas=document.createElement('div');canvas.className='arena-canvas'
+ const hud=document.createElement('div');hud.className='score-overlay'
+ document.body.append(stage);canvas.append(document.getElementById('root'));stage.append(canvas,hud)
+ await mount()
+ assert.equal(dom.window.getComputedStyle(hud).position,'static')
+ assert.ok(Number(dom.window.getComputedStyle(hud).order)<Number(dom.window.getComputedStyle(canvas).order))
+ assert.equal(dom.window.getComputedStyle(document.querySelector('.scene-plan-food text')).stroke,'none')
+})

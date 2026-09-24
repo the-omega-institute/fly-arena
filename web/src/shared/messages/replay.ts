@@ -1,4 +1,7 @@
 export const replayMessages = {
+  "Match mode": {en: "Match mode", "zh-CN": "比赛模式"},
+  "Participant identity": {en: "Participant identity", "zh-CN": "观察个体身份"},
+  "Opponent identities": {en: "Opponent identities", "zh-CN": "对手身份"},
   "Replay outcome · draw": {en: "Draw", "zh-CN": "平局"},
   "Replay outcome · win": {en: "Decisive result", "zh-CN": "已分胜负"},
   "Replay outcome · solo": {en: "Solo experiment completed", "zh-CN": "单蝇实验完成"},

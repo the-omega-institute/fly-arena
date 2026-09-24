@@ -821,7 +821,7 @@ test('lineage comparison keeps mismatched conditions and missing neural behavior
 test('synchronized life comparison seeks actual bodies and brains, shares scales, and rejects stale records',async()=>{
  const canvasFile=require.resolve('./src/ArenaCanvas.js'),replayFile=require.resolve('./src/features/arena/useReplay.js')
  const oldCanvas=require.cache[canvasFile],oldReplay=require.cache[replayFile]
- require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:p=>React.createElement('div',{'data-paired-body':p.selectedId,'data-sample':p.frame?.time,'data-alpha':p.alpha})}}
+ require.cache[canvasFile]={id:canvasFile,filename:canvasFile,loaded:true,exports:{ArenaCanvas:p=>React.createElement('div',{'data-paired-body':p.selectedId,'data-sample':p.frame?.time,'data-alpha':p.alpha,'data-recorded-frames':JSON.stringify(p.frames)})}}
  delete require.cache[replayFile];delete require.cache[require.resolve('./src/features/arena/ReplayComparison.js')]
  const {ReplayComparison,comparisonWindow,comparisonActivityScales}=require('./src/features/arena/ReplayComparison.js')
  const participant=id=>({...own,id,name:id,artifact_id:id,spec,brain_graph:{schema:'brain-neighborhood/v1',artifact_id:id,connectome_sha256:spec.connectome_sha256,circuits:{olfactory:{neurons:[],edges:[]}}}})
@@ -845,6 +845,7 @@ test('synchronized life comparison seeks actual bodies and brains, shares scales
   assert.deepEqual(comparisonWindow(left,right),{start:0,end:.2});assert.equal(comparisonWindow(left,[]),null);assert.equal(comparisonWindow(left,frames([1,2],1)),null)
   assert.deepEqual(comparisonActivityScales([left,right]),{region:20,node:40})
   assert.equal(document.querySelectorAll('[data-paired-body]').length,2)
+  assert.deepEqual([...document.querySelectorAll('[data-paired-body]')].map(e=>JSON.parse(e.dataset.recordedFrames)),[left,right])
   assert.ok([...document.querySelectorAll('.brain-overview-legend')].every(e=>e.textContent.includes('0–20.00 Hz')))
   const priorRAF=globalThis.requestAnimationFrame,priorCancel=globalThis.cancelAnimationFrame
   let tick,cancelled=0
