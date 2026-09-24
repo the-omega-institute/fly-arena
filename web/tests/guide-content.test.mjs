@@ -76,7 +76,7 @@ for(const locale of ['en','zh-CN'])test(`guide renders ordered summaries, workin
  globalThis.fetch=()=>{throw Error('Guide must not launch work')}
  localStorage.setItem('flyarena.locale',locale)
  const root=createRoot(document.getElementById('root')),calls=[]
- const props={canCloneWT:false,hasSavedDesign:true,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('design'),onArena:()=>calls.push('arena'),onTrain:()=>calls.push('train'),onAI:()=>calls.push('ai')}
+ const props={canCompare:true,onCompare:()=>calls.push('compare'),canCloneWT:false,hasSavedDesign:true,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('design'),onArena:()=>calls.push('arena'),onTrain:()=>calls.push('train'),onAI:()=>calls.push('ai')}
  try{
   await act(async()=>root.render(React.createElement(I18nProvider,null,React.createElement(PlaygroundGuide,props))))
   assert.deepEqual([...document.querySelectorAll('[data-guide-section]')].map(el=>el.dataset.guideSection),guideSections.map(s=>s.id))
@@ -84,7 +84,7 @@ for(const locale of ['en','zh-CN'])test(`guide renders ordered summaries, workin
   for(const section of guideSections){
    const el=document.querySelector(`[data-guide-section="${section.id}"]`)
    assert.equal(el.querySelector('h3').textContent,guideMessages[section.title][locale])
-   assert.equal(el.querySelector('.playground-guide__section-content>p').textContent,guideMessages[section.summary][locale])
+   assert.equal(el.querySelector('.playground-guide__details>p').textContent,guideMessages[section.summary][locale])
    const details=el.querySelector('details')
    assert.equal(details.open,false)
    await act(async()=>details.querySelector('summary').click())
@@ -95,7 +95,7 @@ for(const locale of ['en','zh-CN'])test(`guide renders ordered summaries, workin
   const clone=document.querySelector('[data-guide-step="clone"] button');assert.equal(clone.disabled,true)
   await act(async()=>clone.click());assert.deepEqual(calls,[])
   for(const step of ['edit','compare','evolve','compete'])await act(async()=>document.querySelector(`[data-guide-step="${step}"] button`).click())
-  assert.deepEqual(calls,['design','arena','train','arena'])
+  assert.deepEqual(calls,['design','compare','train','arena'])
   assert.equal(document.querySelector('[data-guide-step="edit"] button').textContent,guideMessages['guide.action.edit'][locale])
   assert.doesNotMatch(document.body.textContent,/guide\.[a-z]/)
  }finally{

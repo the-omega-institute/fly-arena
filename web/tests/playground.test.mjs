@@ -38,15 +38,17 @@ const {WildTypeChallenge}=require('./src/features/arena/WildTypeChallenge.js')
 const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtype.js')
 const {DevelopersFeature}=require('./src/features/developers/DevelopersFeature.js')
 const {I18nProvider,Preferences}=require('./src/shared/i18n.js')
-const dom=new JSDOM('<!doctype html><html><body><main id="root"></main></body></html>',{url:'http://arena.example/'})
-const originals=Object.fromEntries(['window','document','navigator','localStorage','location','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame','matchMedia','IS_REACT_ACT_ENVIRONMENT','fetch'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
-for(const k of ['window','document','navigator','localStorage','location','history','sessionStorage'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
-globalThis.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
-globalThis.IS_REACT_ACT_ENVIRONMENT=true
-globalThis.requestAnimationFrame=()=>1
-globalThis.cancelAnimationFrame=()=>{}
-globalThis.fetch=()=>{throw Error('An onboarding control unexpectedly requested network/compute')}
-let root=createRoot(document.getElementById('root'))
+let dom,root,originals
+test.beforeEach(()=>{
+ dom=new JSDOM('<!doctype html><html><body><main id="root"></main></body></html>',{url:'http://arena.example/'})
+ originals=Object.fromEntries(['window','document','navigator','localStorage','location','history','sessionStorage','requestAnimationFrame','cancelAnimationFrame','matchMedia','IS_REACT_ACT_ENVIRONMENT','fetch'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]))
+ for(const k of ['window','document','navigator','localStorage','location','history','sessionStorage'])Object.defineProperty(globalThis,k,{configurable:true,value:dom.window[k]})
+ globalThis.matchMedia=()=>({matches:false,addEventListener(){},removeEventListener(){}})
+ globalThis.IS_REACT_ACT_ENVIRONMENT=true
+ globalThis.requestAnimationFrame=()=>1;globalThis.cancelAnimationFrame=()=>{}
+ globalThis.fetch=()=>{throw Error('An onboarding control unexpectedly requested network/compute')}
+ root=createRoot(document.getElementById('root'))
+})
 const spec={schema_version:'flyspec/v1',name:'My fly',description:'',color:'mint',parent_id:null,connectome_sha256:'a'.repeat(64),model_profile:'malecns-lif-cpu-v1',weight_mutations:[],edge_deltas:[],neuron_parameters:{tau_scale:1,threshold_shift_mv:0},plasticity:'none'}
 const wt={id:'a'.repeat(32),name:'Canonical reference',spec,reference_kind:'wildtype'}
 const own={id:'b'.repeat(32),name:'My saved fly',spec:{...spec,parent_id:wt.id},reference_kind:'user'}
@@ -54,11 +56,11 @@ const noop=()=>{}
 const button=label=>{const el=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===label||b.getAttribute('aria-label')===label);assert.ok(el,`Missing button: ${label}`);return el}
 async function click(label){await act(async()=>button(label).click())}
 async function mount(Component,props){await act(async()=>root.render(React.createElement(I18nProvider,null,React.createElement(Preferences),React.createElement(Component,props))))}
-test.afterEach(async()=>{await act(async()=>root.unmount());document.getElementById('root').replaceChildren();root=createRoot(document.getElementById('root'));localStorage.clear();sessionStorage.clear()})
-test.after(async()=>{await act(async()=>root.unmount());dom.window.close();fs.rmSync(out,{recursive:true,force:true});for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
+test.afterEach(async()=>{await act(async()=>root.unmount());dom.window.close();for(const [k,d]of Object.entries(originals)){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k]}})
+test.after(()=>fs.rmSync(out,{recursive:true,force:true}))
 
 test('a novice can clone, edit, train, compare and open AI help without launching work',async()=>{
- const calls=[];const props={canCloneWT:true,hasSavedDesign:false,neuronCount:123,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('edit'),onTrain:()=>calls.push('train'),onArena:()=>calls.push('compare'),onAI:()=>calls.push('ai')}
+ const calls=[];const props={canCompare:true,onCompare:()=>calls.push('compare'),canCloneWT:true,hasSavedDesign:false,neuronCount:123,onCloneWT:()=>calls.push('clone'),onDesign:()=>calls.push('edit'),onTrain:()=>calls.push('train'),onArena:()=>calls.push('compare'),onAI:()=>calls.push('ai')}
  await mount(PlaygroundGuide,props)
  assert.match(document.body.textContent,/123/)
  for(const label of ['Use WT','Open design','Train','Compare','Connect an AI'])await click(label)
@@ -70,7 +72,7 @@ test('a novice can clone, edit, train, compare and open AI help without launchin
  assert.match(document.body.textContent,/not identical to a real animal/)
 })
 test('guide handles unavailable WT and switches all instructions with the global language',async()=>{
- await mount(PlaygroundGuide,{canCloneWT:false,hasSavedDesign:false,onCloneWT:noop,onDesign:noop,onTrain:noop,onArena:noop,onAI:noop})
+ await mount(PlaygroundGuide,{canCompare:false,onCompare:noop,canCloneWT:false,hasSavedDesign:false,onCloneWT:noop,onDesign:noop,onTrain:noop,onArena:noop,onAI:noop})
  assert.equal(button('Use WT').disabled,true)
  assert.ok(!document.querySelector('.playground-guide__count'))
  const language=document.querySelector('select[aria-label="Language"]')

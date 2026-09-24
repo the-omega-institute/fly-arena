@@ -59,4 +59,9 @@ export const guideMessages = {
   'guide.action.compete':{'en':'Open Arena','zh-CN':'打开竞技场'},
   'guide.action.ai':{'en':'Connect an AI','zh-CN':'接入 AI'},
   'guide.arenaLink':{'en':'Explore environments and comparisons in Arena','zh-CN':'前往竞技场探索环境与对照比较'},
+  "guide.next":{"en": "Your next step", "zh-CN": "你的下一步"},
+  "guide.prepareOnly":{"en": "Prepare a draft or a plan here. Only an explicit Start submits simulation.", "zh-CN": "这里仅准备草稿或方案，明确点击开始后才会提交仿真。"},
+  "guide.noWT":{"en": "The server WT reference is unavailable. You can still edit the canonical draft below.", "zh-CN": "服务端 WT 参考暂不可用。你仍可编辑下方的标准草稿。"},
+  "guide.noComparison":{"en": "A compatible WT, an eligible orchard and an available Legacy v1 profile are required. Comparison is unavailable until these are ready.", "zh-CN": "需要兼容的 WT、符合条件的果园地图和可用的 Legacy v1 方案。它们就绪前无法准备对照。"},
+  "guide.evidenceError":{"en": "Recorded progress could not be loaded; no completion is assumed.", "zh-CN": "无法加载已记录进度；不会推定已完成。"},
 } as const

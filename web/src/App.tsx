@@ -5,6 +5,7 @@ import type {ReplayDesignOrigin} from './features/arena/replayDesign'
 import {NeuralPreviewPanel,type NeuralPreview,type PreviewRecord} from './features/design/NeuralPreviewPanel'
 import {BrainModelPicker} from './features/design/BrainModelPicker'
 import {LifeLedger} from './features/life/LifeLedger'
+import {guideSubject,guideComparisonPlan,baselineComparison,hasRecordedEvolution,useGuideEvidence} from './features/guide/nextAction'
 import {PlaygroundGuide} from './features/guide/PlaygroundGuide'
 import {matchingWildType} from './features/arena/wildtype'
 import {TrainingSandbox} from './features/training/TrainingSandbox'
@@ -94,6 +95,11 @@ export default function App(){
   const fileInput=useRef<HTMLInputElement>(null)
   const availableFlies=[...lifeComparisonFlies.filter(f=>!flies.some(item=>item.id===f.id)&&f.id!==branchFly?.id),...(branchFly&&!flies.some(f=>f.id===branchFly.id)?[branchFly,...flies]:flies)]
   const selectedFly=availableFlies.find(f=>f.id===selected)
+  const guideFly=guideSubject(availableFlies,selected,identity?.id)
+  const guideEvidence=useGuideEvidence(tab==='design'?guideFly:undefined,identity)
+  const guidePlan=guideComparisonPlan(availableFlies,guideFly?.id||'',maps,season)
+  const guideMatches=[...matches,...(guideEvidence.record?.experiences?.map(e=>e.match)||[])]
+  function prepareGuideComparison(plan:ExperimentPlan){const setup=plan.setup;setSelected(setup.selected);setOpponent(setup.opponent);setMode(setup.mode);setMapId(setup.mapId);setSeedText(setup.seedText);setDuration(setup.duration);setBridgeProfile(setup.bridgeProfile);setSensoryProfile(setup.sensoryProfile);navigate('arena',experimentId,'','');setPlay(false)}
   const [archivedMatch,setArchivedMatch]=useState<Match|null>(null)
   const [archiveError,setArchiveError]=useState<{id:string;message:string}|null>(null)
   const listedMatch=matches.find(m=>m.id===focused)
@@ -271,10 +277,11 @@ export default function App(){
         {replayOrigin&&<section className="panel replay-design-origin" aria-label={locale==='zh-CN'?'回放设计来源':'Replay design source'}><div><strong>{locale==='zh-CN'?'从这份参赛大脑继续设计：':'Designing from this recorded brain: '}{replayOrigin.name}</strong><p>{locale==='zh-CN'?'当前是未保存的后代草稿。修改、预览并保存后，选择算法训练或与 WT 竞技。':'This is an unsaved child draft. Edit, preview and save it, then select training or compete with WT.'}</p></div><button className="text-link" aria-label={locale==='zh-CN'?'回看亲代这场表现':'Revisit the parent’s match'} onClick={()=>setFocused(replayOrigin.matchId)}>{locale==='zh-CN'?'回看亲代这场表现':'Revisit the parent’s match'} →</button></section>}
 
         <PlaygroundGuide neuronCount={season?.connectome.neuron_count}
-          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!identity&&flies.some(f=>f.owner===identity.id)}
+          canCloneWT={!!matchingWildType(flies)} hasSavedDesign={!!guideFly} subjectName={guideFly?.name} canCompare={!!guidePlan} hasCompared={!!baselineComparison(availableFlies,guideFly,guideMatches)} hasEvolved={hasRecordedEvolution(guideEvidence.record,guideFly)} evidenceError={guideEvidence.error}
+          onCompare={()=>{if(guidePlan)prepareGuideComparison(guidePlan)}}
           onDesign={()=>{document.getElementById('fly-name')?.scrollIntoView({block:'center',behavior:'smooth'});document.getElementById('fly-name')?.focus({preventScroll:true})}}
           onCloneWT={()=>{const wt=matchingWildType(flies);if(wt){clone(wt);setToast(locale==='zh-CN'?'已复制 WT 为草稿。修改并保存后，再训练或挑战。':'WT copied into a draft. Edit and save it before training or competing.');document.getElementById('fly-name')?.focus()}}}
-          onTrain={()=>setTab('train')} onArena={()=>{setFocused('');setPlay(false)}}
+          onTrain={()=>{if(guideFly)setSelected(guideFly.id);navigate('train',experimentId,'','')}} onArena={()=>{if(guideFly)setSelected(guideFly.id);setMode('contest');navigate('arena',experimentId,'','');setPlay(false)}}
           onAI={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}/>
         <div className="design-workspace">
           <aside className="collection panel"><div className="panel-heading"><span>{t("我的果蝇库")}</span><span className="count">{flies.length.toString().padStart(2,'0')}</span></div><div className="tiny-label">{t("SELECT A STARTING POINT")}</div><p className="draft-status">{parentId?t('Unsaved draft from parent')+': '+parentId:t('Unsaved canonical draft')}</p>
@@ -309,7 +316,7 @@ export default function App(){
 
       {tab==='arena'&&<ArenaFeature observationId={observationId} seriesId={seriesId} onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seedText={seedText} setSeedText={setSeedText} busy={busy} startMatch={startMatch}/>}
 
-      {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeedText(String(setup.seed));setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
+      {tab==='train'&&<TrainingSandbox matches={matches} onCompareWT={prepareGuideComparison} flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeedText(String(setup.seed));setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
       {tab==='life'&&<LifeLedger identity={identity} selected={selected} onBranch={fly=>{setBranchFly(fly);setSelected(fly.id);setTab('train')}} onCompete={(fly,rival)=>{setLifeComparisonFlies(rival?[fly,rival]:[fly]);setBranchFly(rival||fly);setSelected(fly.id);setOpponent(rival?.id||matchingWildType(flies,fly)?.id||'');setMode('contest');setMapId('orchard');setDuration(Math.min(30,duration));setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 

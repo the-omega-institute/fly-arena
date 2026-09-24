@@ -21,3 +21,9 @@ export const journeySteps:readonly JourneyStep[]=[
   {id:'evolve',title:'guide.evolve.title',summary:'guide.evolve.summary',detail:'guide.evolve.detail',action:'train',label:'guide.action.train'},
   {id:'compete',title:'guide.compete.title',summary:'guide.compete.summary',detail:'guide.compete.detail',action:'compete',label:'guide.action.compete'},
 ]
+
+/** Progress is supplied from recorded evidence, never from clicking a guide action. */
+export function nextGuideStep({hasSavedDesign,hasCompared=false,hasEvolved=false}:{hasSavedDesign:boolean;hasCompared?:boolean;hasEvolved?:boolean}){
+ const id=!hasSavedDesign?'clone':hasEvolved?'compete':hasCompared?'evolve':'compare'
+ return journeySteps.find(step=>step.id===id)!
+}
