@@ -31,7 +31,8 @@ def test_candidate_is_admission_restricted_and_uses_measured_state():
     candidate = motor_for_profile(RECOVERY_MOTOR["id"], admission="sandbox")
     upright = candidate.advance([.5, .5], {"upright_z": 1., "roll_rate": 0., "pitch_rate": 0.,
                                            "support_left": .5, "support_right": .5})
-    tilted = candidate.advance([.5, .5], {"upright_z": -.1, "roll_rate": 1., "pitch_rate": 0.,
+    tilted_candidate = motor_for_profile(RECOVERY_MOTOR["id"], admission="sandbox")
+    tilted = tilted_candidate.advance([.5, .5], {"upright_z": -.1, "roll_rate": 1., "pitch_rate": 0.,
                                           "support_left": 1., "support_right": 0.})
     assert np.isfinite(tilted).all() and np.all((tilted >= 0) & (tilted <= 1.5))
     assert not np.array_equal(upright, tilted)

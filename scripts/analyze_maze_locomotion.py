@@ -239,7 +239,38 @@ def _drive_statistics(drives: list, mask: np.ndarray) -> dict:
     return result
 
 
-def analyze_replay(root: Path, *, slot: int = 0) -> dict:
+def _window_report(frames, times, up, contacts, slot, window, rows, first_inversion):
+    start, end = window
+    if not all(math.isfinite(v) for v in window) or start < times[0] or end > times[-1] or start >= end:
+        raise ValueError("window must be increasing and within the recorded time range")
+    if len(rows) > 256 or any(not math.isfinite(t) or not start <= t <= end for t in rows):
+        raise ValueError("request at most 256 row times within the closed window")
+
+    def sample(index):
+        xyz = frames[index].get("positions", [])[slot]
+        if len(xyz) != 3 or not all(isinstance(v, (int, float)) and math.isfinite(v) for v in xyz):
+            raise ValueError("window report requires finite recorded thorax XYZ positions")
+        return {"time_s": float(times[index]), "thorax_xyz_mm": xyz,
+                "height_mm": xyz[2], "upright_projection": float(up[index]),
+                "obstacle_contacts": contacts[index]}
+
+    samples = []
+    for time in rows:
+        indices = np.flatnonzero(np.isclose(times, time, rtol=0, atol=1e-9))
+        if len(indices) != 1:
+            raise ValueError(f"requested row {time} is not an exact recorded sample")
+        samples.append(sample(int(indices[0])))
+    peak_end = min(end, first_inversion) if first_inversion is not None else end
+    candidates = [sample(int(i)) for i in np.flatnonzero((times >= start) & (times < peak_end))]
+    peak = max(candidates, key=lambda row: row["height_mm"]) if candidates else None
+    return {"start_s": start, "end_s": end, "rows": samples,
+            "row_policy": "exact recorded samples; closed window endpoints; no interpolation",
+            "position_source": "frames.positions[slot] (recorded thorax body position, not render-geom center)",
+            "pre_inversion_interval": {"start_s": start, "end_exclusive_s": peak_end},
+            "pre_inversion_height_max": peak}
+
+
+def analyze_replay(root: Path, *, slot: int = 0, window=None, rows=()) -> dict:
     paths = _replay_paths(root)
     verification = verify_replay(paths)
     scene, frames, events = (_json(paths[name]) for name in ("scene", "frames", "events"))
@@ -293,7 +324,7 @@ def analyze_replay(root: Path, *, slot: int = 0) -> dict:
     window_mask = (times >= 45.) & (times < 65.)
     window_indices = np.flatnonzero(window_mask)
     window_objects = sorted({obj for i in window_indices for obj in (wall_objects[i] or [])})
-    window = {"start_s": 45., "end_s": 65., "frames": len(window_indices),
+    contact_window = {"start_s": 45., "end_s": 65., "frames": len(window_indices),
               "contact_samples": sum(bool(wall_objects[i]) for i in window_indices),
               "missing_contact_samples": sum(wall_objects[i] is None for i in window_indices),
               "objects": {obj: sum(obj in (wall_objects[i] or []) for i in window_indices) for obj in window_objects},
@@ -326,7 +357,7 @@ def analyze_replay(root: Path, *, slot: int = 0) -> dict:
         "wall_contact_sampled_seconds": (sum(row["duration_s"] for row in wall_timeline)
                                          if any(objects is not None for objects in wall_objects[:-1]) else None),
         "wall_contact_missing_samples": sum(objects is None for objects in wall_objects),
-        "wall_contact_window_45_65_s": window,
+        "wall_contact_window_45_65_s": contact_window,
         "left_right_drive_before_inversion": drive_stats,
         "left_right_drive_final_5s_before_inversion": _drive_statistics(drives, final_pre_mask),
         "goal_contact": {"food_id": goal_id, "first_contact_time_s": min(goal_times) if goal_times else None,
@@ -340,6 +371,10 @@ def analyze_replay(root: Path, *, slot: int = 0) -> dict:
                        "wall_contact_source": "per-slot senses.contact_environment; events are onsets only",
                        "duration_estimator": "left-hold to next frame, clipped at final frame; unknown contacts excluded"},
     }
+    if window is not None:
+        result["window_report"] = _window_report(frames, times, up, wall_objects, slot, window, rows, first_inversion)
+    elif rows:
+        raise ValueError("row times require an explicit window")
     return result
 
 
@@ -348,12 +383,16 @@ def main() -> None:
     parser.add_argument("replay", type=Path, help="Replay directory or release tar.gz")
     parser.add_argument("--slot", type=int, default=0)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--window", type=float, nargs=2, metavar=("START", "END"),
+                        help="bounded pose/contact report and height maximum before first inversion")
+    parser.add_argument("--rows", type=float, nargs="+", default=[], metavar="TIME",
+                        help="exact recorded timestamps within the closed window (maximum 256)")
     args = parser.parse_args()
     if args.slot < 0:
         parser.error("--slot must be nonnegative")
     root, temporary = _source_root(args.replay)
     try:
-        report = analyze_replay(root, slot=args.slot)
+        report = analyze_replay(root, slot=args.slot, window=args.window, rows=args.rows)
         payload = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
         if args.output:
             args.output.parent.mkdir(parents=True, exist_ok=True)

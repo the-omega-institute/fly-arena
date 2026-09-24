@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 import hashlib
 import math
 import time
@@ -183,13 +184,20 @@ class LifeLedger:
                     'code':'founder',
                     'summary':'Founder design; no parent design was recorded.'}
         changed_circuits=[];circuit_scales=[]
-        parent_mut={m['selector']:m['scale'] for m in parent.get('weight_mutations',[])}
-        child_mut={m['selector']:m['scale'] for m in child.get('weight_mutations',[])}
+        # Preserve every occurrence: the compiler adds each log multiplier.
+        def circuit_lists(spec):
+            result={}
+            for mutation in spec.get('weight_mutations',[]):
+                result.setdefault(mutation['selector'],[]).append(mutation['scale'])
+            return result
+        parent_mut=circuit_lists(parent);child_mut=circuit_lists(child)
         for selector in sorted(set(parent_mut)|set(child_mut)):
-            before=parent_mut.get(selector,1.0);after=child_mut.get(selector,1.0)
-            if before != after:
+            before_scales=parent_mut.get(selector,[]);after_scales=child_mut.get(selector,[])
+            before=math.prod(before_scales);after=math.prod(after_scales)
+            if before_scales != after_scales:
                 changed_circuits.append(selector)
-                circuit_scales.append({'selector':selector,'parent':before,'child':after,'delta':after-before})
+                circuit_scales.append({'selector':selector,'parent':before,'child':after,'delta':after-before,
+                                       'parent_scales':before_scales,'child_scales':after_scales})
         changed_parameters=[]
         for name in ('tau_scale','threshold_shift_mv'):
             before=parent.get('neuron_parameters',{}).get(name,1.0 if name=='tau_scale' else 0.0)
@@ -201,14 +209,24 @@ class LifeLedger:
         for edge in sorted(set(parent_edges)|set(child_edges)):
             before=parent_edges.get(edge,0.0);after=child_edges.get(edge,0.0)
             if before != after:edge_changes.append({'edge':edge,'parent':before,'child':after,'delta':after-before})
-        parent_interventions={json.dumps(v,sort_keys=True,separators=(',',':')):v for v in parent.get('interventions',[])}
-        child_interventions={json.dumps(v,sort_keys=True,separators=(',',':')):v for v in child.get('interventions',[])}
-        intervention_items=[{'parent':parent_interventions.get(key),'child':child_interventions.get(key)}
-                            for key in sorted(set(parent_interventions)^set(child_interventions))]
-        changed=bool(changed_circuits or changed_parameters or edge_changes or intervention_items)
+        def interventions(spec):
+            return Counter(json.dumps(v,sort_keys=True,separators=(',',':')) for v in spec.get('interventions',[]))
+        parent_interventions=interventions(parent);child_interventions=interventions(child)
+        intervention_items=[]
+        for key in sorted(set(parent_interventions)|set(child_interventions)):
+            before=parent_interventions[key];after=child_interventions[key]
+            if before != after:
+                intervention_items.append({'parent':json.loads(key) if before else None,
+                                           'child':json.loads(key) if after else None,
+                                           'parent_count':before,'child_count':after})
+        design_changes=[]
+        for name,default in (('model_profile','malecns-lif-cpu-v1'),('connectome_sha256',None),('plasticity','none')):
+            before=parent.get(name,default);after=child.get(name,default)
+            if before != after:design_changes.append({'name':name,'parent':before,'child':after})
+        changed=bool(changed_circuits or changed_parameters or edge_changes or intervention_items or design_changes)
         return {'relative_to_parent':parent_id,'changed':changed,
                 'changed_circuits':changed_circuits,'circuit_scales':circuit_scales,
-                'changed_parameters':changed_parameters,
+                'changed_parameters':changed_parameters,'design_changes':design_changes,
                 'edge_changes':{'count':len(edge_changes),'edges':edge_changes[:128]},
                 'intervention_changes':{'count':len(intervention_items),'items':intervention_items[:64]},
                 'code':'changed' if changed else 'unchanged',
@@ -286,22 +304,22 @@ class LifeLedger:
             edge={'from':parent_id,'to':child_id,'relation':relation}
             if edge not in edges:edges.append(edge)
         add_node(ident,'center',0)
-        # Ancestors are shown from root to nearest parent. A marker preserves
-        # the fact that the requested depth stopped before the root.
+        # Construct links nearest-first; visual ordering must not reverse ancestry.
         ancestor_ids=[];current=root.get('spec',{}).get('parent_id');steps=0
-        while current and steps<depth:
+        # The immediate parent is also needed to anchor siblings at depth zero.
+        while current and steps<max(1,depth):
             if self.visible(current,owner):ancestor_ids.append((current,-steps-1))
-            else:ancestor_ids.append((redacted_id('ancestor',ident+str(steps)), -steps-1))
+            else:ancestor_ids.append((redacted_id('ancestor',current), -steps-1))
             current_fly=self.store.fly(current)
             current=current_fly.get('spec',{}).get('parent_id') if current_fly else None
             steps+=1
         previous=ident
-        for ancestor,relative_depth in reversed(ancestor_ids):
+        for ancestor,relative_depth in ancestor_ids:
             add_node(ancestor,'ancestor',relative_depth,redacted=ancestor.startswith('redacted:'),anchor=ident)
             link(ancestor,previous,'parent')
             previous=ancestor
         if current:
-            marker=add_marker('ancestors',ident)
+            marker=add_marker('ancestors',ident,relative_depth=-steps-1)
             link(marker,previous,'ancestor')
         # Siblings share the selected individual's parent. Private siblings are
         # represented without their id, name, owner, or design details.
@@ -311,9 +329,10 @@ class LifeLedger:
             if len(siblings)>50:
                 visible_siblings=siblings[:50];omitted=len(siblings)-50
             else:visible_siblings=siblings;omitted=0
-            sibling_parent=parent_id if self.visible(parent_id,owner) else redacted_id('parent',ident)
+            sibling_parent=parent_id if self.visible(parent_id,owner) else redacted_id('ancestor',parent_id)
             if sibling_parent not in seen:
                 add_node(sibling_parent,'ancestor',-1,redacted=sibling_parent.startswith('redacted:'),anchor=ident)
+            link(sibling_parent,ident,'parent')
             for sibling in visible_siblings:
                 if self.visible(sibling,owner):
                     add_node(sibling,'sibling',0);link(sibling_parent,sibling,'sibling')
@@ -346,7 +365,7 @@ class LifeLedger:
         # Ensure the center node is always present first for keyboard navigation
         # consumers while retaining a root-to-leaf visual order elsewhere.
         center=next(n for n in nodes if n['id']==ident)
-        nodes=[center]+[n for n in nodes if n is not center]
+        nodes=[center]+sorted((n for n in nodes if n is not center),key=lambda n:n['depth'])
         return {'center_id':ident,'depth':depth,'nodes':nodes,'edges':edges,
                 'truncated':list(markers),'limits':{'depth':depth,'branch':50,'nodes':len(nodes)}}
 

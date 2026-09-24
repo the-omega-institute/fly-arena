@@ -1,15 +1,5 @@
-import type {Frame,ReplayEvent,Scene}
+import type {Frame,Scene}
   from '../../types'
-
-export const replayInspectionSteps = [
-  'individual',
-  'outcome',
-  'navigator',
-  'detail',
-  'disclosures',
-] as const
-
-export type ReplayInspectionStep = typeof replayInspectionSteps[number]
 
 type ScreenRect={left:number;right:number;top:number;bottom:number}
 /** Hide screen-space labels outside the scene or underneath its measured HUD. */
@@ -25,27 +15,8 @@ export function selectedReplaySlot(scene:Pick<Scene,'flies'>,selectedId:string|u
   return Math.min(Math.max(current,0),Math.max(0,scene.flies.length-1))
 }
 
-/** Keep the navigator chronological and remove duplicate event receipts. */
-export function replayNavigatorEvents(events:ReplayEvent[],slot:number){
-  const seen=new Set<string>()
-  return events
-    .filter(event=>event.slot===undefined||event.slot===slot||event.slots?.includes(slot))
-    .filter(event=>{
-      const key=JSON.stringify([event.type,event.tick,event.slot,event.food,event.objects,event.amount])
-      if(seen.has(key))return false
-      seen.add(key);return true
-    })
-    .sort((a,b)=>a.tick-b.tick)
-}
-
-/** Locate the first recorded sample at or after an event response time. */
-export function sharedPlayheadSample(frames:Pick<Frame,'time'|'tick'>[],event:ReplayEvent,delayMs=0){
-  if(!frames.length||!Number.isFinite(event.tick))return null
-  const target=event.tick/10000+Math.max(0,delayMs)/1000
-  let index=frames.findIndex(frame=>Number.isFinite(frame.time)&&frame.time>=target)
-  if(index<0)index=frames.length-1
-  const frame=frames[index]
-  return Number.isFinite(frame.time)?{index,time:frame.time,eventTime:event.tick/10000}:null
+export function replayOutcomeLabel(outcome:string){
+ return ({draw:'Replay outcome · draw',win:'Replay outcome · win',solo:'Replay outcome · solo'} as Record<string,string>)[outcome]||outcome
 }
 
 export type RecordedOutcome={score:number|null;energy:number|null;duration:number|null;status:'recorded'|'partial'|'unavailable'}

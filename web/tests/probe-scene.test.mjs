@@ -1,10 +1,20 @@
+import os from 'node:os'
+import path from 'node:path'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import ts from 'typescript'
 
-const {outputText}=ts.transpileModule(fs.readFileSync(new URL('../src/features/phenotype/probeScene.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}})
-const {probeGeometry,probeSegments,probeSampleAt,adaptProbeScene,probeFraming}=await import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'))
+const adapterOut=fs.mkdtempSync(path.join(os.tmpdir(),'probe-scene-'))
+fs.writeFileSync(path.join(adapterOut,'package.json'),'{"type":"commonjs"}')
+fs.symlinkSync(fs.realpathSync(new URL('../node_modules',import.meta.url)),path.join(adapterOut,'node_modules'))
+for(const folder of ['arena','phenotype'])fs.mkdirSync(path.join(adapterOut,folder))
+for(const file of ['arena/obstacleGeometry','phenotype/probeScene']){
+ const source=fs.readFileSync(new URL('../src/features/'+file+'.ts',import.meta.url),'utf8')
+ fs.writeFileSync(path.join(adapterOut,file+'.js'),ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText)
+}
+const {probeGeometry,probeSegments,probeSampleAt,adaptProbeScene,probeFraming}=await import(path.join(adapterOut,'phenotype/probeScene.js'))
+test.after(()=>fs.rmSync(adapterOut,{recursive:true,force:true}))
 // Synthetic inputs exercise rendering contracts, not measured biological results.
 const subjects=['wildtype','official','design'].map(role=>({role,fly_id:role,artifact_id:role+'-artifact',name:role}))
 const scene={size:80,spawns:[[0,0,Math.PI/2]],obstacles:[{position:[10,0,1.5],size:[1,5,3]}],food:[{id:'test-food',position:[7,5,.15],initial:10}]}
@@ -80,12 +90,11 @@ test('camera includes arena and outlying recorded positions; spawn yaw is not el
 })
 
 // Exercise real view controls; mock only the GPU boundary, never the adapter or clock.
-const {default:os}=await import('node:os'),{default:path}=await import('node:path')
 const {createRequire}=await import('node:module'),{default:React,act}=await import('react'),{createRoot}=await import('react-dom/client'),{JSDOM}=await import('jsdom')
 const web=new URL('../',import.meta.url).pathname,out=fs.mkdtempSync(path.join(os.tmpdir(),'probe-controls-'))
 fs.writeFileSync(path.join(out,'package.json'),'{"type":"commonjs"}')
 fs.symlinkSync(fs.realpathSync(path.join(web,'node_modules')),path.join(out,'node_modules'))
-for(const relative of ['src/features/phenotype/ProbeScene3D.tsx','src/features/phenotype/probeScene.ts','src/shared/research.ts','src/shared/theme.ts','src/shared/messages/lab3d.ts']){
+for(const relative of ['src/features/arena/obstacleGeometry.ts','src/features/phenotype/ProbeScene3D.tsx','src/features/phenotype/probeScene.ts','src/shared/research.ts','src/shared/theme.ts','src/shared/messages/lab3d.ts']){
  const dest=path.join(out,relative.replace(/\.tsx?$/,'.js'));fs.mkdirSync(path.dirname(dest),{recursive:true})
  fs.writeFileSync(dest,ts.transpileModule(fs.readFileSync(path.join(web,relative),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText)
 }

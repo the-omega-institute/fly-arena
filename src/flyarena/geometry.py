@@ -51,8 +51,8 @@ def validate_obstacle(value: Mapping[str, Any]) -> Mapping[str, Any]:
     size = _vector(value.get("size"), 3, "obstacle.size")
     if any(component <= 0 for component in size):
         raise GeometryError("obstacle.size must be positive")
-    shape = value.get("shape")
-    if shape is not None and shape not in SHAPES:
+    shape = value.get("shape", "box")
+    if shape not in SHAPES:
         raise GeometryError(f"unsupported obstacle shape: {shape!r}")
     quaternion = value.get("quaternion")
     if quaternion is not None:

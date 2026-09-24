@@ -19,7 +19,7 @@ import {mergeNeighborhoods} from './anatomy'
 import {NeuronActivityTrace} from './NeuronActivityTrace'
 import {EventNeuralResponse} from './EventNeuralResponse'
 import {SharedResources} from './SharedResources'
-import {recordedOutcome,selectedReplaySlot} from './replayInspector'
+import {replayOutcomeLabel,recordedOutcome,selectedReplaySlot} from './replayInspector'
 
 function tracePath(frames:Frame[],read:(frame:Frame)=>number|undefined,max:number) {
   const start=frames[0]?.time||0,end=frames.at(-1)?.time||start
@@ -172,7 +172,7 @@ export function MatchObservations({scene,frame,frames,events=[],flies,selectedId
     return <div className="observation-participant" key={entry?.id||index}>
       <div className="observation-participant-heading"><span><i style={{background:color}}/>{t('Slot')} {index+1} · {entry?.name}</span><small>{entry?.id.slice(0,8)}</small></div>
       <div className="replay-outcome-summary" aria-label={t('Recorded outcome')}>
-        <div><span>{t('Recorded outcome')}</span><strong>{match?.result?.outcome|| (frames.length?t('Recorded'):t('No recorded outcome'))}</strong><small>{outcome.status==='unavailable'?t('Not recorded'):`${outcome.duration===null?'—':outcome.duration.toFixed(2)} s · ${t('Recorded samples')} ${frames.length}`}</small></div>
+        <div><span>{t('Recorded outcome')}</span><strong>{(match?.result?.outcome?t(replayOutcomeLabel(match.result.outcome)):null)|| (frames.length?t('Recorded'):t('No recorded outcome'))}</strong><small>{outcome.status==='unavailable'?t('Not recorded'):`${outcome.duration===null?'—':outcome.duration.toFixed(2)} s · ${t('Recorded samples')} ${frames.length}`}</small></div>
         <div><span>{match?.request?.mode==='duel'?(locale==='zh-CN'?'中央独占时间 · 秒':'Exclusive center time · s'):t('Food collected')}</span><strong>{outcome.score===null?'—':outcome.score.toFixed(2)}</strong><small>{t('Current playhead')} {shown(frame?.time,2)} s</small></div>
         <div><span>{t('Energy reserve')}</span><strong>{outcome.energy===null?'—':outcome.energy.toFixed(1)}</strong><small>{outcome.energy===null?t('Not recorded'):t('Recorded at')}</small></div>
       </div>

@@ -40,3 +40,10 @@ def test_probe_fixture_is_valid_and_digest_pinned():
 def test_malformed_geometry_is_rejected(bad):
     with pytest.raises((GeometryError, ValueError)):
         validate_arena_scene(bad)
+
+
+def test_shared_invalid_obstacles():
+    from flyarena.geometry import validate_obstacle
+    for obstacle in FIXTURE["invalid_obstacles"]:
+        with pytest.raises(GeometryError):
+            validate_obstacle(obstacle)

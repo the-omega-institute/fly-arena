@@ -13,7 +13,7 @@ fs.symlinkSync(fs.realpathSync(path.join(web,'node_modules')),path.join(out,'nod
 const transpile=(source,jsx=false)=>ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:jsx?ts.JsxEmit.ReactJSX:undefined,esModuleInterop:true}}).outputText
 fs.mkdirSync(path.join(out,'src/features/arena'),{recursive:true});fs.mkdirSync(path.join(out,'src/features/phenotype'),{recursive:true})
 for(const [relative,target] of [['src/features/arena/obstacleGeometry.ts','src/features/arena/obstacleGeometry.js'],['src/features/phenotype/probeScene.ts','src/features/phenotype/probeScene.js']])fs.writeFileSync(path.join(out,target),transpile(fs.readFileSync(path.join(web,relative),'utf8')))
-const {validateObstacleGeometry}=await import(path.join(out,'src/features/arena/obstacleGeometry.js'))
+const {validateObstacleGeometry,obstacleBatches}=await import(path.join(out,'src/features/arena/obstacleGeometry.js'))
 const {probeGeometry}=await import(path.join(out,'src/features/phenotype/probeScene.js'))
 test.after(()=>fs.rmSync(out,{recursive:true,force:true}))
 
@@ -29,3 +29,11 @@ test('probe adapter accepts every Python generated probe scene without defaults'
   assert.deepEqual(geometry,{size:scene.size,spawns:scene.spawns,obstacles:scene.obstacles,food:scene.food})
  }
 })
+
+ test('shared invalid obstacles are rejected by validation, probes and production batching',()=>{
+  for(const obstacle of fixture.invalid_obstacles){
+   assert.equal(validateObstacleGeometry(obstacle),false)
+   assert.equal(probeGeometry({size:10,spawns:[],food:[],obstacles:[obstacle]}),null)
+   assert.throws(()=>obstacleBatches([obstacle],'#fff'),/Invalid arena obstacle geometry/)
+  }
+ })

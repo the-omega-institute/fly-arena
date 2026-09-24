@@ -1,4 +1,7 @@
 export const replayMessages = {
+  "Replay outcome · draw": {en: "Draw", "zh-CN": "平局"},
+  "Replay outcome · win": {en: "Decisive result", "zh-CN": "已分胜负"},
+  "Replay outcome · solo": {en: "Solo experiment completed", "zh-CN": "单蝇实验完成"},
   "No event receipts were recorded for this participant. Sampled behavior remains available below.": {en: "No event receipts were recorded for this participant. Sampled behavior remains available below.", "zh-CN": "未记录该个体的事件凭据。下方仍可查看采样行为。"},
   "Recorded outcome": {en: "Recorded outcome", "zh-CN": "已记录结果"},
   "Recorded replay flow": {en: "Recorded replay flow", "zh-CN": "已记录回放流程"},

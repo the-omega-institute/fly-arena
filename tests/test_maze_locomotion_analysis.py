@@ -181,3 +181,45 @@ def test_rejects_nonfinite_observations(tmp_path, key):
     _seal(root)
     with pytest.raises(ValueError, match="finite"):
         analyze_replay(root)
+
+
+def test_explicit_window_reports_exact_rows_and_peak_from_all_pre_inversion_samples(tmp_path):
+    root = _fixture(tmp_path)
+    frames = json.loads((root / 'frames.json').read_text())
+    for frame, height in zip(frames, [2., 5., 9., 8., 7.]):
+        frame['positions'][0][2] = height
+    del frames[0]['senses']
+    (root / 'frames.json').write_text(json.dumps(frames))
+    _seal(root)
+    report = analyze_replay(root, window=(0., 4.), rows=[0., 2., 4.])['window_report']
+    assert [row['time_s'] for row in report['rows']] == [0., 2., 4.]
+    assert report['rows'][0]['obstacle_contacts'] is None
+    assert report['rows'][1]['upright_projection'] == -1.
+    assert report['pre_inversion_height_max'] == {
+        'time_s': 1., 'thorax_xyz_mm': [1., 0, 5.], 'height_mm': 5.,
+        'upright_projection': 1., 'obstacle_contacts': ['obstacle-0']}
+    assert report['pre_inversion_interval'] == {'start_s': 0., 'end_exclusive_s': 2.}
+    assert analyze_replay(root, window=(2., 4.))['window_report']['pre_inversion_height_max'] is None
+
+
+@pytest.mark.parametrize('window,rows', [((0, 4), [.5]), ((0, 4), [5]), ((4, 0), []),
+                                        ((-1, 4), []), ((0, 5), []), ((0, 4), [0] * 257),
+                                        ((0, float('nan')), []), (None, [1])])
+def test_window_rejects_out_of_bounds_or_unrecorded_rows(tmp_path, window, rows):
+    with pytest.raises(ValueError):
+        analyze_replay(_fixture(tmp_path), window=window, rows=rows)
+
+
+def test_window_cli_emits_rows_and_xyz(tmp_path):
+    import os
+    import subprocess
+    import sys
+    root = _fixture(tmp_path)
+    result = subprocess.run([sys.executable, str(Path(_ANALYSIS.__file__)), str(root),
+                             '--window', '0', '4', '--rows', '0', '1', '4'],
+                            capture_output=True, text=True, check=True,
+                            env=os.environ | {'PYTHONPATH': str(Path(__file__).parents[1] / 'src')})
+    report = json.loads(result.stdout)
+    assert report['verification']['status'] == 'verified'
+    assert [r['time_s'] for r in report['window_report']['rows']] == [0., 1., 4.]
+    assert report['window_report']['pre_inversion_height_max']['thorax_xyz_mm'] == [0., 0, 1]

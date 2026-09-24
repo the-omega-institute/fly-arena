@@ -22,7 +22,7 @@
 .has-life-replay .match-setup-disclosure>summary{display:list-item;padding:16px 20px;border:1px solid var(--line);border-radius:8px;background:var(--paper);font-size:13px;cursor:pointer}
 .has-life-replay .match-setup-disclosure[open]>summary{margin-bottom:12px}
 .life-theater-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(400px,1fr);gap:18px;align-items:start}
-.life-theater-layout>.arena-stage{position:sticky;top:18px;min-width:0}
+.life-theater-layout>.arena-stage{position:sticky;top:95px;min-width:0}
 .life-theater-layout>.observations{margin-top:0;min-width:0;max-height:none;overflow:visible}
 .life-theater-layout .arena-canvas{height:clamp(350px,55vh,600px)}
 .life-theater-layout .observation-comparison{grid-template-columns:1fr}

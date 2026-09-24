@@ -41,6 +41,7 @@ Reproduce the verified diagnosis with the requested interpreter:
 ```sh
 PYTHONPATH=src /Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python \
   scripts/analyze_maze_locomotion.py var/research/issue82/replay-gallery-v1 \
+  --window 45 65 --rows 45 50 51 51.5 51.7 51.75 51.8 52 54 54.15 60 65 \
   --output var/research/issue82/diagnosis.json
 ```
 
@@ -119,6 +120,14 @@ The complete sampled wall-contact intervals intersecting this window are
 The first interval is clipped at 45 s, not a claim that contact began there.
 Continuous sampled contact does not exclude brief unsampled separations.
 
+The table below is generated from `window_report.rows` in the command above.
+Rows use exact recorded timestamps, including the closed window endpoint at
+65 s; no interpolation is used. Heights and XYZ use `frames.positions[slot]`,
+the recorded thorax body position, rather than the render-geometry center.
+`window_report.pre_inversion_height_max` selects the earliest maximum among
+all samples in [window start, min(window end, first inversion)), not just
+the requested table rows. Missing contact fields remain `null`.
+
 | Time (s) | Thorax height (mm) | Upright projection relative to initial pose | Recorded obstacle contacts |
 |---:|---:|---:|---|
 | 45.00 | 1.34718 | +0.936556 | 0 |
@@ -126,16 +135,16 @@ Continuous sampled contact does not exclude brief unsampled separations.
 | 51.00 | 1.67331 | +0.849302 | 0, 2 |
 | 51.50 | 2.46935 | +0.181471 | 0, 2 |
 | 51.70 | 2.13256 | +0.340694 | 2 |
-| 51.75 | 1.67540 | −0.477757 | 2 |
-| 51.80 | 0.48657 | −0.735991 | 0, 2 |
-| 52.00 | 0.45464 | −0.977879 | None |
+| 51.75 | 1.67540 | -0.477757 | 2 |
+| 51.80 | 0.48657 | -0.735991 | 0, 2 |
+| 52.00 | 0.45464 | -0.977879 | None |
 | 54.00 | 1.69773 | +0.721720 | 0 |
-| 54.15 | 0.46226 | −0.603305 | 2 |
-| 60.00 | 0.50885 | −0.987684 | 0 |
-| 65.00 | 0.49962 | −0.990584 | None |
+| 54.15 | 0.46226 | -0.603305 | 2 |
+| 60.00 | 0.50885 | -0.987684 | 0 |
+| 65.00 | 0.49962 | -0.990584 | None |
 
 The height peak within [45, 51.75) s is 2.46935 mm at 51.50 s, near the
-southwest wall corner (x = −12.07178, y = −12.25204 mm), before the drop and
+southwest wall corner (XYZ = [-12.07178, -12.25204, 2.46935] mm), before the drop and
 inversion. This is consistent with **wall-associated climbing/rearing under
 sustained differential drive**. The data support an interaction hypothesis;
 they do not establish whether wall climbing alone, turning drive alone, or
