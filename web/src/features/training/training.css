@@ -17,3 +17,8 @@
 
 .first-experiment-guide{grid-column:1/-1;padding:18px}.first-experiment-guide h2{font-size:18px}.first-experiment-guide h3{font-size:14px;margin:12px 0 6px}.first-experiment-guide p{font-size:12px;line-height:1.6;color:var(--text-muted);margin:8px 0}.first-experiment-guide .training-pair{gap:20px}
 @media(max-width:560px){.first-experiment-guide .training-pair{grid-template-columns:1fr;gap:4px}}
+
+.training-setup,.training-main,.algorithm-picker{min-width:0}
+.training-setup>section{overflow-wrap:anywhere}
+.training-setup>section code{white-space:pre-wrap}
+.algorithm-options input[type=radio]{width:14px;height:14px;padding:0;margin:3px 0 0;flex-shrink:0;accent-color:var(--accent)}
