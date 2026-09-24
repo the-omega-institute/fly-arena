@@ -25,11 +25,16 @@ function compile(folder) {
       const dest = path.join(output, relative.replace(/\.tsx?$/, '.js'))
       fs.mkdirSync(path.dirname(dest), {recursive:true})
       fs.writeFileSync(dest, result.outputText)
+    } else if (entry.name.endsWith('.css')) {
+      const dest = path.join(output, relative)
+      fs.mkdirSync(path.dirname(dest), {recursive:true})
+      fs.writeFileSync(dest, '')
     }
   }
 }
 compile('src')
 const require = createRequire(path.join(output, 'package.json'))
+require.extensions['.css'] = () => {}
 const {SavedFlyCard} = require('./src/features/design/SavedFlyCard.js')
 const {ArenaFeature} = require('./src/features/arena/ArenaFeature.js')
 const {ArenaWorldLabel} = require('./src/features/arena/ArenaWorldLabel.js')
@@ -104,7 +109,7 @@ const flies = [legacy, wt, official, fly('clone001-full-id', {reference_kind:'us
 function arena(identity, extra={}) {
   return render(ArenaFeature, {replayStatus:'idle', replayError:'', bridgeProfile:'', scene:null, focused:'', preview:null,
     selected:legacy.id, identity, flies, frames:[], play:false, playtime:0, playbackSpeed:1, season:null, matches:[], maps:[],
-    mapId:'orchard', mode:'contest', opponent:wt.id, duration:5, seed:42, busy:'', ...extra})
+    mapId:'orchard', mode:'contest', opponent:wt.id, duration:5, seedText:'42', busy:'', ...extra})
 }
 const options = html => [...html.matchAll(/<option\b[^>]*value="([^"]+)"[^>]*>(.*?)<\/option>/g)]
 const textOnly = html => html.replace(/<[^>]*>/g, '')

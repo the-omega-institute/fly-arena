@@ -183,6 +183,8 @@ class Store:
                 existing = db.execute("SELECT payload,resource FROM idempotency WHERE owner=? AND key=?", (owner, key)).fetchone()
                 if existing:
                     return self.prior_submission(owner, key, request)
+            from .contracts import MatchRequest
+            MatchRequest.model_validate(request).validate_admission()
             if db.execute("SELECT count(*) FROM matches WHERE owner=? AND status IN ('queued','running')", (owner,)).fetchone()[0] >= 12:
                 if training:return None
                 raise ValueError("Queue quota reached: at most 12 unfinished matches per designer")
@@ -280,6 +282,8 @@ class Store:
                 old = db.execute('SELECT payload,resource FROM idempotency WHERE owner=? AND key=?', (owner,key)).fetchone()
                 if old:
                     return self.prior_submission(owner, key, spec, tournament=True)
+            from .contracts import TournamentRequest
+            TournamentRequest.model_validate(spec).validate_admission()
             artifacts = {}
             for fly in spec['fly_ids']:
                 row = db.execute('SELECT artifact_id,spec FROM flies WHERE id=?',(fly,)).fetchone()

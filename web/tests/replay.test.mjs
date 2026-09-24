@@ -232,7 +232,7 @@ test('feeding history requires recorded timing and rejects incomplete resource a
 
 const cameraModule=ts.transpileModule(fs.readFileSync(new URL('../src/features/arena/followCamera.ts',import.meta.url),'utf8'),
  {compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}})
-const {recordedCameraTarget}=await import('data:text/javascript;base64,'+Buffer.from(cameraModule.outputText).toString('base64'))
+const {recordedCameraTarget,replayLabelOpacity}=await import('data:text/javascript;base64,'+Buffer.from(cameraModule.outputText).toString('base64'))
 test('camera seeks the same recorded participant position and rejects missing coordinates',()=>{
  const frame={positions:[[1,2,3],[4,5,6]]},next={positions:[[3,4,5],[6,7,8]]}
  assert.deepEqual(recordedCameraTarget(frame,next,.5,1),[5,6,7])
@@ -243,4 +243,13 @@ test('camera seeks the same recorded participant position and rejects missing co
  assert.equal(recordedCameraTarget(frame,next,.5,2),null)
  assert.equal(recordedCameraTarget({positions:[[1,2]]},next,.5,0),null)
  assert.equal(recordedCameraTarget(undefined,next,.5,0),null)
+})
+
+test('replay annotations fade near the body and throughout follow mode',()=>{
+ assert.ok(replayLabelOpacity(8,false)<replayLabelOpacity(24,false))
+ assert.ok(replayLabelOpacity(24,false)<replayLabelOpacity(60,false))
+ for(const distance of [0,8,24,60,1000]){
+  assert.ok(replayLabelOpacity(distance,true)<=.18)
+  assert.ok(replayLabelOpacity(distance,true)<=replayLabelOpacity(distance,false))
+ }
 })

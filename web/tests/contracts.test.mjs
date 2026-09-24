@@ -2,10 +2,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import ts from 'typescript'
 import fs from 'node:fs'
-async function moduleAt(path){const source=fs.readFileSync(new URL(path,import.meta.url),'utf8');const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});return import('data:text/javascript;base64,'+Buffer.from(outputText).toString('base64'))}
+import {createRequire} from 'node:module'
+import {pathToFileURL} from 'node:url'
+const require=createRequire(import.meta.url)
+function moduleUrl(url){
+ const source=fs.readFileSync(url,'utf8');
+ const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ESNext}});
+ const resolved=outputText.replace(/from (['"])([^'"]+)\1/g,(_,quote,path)=>`from ${quote}${path.startsWith('.')?moduleUrl(new URL(/\.tsx?$/.test(path)?path:path+'.ts',url)):pathToFileURL(require.resolve(path)).href}${quote}`);
+ return 'data:text/javascript;base64,'+Buffer.from(resolved).toString('base64');
+}
+async function moduleAt(path){return import(moduleUrl(new URL(path,import.meta.url)))}
 const {parseSeeds,alignment,sampleAt,metricUnit,validateHorizon,designRoleLabel,plotTransform}=await moduleAt('../src/shared/research.ts');
 const {assertSpec,composeSpec}=await moduleAt('../src/features/design/spec.ts');
 const {catalog}=await moduleAt('../src/shared/messages.ts');
+test('every composed catalog entry has nonempty English and Chinese translations',()=>{for(const [key,message] of Object.entries(catalog)){for(const locale of ['en','zh-CN']){assert.equal(typeof message[locale],'string',`${key}: ${locale}`);assert.ok(message[locale].trim(),`${key}: ${locale}`)}}});
 const subjects=['wildtype','official','design'].map((role,i)=>({role,fly_id:`f${i}`,artifact_id:`a${i}`}));
 const reports=subjects.map(s=>({...s,status:'complete',condition_key:'same-condition',receipt_sha256:'receipt',duration_seconds:3,trajectory:[{time:0,x:0,y:0,yaw:0},{time:3,x:6,y:3,yaw:0}]}));
 test('seed admission matches strict API limits: at most eight distinct nonnegative int32 seeds',()=>{assert.deepEqual(parseSeeds('0, 42 2147483647'),[0,42,2147483647]);assert.equal(parseSeeds('1,2,3,4,5,6,7,8').length,8);for(const v of ['', '-1','1.2','2147483648','42,42','1,2,3,4,5,6,7,8,9'])assert.throws(()=>parseSeeds(v))});
@@ -84,7 +94,7 @@ test('every map/seed and mirrored position is charged before training starts',()
  assert.equal(planProblem({...trainingPlan,conditions,budget:8}),null);
  assert.equal(evaluationCount({...trainingPlan,conditions,mode:'contest'}),16);
  for(const invalid of [[],[...conditions,...conditions],[{map_id:'maze',seed:NaN}],[{map_id:'unknown',seed:42}],Array.from({length:5},(_,seed)=>({map_id:'maze',seed}))])assert.ok(planProblem({...trainingPlan,conditions:invalid,budget:96}));
- assert.equal(planProblem({...trainingPlan,conditions:Array.from({length:4},(_,seed)=>({map_id:'maze',seed})),budget:16}),null);
+ assert.equal(planProblem({...trainingPlan,conditions:Array.from({length:4},(_,seed)=>({map_id:'orchard',seed})),budget:16}),null);
 });
 test('comparison uses all effective conditions and retains implicit legacy conditions',()=>{
  const legacy=comparisonRun;
@@ -181,3 +191,20 @@ test('static hosting routes API calls to the configured service without sending 
   assert.equal(serviceUrl('/docs'),'https://compute.example/docs');
  }finally{globalThis.fetch=priorFetch;if(priorDocument===undefined)delete globalThis.document;else globalThis.document=priorDocument}
 });
+
+test('catalog spreads never silently overwrite keys from another message module',async()=>{
+ const url=new URL('../src/shared/messages.ts',import.meta.url),source=fs.readFileSync(url,'utf8')
+ const sf=ts.createSourceFile('messages.ts',source,ts.ScriptTarget.Latest,true)
+ const bindings=new Map(),objects=new Map()
+ for(const statement of sf.statements){
+  if(ts.isImportDeclaration(statement))for(const binding of statement.importClause?.namedBindings?.elements||[])bindings.set(binding.name.text,{name:binding.propertyName?.text||binding.name.text,path:statement.moduleSpecifier.text})
+  if(ts.isVariableStatement(statement))for(const d of statement.declarationList.declarations){let value=d.initializer;while(value&&ts.isAsExpression(value))value=value.expression;if(value&&ts.isObjectLiteralExpression(value))objects.set(d.name.getText(sf),value)}
+ }
+ const seen=new Map()
+ for(const spread of objects.get('catalog').properties){
+  assert.ok(ts.isSpreadAssignment(spread),'Catalog entries must be checked explicitly')
+  const name=spread.expression.getText(sf),binding=bindings.get(name)
+  const keys=binding?Object.keys((await moduleAt('../src/shared/'+binding.path+'.ts'))[binding.name]):objects.get(name).properties.map(p=>p.name.text)
+  for(const key of keys){assert.ok(!seen.has(key),`${key}: duplicated in ${seen.get(key)} and ${name}`);seen.set(key,name)}
+ }
+})

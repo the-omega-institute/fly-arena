@@ -1,4 +1,6 @@
-import {playableProfile,compatibleSensory} from './types'
+import {buildExperimentPlan,type ExperimentPlan} from './features/arena/experimentSetup'
+import './features/arena/experimentSetup.css'
+import {playableProfile} from './types'
 import type {ReplayDesignOrigin} from './features/arena/replayDesign'
 import {NeuralPreviewPanel,type NeuralPreview,type PreviewRecord} from './features/design/NeuralPreviewPanel'
 import {BrainModelPicker} from './features/design/BrainModelPicker'
@@ -13,7 +15,7 @@ import {ArenaFeature} from './features/arena/ArenaFeature'
 import {useReplay} from './features/arena/useReplay'
 import {selectReplayFrames} from './features/arena/replayFrames'
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react'
-import {ArrowDownToLine,ArrowRight,ArrowUpRight,AudioLines,Beaker,Bug,Check,ChevronDown,Code2,Copy,Dna,ExternalLink,FlaskConical,GitBranch,Leaf,Loader2,Pause,Play,Plus,RotateCcw,Settings2,ShieldCheck,Sparkles,Swords,Terminal,Trophy,UserRound,X} from 'lucide-react'
+import {ArrowDownToLine,ArrowRight,ArrowUpRight,AudioLines,Beaker,Bug,Check,ChevronDown,Code2,Copy,Dna,ExternalLink,FlaskConical,GitBranch,Leaf,Loader2,Pause,Play,Plus,RotateCcw,Settings2,ShieldCheck,Swords,Terminal,Trophy,UserRound,X} from 'lucide-react'
 import {api,setCsrfToken,newRequestKey} from './api'
 import {PhenotypeLab} from './features/phenotype/PhenotypeLab'
 import {AdvancedInterventions} from './features/design/AdvancedInterventions'
@@ -27,16 +29,6 @@ import {defaultMatchProfile,colors,modes,num} from './types'
 import {readRoute,routeHash,type Tab} from './shared/navigation'
 type Ranking={fly:Fly;wins:number;draws:number;losses:number;matches:number;food:number;points:number}
 const defaultScales=()=>({olfactory:1,projection:1,local:1,memory:1,readout:1,descending:1,visual:1,motor:1})
-
-function MapDrawing({map}:{map:ArenaMap}){
-  return <svg viewBox="0 0 220 105" className={'map-drawing '+map.id} aria-hidden="true">
-    <defs><pattern id={'grid-'+map.id} width="14" height="14" patternUnits="userSpaceOnUse"><path d="M14 0H0V14" fill="none" stroke="currentColor" strokeWidth=".45" opacity=".18"/></pattern></defs>
-    <rect x="8" y="3" width="204" height="98" rx="9" fill={'url(#grid-'+map.id+')'}/>
-    {map.id==='enclosure'?<><polygon points={Array.from({length:16},(_,i)=>`${110+45*Math.cos(i*Math.PI/8)},${54+45*Math.sin(i*Math.PI/8)}`).join(' ')} fill="currentColor" fillOpacity=".06" stroke="currentColor" strokeWidth="4"/>{[[0,0],[-3,5],[3,-5],[6,6],[-6,-6]].map(([x,y],i)=><circle key={i} cx={110+x*4} cy={54+y*4} r="3" fill="currentColor"/>)}</>:map.id==='terrarium'?<><path d="M43 63L91 42h38l48 21-48 9H91Z" fill="currentColor" opacity=".28"/><path d="M43 63L91 42h38l48 21M91 42v30m38-30v30" fill="none" stroke="currentColor" strokeWidth="2"/>{[[62,25],[158,83],[153,27],[68,84]].map(([x,y],i)=><ellipse key={i} cx={x} cy={y} rx={i<2?15:10} ry="8" fill="currentColor" opacity=".35"/>)}<path d="M27 55Q64 2 110 19T193 53M27 65Q66 101 111 88T193 64" fill="none" stroke="currentColor" strokeDasharray="3 4"/></>:map.id==='scarcity'?<><circle cx="110" cy="54" r="26" fill="currentColor" opacity=".06"/><circle cx="110" cy="54" r="5" fill="currentColor"/><path d="M64 54h32m28 0h32" stroke="currentColor" strokeDasharray="3 4" opacity=".5"/></>:map.id==='ring'?<><ellipse cx="110" cy="54" rx="57" ry="38" fill="none" stroke="currentColor" strokeWidth="1.5"/><ellipse cx="110" cy="54" rx="46" ry="30" fill="none" stroke="currentColor" opacity=".15"/><path d="M62 68L145 28M78 80L158 40" stroke="currentColor" opacity=".09"/></>:map.id==='maze'?<><path d="M83 19v49h-23M137 88V39h24" fill="none" stroke="currentColor" strokeWidth="7"/><path d="M40 50h25q10 0 10 14v9q0 8 20 8h24" fill="none" stroke="currentColor" strokeDasharray="3 4" opacity=".45"/></>:<><path d="M39 62Q70 16 109 53T175 44" fill="none" stroke="currentColor" strokeDasharray="3 4" opacity=".4"/>{[[75,27],[112,61],[163,34],[57,80],[168,79]].map(([x,y],i)=><g key={i}><circle cx={x} cy={y} r="10" fill="currentColor" opacity=".07"/><circle cx={x} cy={y} r="3" fill="currentColor" opacity=".7"/></g>)}</>}
-    <g transform="translate(54,55) rotate(-25)"><ellipse rx="4" ry="2.5" fill="currentColor"/><path d="M-1 -2l-4 -4m4 8l-4 4M1 -2l2 -4m-2 8l2 4" stroke="currentColor" strokeWidth=".8"/></g>
-    <g transform="translate(166,53) rotate(150)"><ellipse rx="4" ry="2.5" fill="currentColor"/><path d="M-1 -2l-4 -4m4 8l-4 4M1 -2l2 -4m-2 8l2 4" stroke="currentColor" strokeWidth=".8"/></g>
-  </svg>
-}
 
 function download(name:string,value:unknown){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url)}
 
@@ -72,6 +64,10 @@ export default function App(){
   const [freshToken,setFreshToken]=useState('')
   const [agentTokens,setAgentTokens]=useState<{id:string;expires:number}[]>([])
   const [login,setLogin]=useState(false)
+  const [setupRestored,setSetupRestored]=useState(false)
+  const pendingExperiment=useRef<ExperimentPlan|null>(null)
+  const experimentAttempt=useRef<{fingerprint:string;keys:string[]}|null>(null)
+  const experimentSubmitting=useRef(false)
   const pendingIntent=useRef<'match'|'save-arena'|'save-train'|null>(null)
   const [identityName,setIdentityName]=useState('')
   const [invite,setInvite]=useState('')
@@ -83,7 +79,7 @@ export default function App(){
   const [mode,setMode]=useState('forage')
   const [opponent,setOpponent]=useState('')
   const [duration,setDuration]=useState(2)
-  const [seed,setSeed]=useState(42)
+  const [seedText,setSeedText]=useState('42')
   const [focused,setFocusedState]=useState<string>(readRoute(location.hash).match)
   const [play,setPlay]=useState(false)
   const [playtime,setPlaytime]=useState(0)
@@ -118,7 +114,6 @@ export default function App(){
   const replay=useReplay(focused,current?.status)
   const {scene,frames,events}=replay
   const chosenMap=maps.find(m=>m.id===mapId)
-  useEffect(()=>{if(chosenMap&&!chosenMap.modes.includes(mode))setMode(chosenMap.modes[0])},[chosenMap,mode])
   function navigate(next:Tab,experiment=experimentId,match=focused){history.pushState(null,'',routeHash(next,experiment,match));setTabState(next);setExperimentId(experiment);setFocusedState(match)}
   function setTab(next:Tab){navigate(next)}
   function setFocused(next:string|((old:string)=>string)){const value=typeof next==='function'?next(focused):next;navigate('arena',experimentId,value)}
@@ -147,10 +142,11 @@ export default function App(){
     return()=>window.removeEventListener('arena:session-expired',expired)
   },[])
   useEffect(()=>{
-    if(!season)return
+    if(!season||setupRestored)return
     const pending=sessionStorage.getItem('flyarena.pendingDesign')
-    if(pending){try{const draft=JSON.parse(pending);loadSpec(draft.spec||draft);if(draft.jsonEditor!==undefined)setJsonEditor(draft.jsonEditor);if(draft.tab)setTab(draft.tab);if(draft.intent)pendingIntent.current=draft.intent;if(draft.setup){setSelected(draft.setup.selected);setMapId(draft.setup.mapId);setMode(draft.setup.mode);setOpponent(draft.setup.opponent);setDuration(draft.setup.duration);setSeed(draft.setup.seed);setBridgeProfile(draft.setup.bridgeProfile);setSensoryProfile(draft.setup.sensoryProfile)}if(draft.replayOrigin){setReplayOrigin(draft.replayOrigin);setSelected('')}sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
-  },[authSettings?.mode,season])
+    if(pending){try{const draft=JSON.parse(pending);loadSpec(draft.spec||draft);if(draft.jsonEditor!==undefined)setJsonEditor(draft.jsonEditor);if(draft.tab)setTab(draft.tab);if(draft.intent)pendingIntent.current=draft.intent;if(draft.experiment)pendingExperiment.current=draft.experiment;if(draft.experimentAttempt)experimentAttempt.current=draft.experimentAttempt;const setup=draft.intent==='match'&&draft.experiment?draft.experiment.setup:draft.setup;if(setup){setSelected(setup.selected);setMapId(setup.mapId);setMode(setup.mode);setOpponent(setup.opponent);setDuration(setup.duration);setSeedText(setup.seedText??String(setup.seed??42));setBridgeProfile(setup.bridgeProfile);setSensoryProfile(setup.sensoryProfile)}if(draft.replayOrigin){setReplayOrigin(draft.replayOrigin);setSelected('')}sessionStorage.removeItem('flyarena.pendingDesign')}catch(e){setError(String(e))}}
+    setSetupRestored(true)
+  },[season,setupRestored])
   useEffect(()=>{
     if(showToken&&authSettings?.mode==='nyxid'&&identity&&!identity.token)api<{id:string;expires:number}[]>('/auth/agent-tokens').then(setAgentTokens).catch(e=>setError(e.message))
     if(!showToken)setFreshToken('')
@@ -188,7 +184,7 @@ export default function App(){
 
   function clone(fly:Fly){setReplayOrigin(null);setParentId(fly.id);setBaseSpec(fly.spec);setInterventions(fly.spec.interventions||[]);setSelected(fly.id);setName(fly.name.split(' / ')[0]+' 02');setColor(fly.color);const values:Record<string,number>=defaultScales();for(const m of fly.spec.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(fly.spec.neuron_parameters.tau_scale);setThreshold(fly.spec.neuron_parameters.threshold_shift_mv);setEdgeDeltas(fly.spec.edge_deltas);setReport(null)}
   async function action(label:string,fn:()=>Promise<void>){setBusy(label);setError('');try{await fn()}catch(e){setError(e instanceof Error?e.message:String(e))}finally{setBusy('')}}
-  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify({spec,jsonEditor,tab,replayOrigin,intent:pendingIntent.current,setup:{selected,mapId,mode,opponent,duration,seed,bridgeProfile,sensoryProfile}}));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
+  function loginNyxID(){if(!authSettings?.login_url)return;try{sessionStorage.setItem('flyarena.pendingDesign',JSON.stringify({spec,jsonEditor,tab,replayOrigin,intent:pendingIntent.current,experiment:pendingExperiment.current,experimentAttempt:experimentAttempt.current,setup:{selected,mapId,mode,opponent,duration,seedText,bridgeProfile,sensoryProfile}}));window.location.assign(authSettings.login_url)}catch(e){setError(String(e))}}
   async function createAgentToken(){await action('agent-token',async()=>{const key=await api<{token:string}>('/auth/agent-tokens',{method:'POST'});setFreshToken(key.token);setAgentTokens(await api('/auth/agent-tokens'))})}
   async function logout(){await action('logout',async()=>{if(authSettings?.mode==='nyxid'&&!identity?.token)await api('/auth/logout',{method:'POST'});setIdentity(null);setCsrfToken(null);setFreshToken('');if(authSettings?.mode==='local')localStorage.removeItem('flyarena.identity');setShowToken(false)})}
   async function register(){await action('identity',async()=>{const user=await api<Identity>('/identities',{method:'POST',body:JSON.stringify({name:identityName||'Explorer'}),headers:{'X-Invite-Code':invite}});setIdentity(user);localStorage.setItem('flyarena.identity',JSON.stringify(user));setLogin(false);setToast(t("设计师身份已创建，现在可以保存与参赛。"))})}
@@ -205,25 +201,45 @@ export default function App(){
       const fly=await api<Fly>('/flies',{method:'POST',body:JSON.stringify(spec)},identity)
       await refresh();setSelected(fly.id);setReport(fly.report);setBaseSpec(fly.spec);setParentId(fly.id);setReplayOrigin(null)
       if(destination==='arena'){
-        setMapId('orchard');setMode('forage');setDuration(2);setSeed(42)
+        setMapId('orchard');setMode('forage');setDuration(2);setSeedText('42')
         await submitMatch(identity,[fly.id],{map_id:'orchard',mode:'forage',duration_seconds:2,seed:42})
       }else{setTab('train');setToast(t('Design saved. Choose a strategy and budget to start training.'))}
     })
   }
-  async function startMatch(){
-    if(!season?.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))){setError(t('Selected match profile is unavailable.'));return}
+  async function startMatch(requested:ExperimentPlan){
+    if(experimentSubmitting.current)return
+    const checked=buildExperimentPlan(requested.setup,availableFlies,maps,season)
+    if(!checked.plan){setError(checked.errors.map(t).join(' '));return}
+    const plan=checked.plan
+    const fingerprint=JSON.stringify(plan.submissions)
+    if(experimentAttempt.current?.fingerprint!==fingerprint)experimentAttempt.current={fingerprint,keys:plan.submissions.map(()=>newRequestKey())}
+    pendingExperiment.current=plan
     if(!identity){pendingIntent.current='match';setLogin(true);return}
-    if(!selected){setError(t("请先选择或保存一只果蝇。"));return}
-    await action('match',()=>submitMatch(identity,mode==='forage'?[selected]:[selected,opponent||selected],{map_id:mapId,mode,seed,duration_seconds:duration}))
+    const keys=experimentAttempt.current.keys
+    experimentSubmitting.current=true
+    await action('match',async()=>{
+      let submitted=0
+      try{
+        for(const [i,request] of plan.submissions.entries()){
+          const result=await api<Match|{matches:Match[]}>(request.endpoint,{method:'POST',headers:{'Idempotency-Key':keys[i]},body:JSON.stringify(request.body)},identity)
+          const accepted='matches' in result?result.matches:[result]
+          submitted+=accepted.length
+          setMatches(old=>[...accepted,...old.filter(m=>!accepted.some(a=>a.id===m.id))])
+          if(accepted[0])setFocused(accepted[0].id)
+        }
+        experimentAttempt.current=null;pendingExperiment.current=null
+        setToast(t('Experiment submitted. Recorded results will appear as each match finishes.'))
+      }catch(e){throw Error(`${t('Experiment submission incomplete. Confirmed matches')}: ${submitted}/${plan.matches.length}. ${t('Accepted matches remain in the log. Retry the unchanged plan in this session to reuse submission keys; do not treat a partial pair as complete.')} ${e instanceof Error?e.message:String(e)}`)}
+      finally{experimentSubmitting.current=false}
+    })
   }
   useEffect(()=>{
-    if(!identity){if(!login&&authSettings?.mode==='local')pendingIntent.current=null;return}
-    if(!season)return
+    if(!identity){if(!login&&authSettings?.mode==='local'){pendingIntent.current=null;pendingExperiment.current=null}return}
+    if(!season||!setupRestored)return
     const intent=pendingIntent.current;pendingIntent.current=null
-    if(intent==='match')void startMatch()
+    if(intent==='match'){const plan=pendingExperiment.current;if(plan)void startMatch(plan)}
     else if(intent)void publish(intent==='save-arena'?'arena':'train')
-  },[identity,login,season])
-  async function startSeries(){if(!season?.match_profiles?.some(p=>p.id===bridgeProfile&&playableProfile(p))){setError(t('Selected match profile is unavailable.'));return}if(!identity){setLogin(true);return}if(selected===(opponent||selected)){setError(t("系列赛需要两只不同的果蝇"));return}await action('series',async()=>{const series=await api<{id:string;matches:Match[]}>('/tournaments',{method:'POST',headers:{'Idempotency-Key':newRequestKey()},body:JSON.stringify({name:t("双循环 / ")+(selectedFly?.name||'Fly'),fly_ids:[selected,opponent],map_id:mapId,mode:mode==='sumo'?'sumo':'contest',seeds:[seed],duration_seconds:duration,bridge_profile:bridgeProfile,sensory_profile:selectedSensoryProfile,sandbox:true})},identity);setFocused(series.matches[0].id);await refresh();setToast(t("双循环已创建：同一地图与种子，两场交换出生位置的比赛。"))})}
+  },[identity,login,season,setupRestored])
   function loadSpec(value:Spec){assertSpec(value);setReplayOrigin(null);setParentId(value.parent_id||null);setBaseSpec(value);setInterventions(value.interventions||[]);setName(value.name);setColor(value.color);setSelected(value.parent_id||'');const values:Record<string,number>=defaultScales();for(const m of value.weight_mutations)values[m.selector]=(values[m.selector]??1)*m.scale;setScales(values);setTau(value.neuron_parameters?.tau_scale??1);setThreshold(value.neuron_parameters?.threshold_shift_mv??0);setEdgeDeltas(value.edge_deltas||[]);setReport(null);setTab('design');setToast(t("设计已导入；保存时将再次通过服务端验证。"))}
   function designFromReplay(draft:Spec,origin:ReplayDesignOrigin){loadSpec(draft);setReplayOrigin(origin);setSelected('');setNeuralPreview(null);setPlay(false)}
   const estimated=useMemo(()=>{
@@ -284,13 +300,12 @@ export default function App(){
         </div>
         {neuralPreview&&<NeuralPreviewPanel record={neuralPreview} stale={neuralPreview.specKey!==JSON.stringify(spec)} circuits={season?.connectome.circuits||[]} onImport={loadSpec} onReplay={id=>{setFocused(id);setTab('arena')}}/>}
         <AdvancedInterventions value={interventions} onChange={v=>{setInterventions(v);setReport(null)}} report={report} spec={spec} onValidate={validate} busy={!!busy}/>
-        <div className="section-title"><div><span className="eyebrow">{t("CHOOSE YOUR CHALLENGE")}</span><h2>{t("下一站，竞技场。")}</h2></div><button className="text-link" onClick={()=>setTab('arena')}>{t("探索全部环境")}<ArrowUpRight size={16}/></button></div>
-        <div className="map-grid">{maps.map((m,i)=><button className="map-card" key={m.id} onClick={()=>{setMapId(m.id);setMode(m.modes.includes('sumo')?'sumo':m.modes.includes('contest')?'contest':m.modes[0]);setFocused('');setPlay(false)}}><div className="map-card-top"><span>0{i+1} / {(locale==='en'?m.english:m.name).toUpperCase()}</span><ArrowUpRight size={17}/></div><MapDrawing map={m}/><div className="map-card-bottom"><div><h3>{locale==='en'?m.english:m.name}</h3><p>{m.id==='orchard'?t("感知 · 探索 · 觅食"):m.id==='maze'?t("路径 · 障碍 · 适应"):m.id==='scarcity'?t("稀缺 · 竞争 · 耗尽"):m.id==='terrarium'?(locale==='en'?'Slopes · routes · shared food':'坡地 · 多路 · 共享食物'):t("接触 · 推挤 · 争夺")}</p></div><span className="map-tag">{m.id==='ring'?t("对抗"):t("觅食")}</span></div></button>)}<div className="ai-card"><span className="ai-icon"><Sparkles size={21}/></span><span className="eyebrow">{t("CO-DESIGN WITH AI")}</span><h3>{t("让 AI，")}<br/>{t("设计它的第一只果蝇。")}</h3><p>{t("开放 FlySpec 与 API。")}<br/>{t("你的 agent，可以直接加入。")}</p><button onClick={()=>{setJsonEditor(JSON.stringify(spec,null,2));setTab('code')}}>{t("接入你的 AI")}<ArrowRight size={16}/></button></div></div>
+        <button className="text-link" onClick={()=>{setFocused('');setPlay(false)}}>{t('guide.arenaLink')}<ArrowUpRight size={16}/></button>
       </>}
 
-      {tab==='arena'&&<ArenaFeature onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={value=>{const id=typeof value==='function'?value(bridgeProfile):value;setBridgeProfile(id);if(!compatibleSensory(season,id,sensoryProfile))setSensoryProfile('odor-only-v1')}} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seed={seed} setSeed={setSeed} busy={busy} startMatch={startMatch} startSeries={startSeries}/>}
+      {tab==='arena'&&<ArenaFeature onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seedText={seedText} setSeedText={setSeedText} busy={busy} startMatch={startMatch}/>}
 
-      {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeed(setup.seed);setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
+      {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeedText(String(setup.seed));setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 
       {tab==='life'&&<LifeLedger identity={identity} selected={selected} onBranch={fly=>{setBranchFly(fly);setSelected(fly.id);setTab('train')}} onCompete={fly=>{setBranchFly(fly);setSelected(fly.id);const wt=matchingWildType(flies,fly);if(wt)setOpponent(wt.id);setMode('contest');setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 

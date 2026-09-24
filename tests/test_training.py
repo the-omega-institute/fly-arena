@@ -630,3 +630,21 @@ def test_behavior_contest_uses_both_participants_and_swapped_positions():
     # Own slot0: 12-3=9; own slot1: 2-4=-2; mean3.5.
     assert condition_results(plan,[match([12,3]),match([4,2])])[0]['fitness']==3.5
     assert condition_results(plan,[match([12,3])])[0]['fitness'] is None
+
+
+@pytest.mark.parametrize('map_id', ['maze', 'switchback'])
+@pytest.mark.parametrize('extra', [False, True])
+def test_navigation_training_rejected_only_at_creation(lab, map_id, extra):
+    import json
+    store, service, user, parent = lab
+    changes = {'evaluation_conditions': [{'map_id': map_id, 'seed': 42}]} if extra else {'map_id': map_id}
+    spec = TrainingSpec(founder_id=parent['id'], **changes)
+    # Historical parsing remains valid, including additional conditions.
+    assert TrainingSpec.model_validate_json(spec.model_dump_json()) == spec
+    with pytest.raises(ValueError, match='observation only.*#82'):
+        service.create(user['id'], spec, 'fixture-runtime')
+    run = create(lab)
+    historical = run['spec'] | changes
+    with store.db() as db:
+        db.execute('UPDATE training_runs SET spec=? WHERE id=?', (json.dumps(historical), run['id']))
+    assert service.get(run['id'])['spec'] == historical
