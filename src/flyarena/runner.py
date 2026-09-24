@@ -22,6 +22,47 @@ from .replay import POLICY, POLICIES, REPLAY_RECEIPT, recording_policy
 from .experiments.embodied_sensor import PROFILES as SENSORY_PROFILES, ENVIRONMENT_PROFILES, SEPARATED_CONTACT_PROFILES, SUPPORT_CONTACT_PROFILES
 
 
+def recovery_body_state(bodies: Bodies, slot: int) -> dict:
+    """Measured thorax rotation/rates and fraction of three supported legs per side.
+
+    Support requires actual tarsal terrain contact below the thorax with a
+    normal within 45 degrees of world up. Food and other flies are excluded.
+    This observation never changes the MuJoCo state or controller.
+    """
+    body = bodies.body_ids[slot]
+    velocity = np.empty(6)
+    mujoco.mj_objectVelocity(bodies.model, bodies.data, mujoco.mjtObj.mjOBJ_BODY,
+                            body, velocity, 1)  # local angular, then linear velocity
+    support = {"l": set(), "r": set()}
+    for contact in bodies.data.contact:
+        if contact.dist > 0:
+            continue
+        a, b = int(contact.geom1), int(contact.geom2)
+        own, other = (a, b) if bodies.geom_slots.get(a) == slot else (b, a)
+        if (bodies.geom_slots.get(own) != slot or other in bodies.geom_slots or
+                other in bodies.food_geom_ids.values()):
+            continue
+        name = mujoco.mj_id2name(bodies.model, mujoco.mjtObj.mjOBJ_GEOM, own) or ""
+        segment = name.rsplit("/", 1)[-1]
+        leg = segment.split("_tarsus", 1)[0]
+        normal_z = float(contact.frame[2]) * (1 if own == b else -1)
+        if ("_tarsus" in segment and leg in {"lf", "lm", "lh", "rf", "rm", "rh"}
+                and normal_z >= 2 ** -.5 and contact.pos[2] < bodies.data.xpos[body, 2]):
+            support[leg[0]].add(leg)
+    return {"upright_z": float(bodies.data.xmat[body].reshape(3, 3)[2, 2]),
+            "roll_rate": float(velocity[0]), "pitch_rate": float(velocity[1]),
+            "support_left": len(support["l"]) / 3, "support_right": len(support["r"]) / 3}
+
+
+def observation_motor_manifest(profile_id: str) -> dict:
+    from .experiments.motor import RECOVERY_MOTOR, profile_identity
+    if profile_id != RECOVERY_MOTOR["id"]:
+        raise ValueError("Only the versioned recovery candidate is an observation override")
+    return {"schema": "arena-observation-motor/v1", "profile_id": profile_id,
+            "identity": profile_identity(profile_id), "configuration": dict(RECOVERY_MOTOR),
+            "admission": "observation", "body_state": "thorax-local-rates-tarsal-support/v1"}
+
+
 def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
                      sensory_profile: str = "odor-only-v1") -> dict:
     from .experiments.embodied_sensor import validate_profile
@@ -61,12 +102,17 @@ def runtime_manifest(data: Path = DATA, bridge_profile: str = "legacy-v1",
 
 def simulate(request: MatchRequest, flies: list[dict], output: Path,
              progress: Callable[[float], None] | None = None, *, silence_output: bool = False,
-             data: Path = DATA, var: Path = VAR) -> dict:
+             data: Path = DATA, var: Path = VAR,
+             observation_motor_profile: str | None = None, observation_20hz: bool = False,
+             observation_record: Callable[[dict, list[dict]], None] | None = None) -> dict:
     start = time.perf_counter()
     output.mkdir(parents=True, exist_ok=True)
     if any(p.name != "worker.log" for p in output.iterdir()):
         raise FileExistsError("Arena evidence directory must be empty; immutable run")
     v2 = request.bridge_profile == "sensorimotor-research-v2"
+    if (observation_motor_profile or observation_20hz or observation_record) and not (v2 and request.sandbox):
+        raise ValueError("Observation hooks require a research-v2 sandbox run")
+    motor_override = observation_motor_manifest(observation_motor_profile) if observation_motor_profile else None
     frozen_runtime = runtime_manifest(data, request.bridge_profile, request.sensory_profile)
     graph = Connectome(data, verify=True)
     compiler = Compiler(graph)
@@ -104,9 +150,16 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
             backend.prepare(V2_IDS | {"capabilities": sorted(CAPABILITIES)})
             backend.reset(request.seed)
             backends.append(backend)
-            motors.append(MotorTransfer())
+            if motor_override:
+                from .experiments.motor import motor_for_profile
+                motors.append(motor_for_profile(observation_motor_profile, admission="observation"))
+            else:
+                motors.append(MotorTransfer())
     scene = arena_scene(request.map_id, request.seed, request.bridge_profile)
     policy = recording_policy(request.duration_seconds)
+    if observation_20hz:
+        from .replay import LONG_POLICY
+        policy = dict(LONG_POLICY)
     scene["replay_policy"] = policy
     scene["visual_observation"] = dict(VISUAL_OBSERVATION)
     if sensory_encoder:
@@ -197,6 +250,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                      senses=[dict(s, odor=list(s["odor"]), visual=list(s["visual"])) for s in senses],
                      eliminated=eliminated.tolist())
         frames.append(frame)
+        if observation_record:
+            observation_record(frame, events)
 
     snapshot()
     simulation_started = time.perf_counter()
@@ -273,7 +328,14 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                     backend.stimulate(float(encoded[0]), float(encoded[1]))
                 backend.advance(RULES["sense_ticks"])
                 command = decoder.command(backend.neural_output(decoder.neurons))
-                drives[slot] = motors[slot].advance(command)
+                if motor_override:
+                    state = recovery_body_state(bodies, slot)
+                    senses[slot]["motor_body_state"] = state
+                    drives[slot] = motors[slot].advance(command, state)
+                    if not np.isfinite(drives[slot]).all() or np.any((drives[slot] < 0) | (drives[slot] > 1.5)):
+                        raise ValueError("Protocol violation: unbounded observation motor drive")
+                else:
+                    drives[slot] = motors[slot].advance(command)
             else:
                 # Bilateral sensory contrast gain uses only the fly's two local sensors.
                 contrast = (odor[0] - odor[1]) / (sum(odor) + .05)
@@ -392,6 +454,8 @@ def simulate(request: MatchRequest, flies: list[dict], output: Path,
                "files": {name: file_sha(output / name) for name in sorted(
                    ["scene.json", "frames.json", "events.json", "result.json", "physics.npz"] +
                    [f"brain-{i}.npz" for i in range(len(brains))])}}
+    if motor_override:
+        receipt["observation_motor"] = motor_override
     receipt["sha256"] = digest(receipt)
     write_json(output / "receipt.json", receipt)
     return receipt
