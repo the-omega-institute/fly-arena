@@ -16,3 +16,4 @@
 .first-comparison-result h3 span{font-size:12px;color:var(--text-muted)}.first-comparison-result details{font-size:12px;line-height:1.8}.first-comparison-result summary{cursor:pointer}.first-comparison-result details>div{padding:10px 0;border-bottom:1px solid var(--border)}
 .first-comparison-next{background:var(--surface-soft)}
 @media(max-width:700px){.first-comparison{padding:16px;gap:16px}.first-comparison h2{font-size:21px}.first-comparison-targets,.first-comparison-results{grid-template-columns:minmax(0,1fr)}.first-comparison-steps{display:grid;gap:8px}.first-comparison-choice,.first-comparison-result,.first-comparison-plan,.first-comparison-next{padding:14px}}
+.experiment-setup .two-fields>.observation-duration{grid-column:1/-1}
