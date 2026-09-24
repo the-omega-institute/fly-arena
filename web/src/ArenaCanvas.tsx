@@ -1,7 +1,8 @@
 import {ReplayCamera} from './features/arena/ReplayCamera'
 import {ArenaWorldLabel} from './features/arena/ArenaWorldLabel'
 import {replayLabelHidden} from './features/arena/replayInspector'
-import {Component,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from 'react'
+import {useEffect,useMemo,useRef,useState} from 'react'
+import {SceneAvailability} from './shared/SceneAvailability'
 import {Canvas,useFrame,useThree} from '@react-three/fiber'
 import {OrbitControls,Grid,Html} from '@react-three/drei'
 import * as THREE from 'three'
@@ -139,36 +140,14 @@ function CameraClipping({far}:{far:number}){
   return null
 }
 
-function arenaWebGLAvailable(){
- if(typeof document==='undefined'||typeof window.WebGL2RenderingContext==='undefined')return false
- try{const gl=document.createElement('canvas').getContext('webgl2');if(!gl)return false;gl.getExtension('WEBGL_lose_context')?.loseContext();return true}catch{return false}
-}
-class ArenaSceneBoundary extends Component<{children:ReactNode;fallback:ReactNode;onFailure:()=>void},{failed:boolean}>{
- state={failed:false}
- static getDerivedStateFromError(){return {failed:true}}
- componentDidCatch(){this.props.onFailure()}
- render(){return this.state.failed?this.props.fallback:this.props.children}
-}
-function ArenaRendererGuard({onLost,onFailure}:{onLost:()=>void;onFailure:()=>void}){
- const gl=useThree(s=>s.gl),failed=useRef(false)
- useEffect(()=>{const canvas=gl.domElement;const lost=(event:Event)=>{event.preventDefault();failed.current=true;onLost()};canvas.addEventListener('webglcontextlost',lost);return()=>canvas.removeEventListener('webglcontextlost',lost)},[gl,onLost])
- // React boundaries cover renderer startup; frame rendering happens outside React.
- useFrame(({gl,scene,camera})=>{if(failed.current)return;try{gl.render(scene,camera)}catch{failed.current=true;onFailure()}},1)
- return null
-}
 export function ArenaCanvas(props:Parameters<typeof ArenaScene>[0]){
  const {t}=useI18n(),world=props.scene||props.layout
- const [choice,setChoice]=useState<{world:typeof world;mode:'3d'|'2d'}|null>(null),[webgl]=useState(arenaWebGLAvailable),[failure,setFailure]=useState<'scene.contextLost'|'scene.rendererFailed'|null>(null)
- const onLost=useCallback(()=>setFailure('scene.contextLost'),[]),onFailure=useCallback(()=>setFailure('scene.rendererFailed'),[])
- const mode=choice?.world===world?choice?.mode:planDefault(world),available=webgl&&!failure,show3d=available&&mode!=='2d'
+ const [choice,setChoice]=useState<{world:typeof world;mode:'3d'|'2d'}|null>(null)
+ const mode=choice?.world===world?choice?.mode:planDefault(world)
  const fallback=<ScenePlanView world={world} recorded={!!props.scene} frame={props.frame} next={props.next} alpha={props.alpha} frames={props.frames} selectedId={props.selectedId} participants={props.participants}/>
- return <div className="scene-presentation">
-  <div className="scene-presentation-viewport">{show3d?<ArenaSceneBoundary onFailure={onFailure} fallback={fallback}><Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:props.layout?52:40,near:.05,far:1000}} gl={{antialias:true,alpha:false}} fallback={fallback} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
-   <ArenaRendererGuard onLost={onLost} onFailure={onFailure}/><ArenaScene {...props}/>
-  </Canvas></ArenaSceneBoundary>:fallback}</div>
-  {(world||!available)&&<div className="scene-presentation-toolbar" role="group" aria-label={t('scene.view')}>
-   {!available&&<p className="scene-presentation-failure" role="status">{t(failure||'scene.webglUnavailable')}</p>}
-   {world&&<><button type="button" aria-pressed={show3d} disabled={!available} onClick={()=>setChoice({world,mode:'3d'})}>{t('scene.3d')}</button><button type="button" aria-pressed={!show3d} onClick={()=>setChoice({world,mode:'2d'})}>{t('scene.2d')}</button></>}
-  </div>}
- </div>
+ return <div className="scene-presentation"><SceneAvailability enabled={mode!=='2d'} fallback={fallback} controls={available=>world&&<div className="scene-presentation-toolbar" role="group" aria-label={t('scene.view')}>
+  <button type="button" aria-pressed={available&&mode!=='2d'} disabled={!available} onClick={()=>setChoice({world,mode:'3d'})}>{t('scene.3d')}</button><button type="button" aria-pressed={!available||mode==='2d'} onClick={()=>setChoice({world,mode:'2d'})}>{t('scene.2d')}</button>
+ </div>}>{(guard,renderer)=><Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:props.layout?52:40,near:.05,far:1000}} gl={defaults=>renderer({...defaults,antialias:true,alpha:false})} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
+  {guard}<ArenaScene {...props}/>
+ </Canvas>}</SceneAvailability></div>
 }

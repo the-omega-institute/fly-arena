@@ -13,18 +13,19 @@ import {JSDOM} from 'jsdom'
 const web=new URL('../',import.meta.url).pathname,out=fs.mkdtempSync(path.join(os.tmpdir(),'scene-plan-'))
 fs.writeFileSync(path.join(out,'package.json'),'{"type":"commonjs"}')
 fs.symlinkSync(fs.realpathSync(path.join(web,'node_modules')),path.join(out,'node_modules'))
-for(const relative of ['ArenaCanvas.tsx','features/arena/ScenePlanView.tsx','features/arena/sceneProjection.ts','features/arena/obstacleGeometry.ts','features/arena/followCamera.ts','types.ts','shared/theme.ts','shared/messages/scene.ts']){
+for(const relative of ['shared/SceneAvailability.tsx','ArenaCanvas.tsx','features/arena/ScenePlanView.tsx','features/arena/sceneProjection.ts','features/arena/obstacleGeometry.ts','features/arena/followCamera.ts','types.ts','shared/theme.ts','shared/messages/scene.ts']){
  const dest=path.join(out,'src',relative.replace(/\.tsx?$/,'.js'));fs.mkdirSync(path.dirname(dest),{recursive:true})
  fs.writeFileSync(dest,ts.transpileModule(fs.readFileSync(path.join(web,'src',relative),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText)
 }
 fs.writeFileSync(path.join(out,'src/features/arena/scenePresentation.css'),'')
+fs.writeFileSync(path.join(out,'src/shared/sceneAvailability.css'),'')
 for(const name of ['ReplayCamera','ArenaWorldLabel','Habitat'])fs.writeFileSync(path.join(out,`src/features/arena/${name}.js`),`exports.${name}=()=>null`)
 fs.writeFileSync(path.join(out,'src/features/arena/replayInspector.js'),'exports.replayLabelHidden=()=>false')
 fs.writeFileSync(path.join(out,'src/shared/i18n.js'),"const {sceneMessages}=require('./messages/scene');exports.useI18n=()=>({resolved:'dark',t:key=>sceneMessages[key]?.[globalThis.sceneTestLocale||'en']||key})")
 const require=createRequire(path.join(out,'package.json'));require.extensions['.css']=()=>{}
 let canvasProps,canvasFailure,renderFrame,canvasEvents
 const fiberFile=require.resolve('@react-three/fiber'),dreiFile=require.resolve('@react-three/drei')
-require.cache[fiberFile]={id:fiberFile,filename:fiberFile,loaded:true,exports:{Canvas:props=>{canvasProps=props;if(canvasFailure)throw Error('TEST renderer startup');return React.createElement('div',{'data-canvas':true},React.Children.toArray(props.children).find(child=>child.type?.name==='ArenaRendererGuard'))},useThree:selector=>selector({gl:{domElement:canvasEvents}}),useFrame:fn=>{renderFrame=fn}}}
+require.cache[fiberFile]={id:fiberFile,filename:fiberFile,loaded:true,exports:{Canvas:props=>{canvasProps=props;if(canvasFailure)throw Error('TEST renderer startup');return React.createElement('div',{'data-canvas':true},React.Children.toArray(props.children).find(child=>child.type?.name==='SceneRendererGuard'))},useThree:selector=>selector({gl:{domElement:canvasEvents,getContext:()=>({isContextLost:()=>false})}}),useFrame:fn=>{renderFrame=fn}}}
 require.cache[dreiFile]={id:dreiFile,filename:dreiFile,loaded:true,exports:{}}
 const {projectObstacle,planPosition,planTrails,planFood,planBounds,planDefault,validPlanWorld}=require('./src/features/arena/sceneProjection.js')
 const {ScenePlanView}=require('./src/features/arena/ScenePlanView.js'),{ArenaCanvas}=require('./src/ArenaCanvas.js')
@@ -171,4 +172,15 @@ uiTest('2D stage places score cards in normal flow above the plan and removes fo
  assert.equal(dom.window.getComputedStyle(hud).position,'static')
  assert.ok(Number(dom.window.getComputedStyle(hud).order)<Number(dom.window.getComputedStyle(canvas).order))
  assert.equal(dom.window.getComputedStyle(document.querySelector('.scene-plan-food text')).stroke,'none')
+})
+
+uiTest('replay retry remounts 3D at the latest external clock and selected subject',async({dom,mount,click})=>{
+ dom.window.WebGL2RenderingContext=class {};await mount({selectedId:'a',alpha:.5})
+ await act(async()=>canvasEvents.dispatchEvent(new dom.window.Event('webglcontextlost',{cancelable:true})))
+ await mount({selectedId:'a',frame:frames[1],next:frames[2],alpha:.25})
+ assert.equal(document.querySelector('[data-position-slot="0"]').getAttribute('transform'),'translate(2.5 -5)')
+ await click('Retry 3D')
+ assert.ok(document.querySelector('[data-canvas]'));assert.ok(!document.querySelector('[role="status"]'))
+ const scene=React.Children.toArray(canvasProps.children).find(child=>child.type?.name==='ArenaScene')
+ assert.equal(scene.props.selectedId,'a');assert.equal(scene.props.frame,frames[1]);assert.equal(scene.props.alpha,.25)
 })

@@ -1,7 +1,8 @@
-import {useEffect,useMemo} from 'react'
+import {useEffect,useMemo,type ReactNode} from 'react'
 import {Canvas,useThree} from '@react-three/fiber'
 import {OrbitControls} from '@react-three/drei'
 import * as THREE from 'three'
+import {SceneAvailability} from '../../shared/SceneAvailability'
 import type {Morphology} from './morphology'
 import {morphologyActivity,morphologyBounds,regionColorMap} from './morphology'
 import type {BrainAngle} from './AnatomicalBrainCanvas'
@@ -64,10 +65,10 @@ function Fibers({data,activity,scale,focus,onFocus,structure,wholeCns,angle,rese
   {!structure&&<mesh geometry={resources.ribbon} material={resources.ribbonMaterial} frustumCulled={false} renderOrder={2} raycast={()=>{}}/>}
  </>
 }
-export function MorphologyCanvas(props:Parameters<typeof Fibers>[0]){
- return <Canvas orthographic frameloop="demand" dpr={[1,1.5]} camera={{zoom:200,near:.01,far:30,position:[0,0,-3.3]}} gl={{antialias:true,alpha:false}} onCreated={({raycaster})=>{raycaster.params.Line.threshold=.006}}>
-  <color attach="background" args={['#030909']}/>
+export function MorphologyCanvas({fallback,...props}:Parameters<typeof Fibers>[0]&{fallback:ReactNode}){
+ return <SceneAvailability fallback={fallback}>{(guard,renderer)=><Canvas orthographic frameloop="demand" dpr={[1,1.5]} camera={{zoom:200,near:.01,far:30,position:[0,0,-3.3]}} gl={defaults=>renderer({...defaults,antialias:true,alpha:false})} onCreated={({raycaster})=>{raycaster.params.Line.threshold=.006}}>
+  {guard}<color attach="background" args={['#030909']}/>
   <OrbitControls makeDefault enableDamping={false} minDistance={.15} maxDistance={12}/>
   <Fibers {...props}/>
- </Canvas>
+ </Canvas>}</SceneAvailability>
 }
