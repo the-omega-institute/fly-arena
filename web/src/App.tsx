@@ -35,6 +35,7 @@ function download(name:string,value:unknown){const url=URL.createObjectURL(new B
 export default function App(){
   const {t,locale}=useI18n()
   const [experimentId,setExperimentId]=useState(()=>new URLSearchParams(location.hash.slice(1)).get('experiment')||'')
+  const [seriesId,setSeriesId]=useState(()=>readRoute(location.hash).series)
   const [replayOrigin,setReplayOrigin]=useState<ReplayDesignOrigin|null>(null)
   const [parentId,setParentId]=useState<string|null>(null)
   const [baseSpec,setBaseSpec]=useState<Partial<Spec>>({})
@@ -114,11 +115,11 @@ export default function App(){
   const replay=useReplay(focused,current?.status)
   const {scene,frames,events}=replay
   const chosenMap=maps.find(m=>m.id===mapId)
-  function navigate(next:Tab,experiment=experimentId,match=focused){history.pushState(null,'',routeHash(next,experiment,match));setTabState(next);setExperimentId(experiment);setFocusedState(match)}
+  function navigate(next:Tab,experiment=experimentId,match=focused,series=seriesId){history.pushState(null,'',routeHash(next,experiment,match,series));setTabState(next);setExperimentId(experiment);setFocusedState(match);setSeriesId(series)}
   function setTab(next:Tab){navigate(next)}
   function setFocused(next:string|((old:string)=>string)){const value=typeof next==='function'?next(focused):next;navigate('arena',experimentId,value)}
   const openExperiment=useCallback((id:string)=>{history.pushState(null,'',routeHash('lab',id));setExperimentId(id);setTabState('lab')},[])
-  useEffect(()=>{const sync=()=>{const r=readRoute(location.hash);setTabState(r.tab);setExperimentId(r.experiment);setFocusedState(r.match)};window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync);return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync)}},[])
+  useEffect(()=>{const sync=()=>{const r=readRoute(location.hash);setTabState(r.tab);setExperimentId(r.experiment);setFocusedState(r.match);setSeriesId(r.series)};window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync);return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync)}},[])
 
 
   const refresh=useCallback(async()=>{
@@ -221,11 +222,12 @@ export default function App(){
       let submitted=0
       try{
         for(const [i,request] of plan.submissions.entries()){
-          const result=await api<Match|{matches:Match[]}>(request.endpoint,{method:'POST',headers:{'Idempotency-Key':keys[i]},body:JSON.stringify(request.body)},identity)
+          const result=await api<Match|{id:string;matches:Match[]}>(request.endpoint,{method:'POST',headers:{'Idempotency-Key':keys[i]},body:JSON.stringify(request.body)},identity)
           const accepted='matches' in result?result.matches:[result]
           submitted+=accepted.length
           setMatches(old=>[...accepted,...old.filter(m=>!accepted.some(a=>a.id===m.id))])
-          if(accepted[0])setFocused(accepted[0].id)
+          if('matches' in result)navigate('arena',experimentId,'',result.id)
+          else if(accepted[0])navigate('arena',experimentId,accepted[0].id,'')
         }
         experimentAttempt.current=null;pendingExperiment.current=null
         setToast(t('Experiment submitted. Recorded results will appear as each match finishes.'))
@@ -303,7 +305,7 @@ export default function App(){
         <button className="text-link" onClick={()=>{setFocused('');setPlay(false)}}>{t('guide.arenaLink')}<ArrowUpRight size={16}/></button>
       </>}
 
-      {tab==='arena'&&<ArenaFeature onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seedText={seedText} setSeedText={setSeedText} busy={busy} startMatch={startMatch}/>}
+      {tab==='arena'&&<ArenaFeature seriesId={seriesId} onDesign={()=>setTab('design')} onDesignReplay={designFromReplay} replayStatus={!current&&focused?(matchError?'error':'loading'):replay.status} replayError={matchError||replay.error} bridgeProfile={bridgeProfile} setBridgeProfile={setBridgeProfile} sensoryProfile={selectedSensoryProfile} setSensoryProfile={setSensoryProfile} scene={scene} frame={frame} next={next} alpha={alpha} focused={focused} preview={preview} selectedFly={selectedFly} chosenMap={chosenMap} current={current} selected={selected} identity={identity} flies={availableFlies} frames={frames} events={events} play={play} playtime={playtime} playbackSpeed={playbackSpeed} setPlay={setPlay} setPlaytime={setPlaytime} setPlaybackSpeed={setPlaybackSpeed} season={season} matches={matches} setFocused={setFocused} maps={maps} setSelected={setSelected} mapId={mapId} setMapId={setMapId} mode={mode} setMode={setMode} opponent={opponent} setOpponent={setOpponent} duration={duration} setDuration={setDuration} seedText={seedText} setSeedText={setSeedText} busy={busy} startMatch={startMatch}/>}
 
       {tab==='train'&&<TrainingSandbox flies={availableFlies} identity={identity} selected={selected} season={season} maps={maps} onLogin={()=>setLogin(true)} onSaved={async fly=>{await refresh();setSelected(fly.id)}} onCompete={(fly,setup,reference)=>{setSelected(fly.id);if(reference)setFlies(old=>old.some(item=>item.id===reference.id)?old:[...old,reference]);const configured=reference|| (setup?.opponent_id?flies.find(item=>item.id===setup.opponent_id):undefined);const fallback=matchingWildType(flies,fly);if(configured||fallback)setOpponent((configured||fallback)!.id);setMode('contest');if(setup){setMapId(setup.map_id);setSeedText(String(setup.seed));setDuration(setup.duration_seconds);setBridgeProfile(setup.bridge_profile);setSensoryProfile(setup.sensory_profile)}setFocused('');setPlay(false)}} onReplay={match=>{setMatches(old=>[match,...old.filter(m=>m.id!==match.id)]);setFocused(match.id)}}/>}
 

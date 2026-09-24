@@ -466,8 +466,8 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                                     digest(match_runtime(body.bridge_profile, body.sensory_profile)), idempotency_key)
 
     @app.get("/api/v1/tournaments")
-    def tournaments():
-        return store.tournaments()
+    def tournaments(owner: str | None = None):
+        return store.tournaments(owner=owner)
 
     @app.get("/api/v1/tournaments/{ident}")
     def tournament_get(ident: str):
