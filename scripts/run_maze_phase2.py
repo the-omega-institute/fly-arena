@@ -7,6 +7,7 @@ No public queue, Store, leaderboard, DB writes, calibration or steering. A
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import fcntl
 import json
 import math
@@ -219,6 +220,32 @@ def failure(status, error):
             **({"protocol_violations": [error]} if "Protocol violation:" in error else {})}
 
 
+def recover_worker_error(folder, outcome):
+    if (folder / "error.json").is_file():
+        outcome["worker_error"] = read(folder / "error.json")
+        error = outcome["worker_error"]["error"]
+        if "Protocol violation:" in error:
+            outcome["protocol_violations"] = list(dict.fromkeys([*outcome.get("protocol_violations", []), error]))
+    return outcome
+
+
+@contextmanager
+def study_locks(output):
+    # Independent of --output and the read-only --var source. All invocations
+    # on the host must share ARENA_VAR; never unlink an advisory lock file.
+    global_path = VAR / "research/issue82-phase2/.global.lock"
+    global_path.parent.mkdir(parents=True, exist_ok=True)
+    with global_path.open("a") as global_lock, (output / ".lock").open("a") as lock:
+        try:
+            fcntl.flock(global_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise SystemExit(f"another harness owns the phase-2 simulation lock or output directory: {global_path}")
+        # Closing rather than explicitly unlocking preserves the lock while an
+        # inherited worker descriptor is still open after the parent exits.
+        yield lock, global_lock
+
+
 def worker(folder):
     """One real runner invocation. Journals survive failure, timeout and SIGKILL."""
     from flyarena.runner import runtime_manifest, simulate
@@ -250,7 +277,7 @@ def worker(folder):
             raise
 
 
-def execute(folder, manifest, timeout, lock_fd=None):
+def execute(folder, manifest, timeout, lock_fd=None, global_lock_fd=None):
     """Existing attempts are never rerun or overwritten, including failed ones."""
     if folder.exists():
         try:
@@ -259,15 +286,16 @@ def execute(folder, manifest, timeout, lock_fd=None):
             if saved != manifest:
                 raise ValueError("attempt manifest differs from frozen study")
             if (folder / "outcome.json").is_file() and read(folder / "outcome.json")["status"] != "complete":
-                return {**read(folder / "outcome.json"), "resumed": True}
+                return recover_worker_error(folder, {**read(folder / "outcome.json"), "resumed": True})
             if (folder / "replay/receipt.json").is_file():
                 verified = verify_run(folder, manifest)
                 if (folder / "outcome.json").is_file():
                     saved_outcome = read(folder / "outcome.json")
                     if saved_outcome.get("receipt_sha256") != verified["receipt_sha256"]:
                         raise ValueError("completed receipt differs from original outcome")
-                return verified
-            return {"status": "incomplete", "error": "Interrupted attempt without a complete receipt; preserved, not retried"}
+                return recover_worker_error(folder, verified)
+            return recover_worker_error(folder, {"status": "incomplete", "resumed": True,
+                "error": "Interrupted attempt without a complete receipt; preserved, not retried"})
         except Exception as exc:
             return failure("invalid", f"{type(exc).__name__}: {exc}")
     folder.mkdir(parents=True)
@@ -279,7 +307,7 @@ def execute(folder, manifest, timeout, lock_fd=None):
         try:
             child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--worker", str(folder)],
                                      stdout=log, stderr=subprocess.STDOUT,
-                                     pass_fds=() if lock_fd is None else (lock_fd,))
+                                     pass_fds=tuple(fd for fd in (lock_fd, global_lock_fd) if fd is not None))
         except OSError as exc:
             outcome = failure("failed", f"{type(exc).__name__}: {exc}")
             outcome["measured_wall_seconds"] = time.perf_counter() - start
@@ -306,10 +334,7 @@ def execute(folder, manifest, timeout, lock_fd=None):
             outcome = failure("invalid", f"{type(exc).__name__}: {exc}")
     else:
         outcome = {"status": status, "error": error}
-    if (folder / "error.json").is_file():
-        outcome["worker_error"] = read(folder / "error.json")
-        if "Protocol violation:" in outcome["worker_error"]["error"]:
-            outcome["protocol_violations"] = [outcome["worker_error"]["error"]]
+    recover_worker_error(folder, outcome)
     outcome["measured_wall_seconds"] = time.perf_counter() - start
     if interrupted:
         outcome["interrupted"] = True
@@ -404,11 +429,7 @@ def main():
         parser.error("--dry-run must use a non-protocol horizon or seed set")
     output = (args.output or Path("var/research/issue82-phase2") / uuid.uuid4().hex).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    with (output / ".lock").open("a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            parser.error("another harness owns this output directory")
+    with study_locks(output) as (lock, global_lock):
         study = {"schema": SCHEMA, "horizon": horizon, "seeds": seeds,
                  "data": str(args.data.resolve()), "var": str(args.var.resolve()),
                  "harness_sha256": file_sha(Path(__file__)), "timeout_seconds": args.timeout,
@@ -444,8 +465,8 @@ def main():
                     "data": study["data"], "var": study["var"], "fly": study["fly"], "runtime": study["runtime"],
                     "request": request_for(seed, horizon).model_dump(), "motor_selection": selection(arm)})
                 print(f"Seed {seed} {arm}: {manifest['motor_selection']['profile_id']}", flush=True)
-                # Keep the lock alive in the worker even if the parent is SIGKILLed.
-                outcome = execute(folder, manifest, args.timeout, lock.fileno())
+                # Keep both locks alive in the worker even if the parent is SIGKILLed.
+                outcome = execute(folder, manifest, args.timeout, lock.fileno(), global_lock.fileno())
                 pairs[seed][arm] = {**outcome, "folder": str(folder), "manifest_sha256": manifest["sha256"],
                                     "motor_selection": manifest["motor_selection"]}
                 if outcome["status"] == "complete" and not estimated:

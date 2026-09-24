@@ -1,5 +1,6 @@
 """Synthetic decision/receipt fixtures; no invented observations used as evidence."""
 import importlib.util
+import os
 from pathlib import Path
 import sys
 
@@ -280,10 +281,69 @@ def test_report_retains_unrecovered_episode_burden_and_null_latency(tmp_path):
 
 def test_spawn_failure_is_durable_and_study_lock_is_inherited(tmp_path, monkeypatch):
     def unavailable(*args, **kwargs):
-        assert kwargs["pass_fds"] == (17,)
+        assert kwargs["pass_fds"] == (17, 18)
         raise OSError("synthetic process launch failure")
     monkeypatch.setattr(p2.subprocess, "Popen", unavailable)
     folder = tmp_path / "failed-spawn"
-    outcome = p2.execute(folder, p2.seal({"fixture": True}), None, lock_fd=17)
+    outcome = p2.execute(folder, p2.seal({"fixture": True}), None, lock_fd=17, global_lock_fd=18)
     assert outcome["status"] == "failed" and "process launch failure" in outcome["error"]
     assert p2.read(folder / "outcome.json") == outcome
+
+
+@pytest.mark.parametrize("saved_outcome", [False, True])
+@pytest.mark.parametrize("error", ["ValueError: Protocol violation: unbounded observation motor drive",
+                                  "RuntimeError: synthetic worker failure"])
+def test_worker_error_survives_resume_and_controls_set_verdict(tmp_path, monkeypatch, saved_outcome, error):
+    folder = tmp_path / "candidate"
+    folder.mkdir()
+    manifest = p2.seal({"request": p2.request_for(46, p2.HORIZON).model_dump(),
+                        "motor_selection": p2.selection("candidate"), "runtime": {}})
+    write_json(folder / "manifest.json", manifest)
+    worker_error = {"error": error, "traceback": "synthetic worker traceback"}
+    write_json(folder / "error.json", worker_error)
+    if saved_outcome:
+        write_json(folder / "outcome.json", {"status": "incomplete", "error": "interrupted"})
+    before = {p.name: p.read_bytes() for p in folder.iterdir()}
+    monkeypatch.setattr(p2.subprocess, "Popen", lambda *a, **k: pytest.fail("preserved attempt was relaunched"))
+    outcome = p2.execute(folder, manifest, None)
+    assert outcome["resumed"] is True and outcome["status"] == "incomplete"
+    assert outcome["worker_error"] == worker_error
+    runs = pairs()  # Complete synthetic baselines, including this candidate's matched seed.
+    runs[46]["candidate"] = outcome
+    result = p2.decision_rule(runs)
+    if "Protocol violation:" in error:
+        assert outcome["protocol_violations"] == [error]
+        assert (result["verdict"], result["reason"]) == ("null", "protocol violation")
+    else:
+        assert not outcome.get("protocol_violations")
+        assert (result["verdict"], result["reason"]) == ("negative", "negative seed")
+    assert {p.name: p.read_bytes() for p in folder.iterdir()} == before
+
+
+def test_global_lock_excludes_other_output_and_survives_parent_close(tmp_path, monkeypatch):
+    var = tmp_path / "var"
+    monkeypatch.setattr(p2, "VAR", var)
+    first, second = tmp_path / "first", tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    env = {**os.environ, "ARENA_VAR": str(var)}
+    command = [sys.executable, str(SCRIPTS / "run_maze_phase2.py"), "--dry-run", "--output", str(second),
+               "--var", str(tmp_path / "different-read-only-source")]
+    def refused():
+        result = p2.subprocess.run(command, env=env, capture_output=True, text=True, timeout=30)
+        assert result.returncode != 0
+        assert "another harness owns the phase-2 simulation lock" in result.stderr
+        assert not (second / "study.json").exists()
+    child = None
+    try:
+        with p2.study_locks(first) as (lock, global_lock):
+            refused()
+            child = p2.subprocess.Popen([sys.executable, "-c", "import sys; sys.stdin.read()"],
+                                       stdin=p2.subprocess.PIPE, pass_fds=(lock.fileno(), global_lock.fileno()))
+        # The parent closed its handles, but the inherited worker keeps exclusion.
+        refused()
+    finally:
+        if child is not None:
+            child.communicate(timeout=10)
+    with p2.study_locks(second):
+        assert (var / "research/issue82-phase2/.global.lock").is_file()
