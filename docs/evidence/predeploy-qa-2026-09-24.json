@@ -2,7 +2,7 @@
   "date": "2026-09-24",
   "branch": "fix/predeploy-qa",
   "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
-  "verdict": "blocked",
+  "verdict": "incomplete",
   "scope": "Pre-deploy integration QA for rounds 3+4, local disposable database, no worker. Not deployed.",
   "checks": [
     {
@@ -46,16 +46,23 @@
     {
       "severity": "validation-blocker",
       "where": "Backend startup, 127.0.0.1:8193",
-      "status": "not resolved",
+      "status": "resolved in follow-up: process successfully bound and served real HTTP",
       "evidence": "Uvicorn completed application startup, then exited 3: [Errno 1] error while attempting to bind on address (127.0.0.1, 8193): operation not permitted. Application shutdown completed.",
       "classification": "Sandbox execution restriction; not established as an application defect."
     },
     {
       "severity": "validation-blocker",
       "where": "Vite startup, 127.0.0.1:5599",
-      "status": "not resolved",
+      "status": "resolved in follow-up: process successfully bound and served real HTTP",
       "evidence": "Vite exited 1: listen EPERM: operation not permitted 127.0.0.1:5599.",
       "classification": "Sandbox execution restriction; not established as an application defect."
+    },
+    {
+      "severity": "validation-blocker",
+      "where": "Browser plugin control connection",
+      "status": "unresolved",
+      "evidence": "unsupported Codex auth method: apikey; nameSession and tabs.list rejected, including a retry. Chrome running, extension installed/enabled, native-host manifest valid.",
+      "classification": "Browser tool authentication restriction; not established as an application defect."
     }
   ],
   "product_defects": [],
@@ -90,8 +97,230 @@
     "screenshots": [],
     "screenshot_directory": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/shots"
   },
-  "changes": "QA evidence report only; no application, scientific semantics, localization, CI, or backend source changes.",
-  "python_tests": "Not run: no Python/backend source changes.",
-  "cleanup": "Both launched servers exited after denied port binding; backend completed shutdown. Temporary Node REPL exited. A process-table cross-check was denied by the sandbox (ps: operation not permitted).",
-  "log_ref": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/log-qa.jsonl"
+  "changes": "QA evidence report only; no application or scientific source changes. Initial port restrictions resolved; browser acceptance remains incomplete.",
+  "python_tests": "Follow-up: 909 passed, 11 skipped, 3 deselected; complete non-integration suite.",
+  "cleanup": "Follow-up local backend and Vite were stopped after HTTP checks; Mac Studio study left running under its original handle.",
+  "log_ref": "/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/qa1/log-qa.jsonl",
+  "follow_up": {
+    "checked_at_utc": "2026-09-24T10:38:05.549669+00:00",
+    "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
+    "backend": {
+      "command": "PYTHONPATH=src python -m pytest -q -m \"not integration\"",
+      "passed": 909,
+      "skipped": 11,
+      "deselected": 3,
+      "failed": 0,
+      "seconds": 243.7
+    },
+    "frontend": {
+      "node26": "259 passed, 0 failed",
+      "node22": "259 passed, 0 failed",
+      "journeys": "74 passed, 0 failed; JSDOM",
+      "build": "passed; unchanged main bundle size warning"
+    },
+    "http_smoke": {
+      "checked_at_utc": "2026-09-24T10:34:48Z",
+      "source_commit": "d5ae00099fee90154a12847df1e0948c0151f347",
+      "scope": "Real HTTP against disposable database; worker disabled. No browser rendering or simulation asserted.",
+      "checks": [
+        "Clone canonical WT, edit olfactory weight, compile and save via real API",
+        "WT preset creates four queued, slot-swapped legs; no standings/outcomes; detail and idempotent retry agree",
+        "Maze preset creates three queued solo observations, no ranking and no fabricated arrival/result",
+        "Saved edited design has real WT parent in lineage API",
+        "Existing verified replay serves scene, frames, events and receipt through actual HTTP",
+        "Scarcity, labyrinth and duel geometry previews respond successfully"
+      ],
+      "fly_id": "71c9589a41b444359cfffd6627a594b0",
+      "tournament_id": "87b20b74d0b84d7f8bdcd57e9de6d25d",
+      "observation_series_id": "082f4dce820a49a68a2ee2de658daa58",
+      "replay_id": "aca9ac97af8a4cfcb863c3b45da5e857",
+      "tournament": null,
+      "observation": null
+    },
+    "live_series_projection": {
+      "scope": "Read-only snapshots of real live tournament data evaluated by rounds 3+4 projection code; not a live browser verification",
+      "series": [
+        {
+          "id": "c9f17c6991a941e59c90cc772b78c762",
+          "legacy_status": "complete",
+          "projection": {
+            "protocol_id": "paired-series/v1",
+            "status": "complete",
+            "schedule": [
+              {
+                "seed": 42,
+                "spawn_order": 1,
+                "fly_ids": [
+                  "2e3654f3feac453b805cb9e1c8f3d6a1",
+                  "0c136a17a43c84c2eb32539454285783"
+                ],
+                "status": "verified",
+                "match_ids": [
+                  "0b6e41a4ec824d509b94d19f0c4ca8df"
+                ],
+                "outcomes": [
+                  {
+                    "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
+                    "score": 0.0,
+                    "outcome": "loss"
+                  },
+                  {
+                    "fly_id": "0c136a17a43c84c2eb32539454285783",
+                    "score": 0.2488,
+                    "outcome": "win"
+                  }
+                ],
+                "issues": [],
+                "errors": []
+              },
+              {
+                "seed": 42,
+                "spawn_order": 2,
+                "fly_ids": [
+                  "0c136a17a43c84c2eb32539454285783",
+                  "2e3654f3feac453b805cb9e1c8f3d6a1"
+                ],
+                "status": "verified",
+                "match_ids": [
+                  "54ab533fc5364044ab783dc0352254f3"
+                ],
+                "outcomes": [
+                  {
+                    "fly_id": "0c136a17a43c84c2eb32539454285783",
+                    "score": 0.4032,
+                    "outcome": "win"
+                  },
+                  {
+                    "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
+                    "score": 0.0,
+                    "outcome": "loss"
+                  }
+                ],
+                "issues": [],
+                "errors": []
+              }
+            ],
+            "expected_matches": 2,
+            "verified_matches": 2,
+            "unexpected_match_ids": [],
+            "issues": [],
+            "standings": [
+              {
+                "fly_id": "0c136a17a43c84c2eb32539454285783",
+                "points": 6,
+                "played": 2,
+                "wins": 2,
+                "draws": 0,
+                "losses": 0
+              },
+              {
+                "fly_id": "2e3654f3feac453b805cb9e1c8f3d6a1",
+                "points": 0,
+                "played": 2,
+                "wins": 0,
+                "draws": 0,
+                "losses": 2
+              }
+            ],
+            "ranking_policy": "ranking/v1",
+            "sandbox": false,
+            "ranking_error": null
+          },
+          "match_count": 2
+        },
+        {
+          "id": "836ddf7654554deaa413a400fef74d90",
+          "legacy_status": "complete",
+          "projection": {
+            "protocol_id": "paired-series/v1",
+            "status": "complete",
+            "schedule": [
+              {
+                "seed": 42,
+                "spawn_order": 1,
+                "fly_ids": [
+                  "8d5c54c75af64954ac667fbbd2724de3",
+                  "c38f62c6cab74ef0a2ddec834c72128b"
+                ],
+                "status": "verified",
+                "match_ids": [
+                  "35c36aea32fc4ed495eb902f07af34bd"
+                ],
+                "outcomes": [
+                  {
+                    "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+                    "score": 0.2048,
+                    "outcome": "loss"
+                  },
+                  {
+                    "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+                    "score": 1.3112,
+                    "outcome": "win"
+                  }
+                ],
+                "issues": [],
+                "errors": []
+              },
+              {
+                "seed": 42,
+                "spawn_order": 2,
+                "fly_ids": [
+                  "c38f62c6cab74ef0a2ddec834c72128b",
+                  "8d5c54c75af64954ac667fbbd2724de3"
+                ],
+                "status": "verified",
+                "match_ids": [
+                  "203662494e034a2c989831a60c4b07cd"
+                ],
+                "outcomes": [
+                  {
+                    "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+                    "score": 1.2708,
+                    "outcome": "win"
+                  },
+                  {
+                    "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+                    "score": 0.1444,
+                    "outcome": "loss"
+                  }
+                ],
+                "issues": [],
+                "errors": []
+              }
+            ],
+            "expected_matches": 2,
+            "verified_matches": 2,
+            "unexpected_match_ids": [],
+            "issues": [],
+            "standings": [
+              {
+                "fly_id": "c38f62c6cab74ef0a2ddec834c72128b",
+                "points": 6,
+                "played": 2,
+                "wins": 2,
+                "draws": 0,
+                "losses": 0
+              },
+              {
+                "fly_id": "8d5c54c75af64954ac667fbbd2724de3",
+                "points": 0,
+                "played": 2,
+                "wins": 0,
+                "draws": 0,
+                "losses": 2
+              }
+            ],
+            "ranking_policy": "ranking/v1",
+            "sandbox": false,
+            "ranking_error": null
+          },
+          "match_count": 2
+        }
+      ]
+    },
+    "evidence_directory": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924",
+    "browser_status": "not run: control connection authentication failed",
+    "screenshots": [],
+    "deployment": "not performed: study still active and real browser acceptance incomplete"
+  }
 }
