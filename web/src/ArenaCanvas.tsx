@@ -1,7 +1,7 @@
 import {ReplayCamera} from './features/arena/ReplayCamera'
 import {ArenaWorldLabel} from './features/arena/ArenaWorldLabel'
 import {replayLabelHidden} from './features/arena/replayInspector'
-import {useEffect,useMemo,useRef} from 'react'
+import {Component,useCallback,useEffect,useMemo,useRef,useState,type ReactNode} from 'react'
 import {Canvas,useFrame,useThree} from '@react-three/fiber'
 import {OrbitControls,Grid,Html} from '@react-three/drei'
 import * as THREE from 'three'
@@ -9,13 +9,16 @@ import type {ArenaLayout,BodyModel,Frame,Scene,Preview} from './types'
 import {useI18n} from './shared/i18n'
 import {sceneThemes} from './shared/theme'
 import {colors} from './types'
+import {ScenePlanView} from './features/arena/ScenePlanView'
+import {planDefault,planFood,planPosition} from './features/arena/sceneProjection'
+import './features/arena/scenePresentation.css'
 import {Habitat} from './features/arena/Habitat'
 import {ArenaObstacles,arenaBounds} from './features/arena/obstacleGeometry'
 import {previewSceneFraming,sceneFraming,sceneGrid,recordedCameraTarget,replayLabelOpacity} from './features/arena/followCamera'
 
 function ReplayLabel({fly,slot,frame,next,alpha,selected,identity,follow}:{fly:Scene['flies'][number];slot:number;frame:Frame;next?:Frame;alpha:number;selected:boolean;identity?:string;follow:boolean}){
  const label=useRef<HTMLDivElement>(null),point=useMemo(()=>new THREE.Vector3(),[])
- const position=recordedCameraTarget(frame,next,alpha,slot)
+ const position=planPosition(frame,next,alpha,slot)?recordedCameraTarget(frame,next,alpha,slot):null
  useFrame(({camera,gl})=>{
   if(!label.current||!position)return
   const hud=gl.domElement.closest('.arena-stage')?.querySelector('.score-overlay')
@@ -41,8 +44,10 @@ function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;fram
   useFrame(()=>{
     body.geoms.forEach((g,index)=>{
       if(g.slot!==slot)return
-      const mesh=refs.current[index];const p=frame.poses[index];const n=next?.poses[index]||p
-      if(!mesh||!p)return
+      const mesh=refs.current[index];const p=frame.poses?.[index];const n=next?.poses?.[index]||p
+      if(!mesh)return
+      mesh.visible=!!p&&p.length>=7&&p.every(Number.isFinite)&&!!n&&n.length>=7&&n.every(Number.isFinite)&&!(alpha>0&&next&&!next.poses?.[index])
+      if(!mesh.visible)return
       mesh.position.set(p[0]+(n[0]-p[0])*alpha,p[1]+(n[1]-p[1])*alpha,p[2]+(n[2]-p[2])*alpha)
       quat.set(p[4],p[5],p[6],p[3]);nextQuat.set(n[4],n[5],n[6],n[3]);quat.slerp(nextQuat,alpha);mesh.quaternion.copy(quat)
     })
@@ -54,17 +59,16 @@ function AnatomicalFly({body,frame,next,alpha,color,slot=0}:{body:BodyModel;fram
 }
 
 function RecordedTrails({frames,time,scene}:{frames:Frame[];time:number;scene:Scene}) {
-  const geometry=useMemo(()=>scene.flies.map((_,slot)=>{
-    const g=new THREE.BufferGeometry()
-    g.setAttribute('position',new THREE.Float32BufferAttribute(frames.flatMap(f=>[f.positions[slot][0],f.positions[slot][1],.07]),3))
-    return g
+  const trails=useMemo(()=>scene.flies.map((fly,slot)=>{
+    const points:number[]=[],ends:number[]=[]
+    frames.forEach((frame,i)=>{if(!i)return;const previous=frames[i-1],a=planPosition(previous,undefined,0,slot),b=planPosition(frame,undefined,0,slot);if(a&&b&&frame.time>previous.time){points.push(...a,.07,...b,.07);ends.push(frame.time)}})
+    const geometry=new THREE.BufferGeometry().setAttribute('position',new THREE.Float32BufferAttribute(points,3))
+    const line=new THREE.LineSegments(geometry,new THREE.LineBasicMaterial({color:colors[fly.color]||colors.mint,transparent:true,opacity:.8}))
+    return {line,ends}
   }),[frames,scene])
-  useEffect(()=>()=>geometry.forEach(g=>g.dispose()),[geometry])
-  const count=Math.max(1,frames.findIndex(f=>f.time>time))
-  geometry.forEach(g=>g.setDrawRange(0,time>=frames[frames.length-1].time?frames.length:count))
-  const lines=useMemo(()=>geometry.map((g,i)=>new THREE.Line(g,new THREE.LineBasicMaterial({color:colors[scene.flies[i].color]||colors.mint,transparent:true,opacity:.65}))),[geometry,scene])
-  useEffect(()=>()=>lines.forEach(line=>line.material.dispose()),[lines])
-  return <>{lines.map((line,i)=><primitive key={i} object={line}/>)}</>
+  useEffect(()=>()=>trails.forEach(({line})=>{line.geometry.dispose();line.material.dispose()}),[trails])
+  trails.forEach(({line,ends})=>{const after=ends.findIndex(end=>end>time);line.geometry.setDrawRange(0,(after<0?ends.length:after)*2)})
+  return <>{trails.map(({line},i)=><primitive key={i} object={line}/>)}</>
 }
 
 function World({scene,frame}:{scene:Scene|ArenaLayout;frame?:Frame}){
@@ -80,10 +84,10 @@ function World({scene,frame}:{scene:Scene|ArenaLayout;frame?:Frame}){
     {scene.ring_radius&&<mesh position={[0,0,.02]}><ringGeometry args={[scene.ring_radius-.09,scene.ring_radius,96]}/><meshBasicMaterial color={tokens.ring} transparent opacity={.65} side={THREE.DoubleSide}/></mesh>}
     {!habitat&&<ArenaObstacles obstacles={scene.obstacles} color={tokens.obstacle}/>}
     {scene.food.map((food,i)=>{
-      const left=frame?.food?.[i]??food.initial
-      return left>.001&&<group key={food.id} position={[food.position[0],food.position[1],food.position[2]??.12]}>
-        <mesh castShadow receiveShadow><sphereGeometry args={[.35+left/40,16,12]}/><meshStandardMaterial color={tokens.food} emissive={tokens.foodEmissive} emissiveIntensity={.16} roughness={.55}/></mesh>
-        <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={.55} side={THREE.DoubleSide}/></mesh>
+      const left=planFood(food,i,'flies' in scene,frame)
+      return (left===null||left>.001)&&<group key={food.id} position={[food.position[0],food.position[1],food.position[2]??.12]}>
+        <mesh castShadow receiveShadow><sphereGeometry args={[left===null?.45:.35+left/40,16,12]}/><meshStandardMaterial color={tokens.food} emissive={tokens.foodEmissive} emissiveIntensity={resolved==='dark'?.35:.16} roughness={.55} wireframe={left===null}/></mesh>
+        <mesh position={[0,0,-.09]}><ringGeometry args={[.9,1.05,32]}/><meshBasicMaterial color={tokens.foodRing} transparent opacity={resolved==='dark'?.85:.65} side={THREE.DoubleSide}/></mesh>
       </group>
     })}
   </>
@@ -104,7 +108,7 @@ function ArenaScene({preview,scene,frame,next,alpha=0,color='mint',design=false,
     <fog attach="fog" args={[tokens.background,framing.distance*2+span,framing.distance*3+span*3]}/>
     <hemisphereLight args={[tokens.sky,tokens.ground,1.25]}/>
     <directionalLight position={[span*.45,-span*.65,span*1.2]} color={tokens.sun} intensity={2.4} castShadow shadow-mapSize={[2048,2048]} shadow-camera-left={-shadowExtent} shadow-camera-right={shadowExtent} shadow-camera-top={shadowExtent} shadow-camera-bottom={-shadowExtent} shadow-camera-near={.1} shadow-camera-far={span*4} shadow-normalBias={.025} shadow-bias={-.0001} shadow-radius={3}/>
-    <directionalLight position={[-span*.6,span*.3,span*.5]} intensity={.45} color={tokens.fill}/>
+    <directionalLight position={[-span*.6,span*.3,span*.5]} intensity={resolved==='dark'?.8:.45} color={tokens.fill}/>
     {layout&&<>
       <World scene={layout}/>
       {layout.spawns.slice(0,participants.length).map((spawn,i)=><group key={i} position={[spawn[0],spawn[1],.08]} rotation={[0,0,spawn[2]]}>
@@ -113,15 +117,16 @@ function ArenaScene({preview,scene,frame,next,alpha=0,color='mint',design=false,
         <Html position={[0,0,1.4]} center style={{pointerEvents:'none'}}><span className="spawn-label">{i+1} · {participants[i].name}</span></Html>
       </group>)}
     </>}
+    {scene&&<World scene={scene} frame={shown}/>}
     {body&&shown&&<>
-      {scene?<World scene={scene} frame={shown}/>:<>
+      {!scene&&<>
         <mesh position={[0,0,-.14]} rotation={[Math.PI/2,0,0]} receiveShadow><cylinderGeometry args={[4.8,5,.18,96]} /><meshStandardMaterial color={tokens.platform} roughness={.93}/></mesh>
         <Grid args={[15,15]} rotation={[Math.PI/2,0,0]} position={[0,0,-.2]} cellSize={1} sectionSize={5} cellColor={tokens.grid} sectionColor={tokens.section} fadeDistance={15} cellThickness={.35}/>
       </>}
       {scene?.flies.map((fly,i)=><ReplayLabel key={'label-'+i} fly={fly} slot={i} frame={shown} next={next} alpha={alpha} selected={fly.id===selectedId} identity={subjectRoles?.[fly.id]} follow={followSelected}/>)}
       {(scene?.flies||[{color}]).map((fly,i)=><AnatomicalFly key={i} body={body} frame={shown} next={next} alpha={alpha} slot={i} color={colors[fly.color]||colors.mint}/>)}
     </>}
-    {scene?.task&&shown&&frames.length>0&&<RecordedTrails frames={frames} time={shown.time} scene={scene}/>}
+    {scene&&shown&&frames.length>0&&<RecordedTrails frames={frames} time={shown.time} scene={scene}/>}
     <ReplayCamera scene={scene} frame={shown} next={next} alpha={alpha} selectedId={selectedId} follow={followSelected} overview={cameraPosition} overviewTarget={cameraTarget}/>
     <OrbitControls makeDefault enablePan={!design&&!followSelected} minDistance={design||followSelected?4:Math.max(4,span*.15)} maxDistance={design?18:framing.distance*2.5} minPolarAngle={.12} maxPolarAngle={Math.PI/2-.03}/>
     <CameraClipping far={framing.distance*4+span*4}/>
@@ -134,9 +139,36 @@ function CameraClipping({far}:{far:number}){
   return null
 }
 
+function arenaWebGLAvailable(){
+ if(typeof document==='undefined'||typeof window.WebGL2RenderingContext==='undefined')return false
+ try{const gl=document.createElement('canvas').getContext('webgl2');if(!gl)return false;gl.getExtension('WEBGL_lose_context')?.loseContext();return true}catch{return false}
+}
+class ArenaSceneBoundary extends Component<{children:ReactNode;fallback:ReactNode;onFailure:()=>void},{failed:boolean}>{
+ state={failed:false}
+ static getDerivedStateFromError(){return {failed:true}}
+ componentDidCatch(){this.props.onFailure()}
+ render(){return this.state.failed?this.props.fallback:this.props.children}
+}
+function ArenaRendererGuard({onLost,onFailure}:{onLost:()=>void;onFailure:()=>void}){
+ const gl=useThree(s=>s.gl),failed=useRef(false)
+ useEffect(()=>{const canvas=gl.domElement;const lost=(event:Event)=>{event.preventDefault();failed.current=true;onLost()};canvas.addEventListener('webglcontextlost',lost);return()=>canvas.removeEventListener('webglcontextlost',lost)},[gl,onLost])
+ // React boundaries cover renderer startup; frame rendering happens outside React.
+ useFrame(({gl,scene,camera})=>{if(failed.current)return;try{gl.render(scene,camera)}catch{failed.current=true;onFailure()}},1)
+ return null
+}
 export function ArenaCanvas(props:Parameters<typeof ArenaScene>[0]){
-  const {t}=useI18n()
-  return <Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:props.layout?52:40,near:.05,far:1000}} gl={{antialias:true,alpha:false}} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
-    <ArenaScene {...props}/>
-  </Canvas>
+ const {t}=useI18n(),world=props.scene||props.layout
+ const [choice,setChoice]=useState<{world:typeof world;mode:'3d'|'2d'}|null>(null),[webgl]=useState(arenaWebGLAvailable),[failure,setFailure]=useState<'scene.contextLost'|'scene.rendererFailed'|null>(null)
+ const onLost=useCallback(()=>setFailure('scene.contextLost'),[]),onFailure=useCallback(()=>setFailure('scene.rendererFailed'),[])
+ const mode=choice?.world===world?choice?.mode:planDefault(world),available=webgl&&!failure,show3d=available&&mode!=='2d'
+ const fallback=<ScenePlanView world={world} recorded={!!props.scene} frame={props.frame} next={props.next} alpha={props.alpha} frames={props.frames} selectedId={props.selectedId} participants={props.participants}/>
+ return <div className="scene-presentation">
+  <div className="scene-presentation-viewport">{show3d?<ArenaSceneBoundary onFailure={onFailure} fallback={fallback}><Canvas shadows="soft" dpr={[1,1.7]} camera={{position:[6,-9,5],up:[0,0,1],fov:props.design?33:props.layout?52:40,near:.05,far:1000}} gl={{antialias:true,alpha:false}} fallback={fallback} title={props.scene?t('scene.presentation'):props.layout?t('scene.layoutPresentation'):undefined}>
+   <ArenaRendererGuard onLost={onLost} onFailure={onFailure}/><ArenaScene {...props}/>
+  </Canvas></ArenaSceneBoundary>:fallback}</div>
+  {(world||!available)&&<div className="scene-presentation-toolbar" role="group" aria-label={t('scene.view')}>
+   {!available&&<p className="scene-presentation-failure" role="status">{t(failure||'scene.webglUnavailable')}</p>}
+   {world&&<><button type="button" aria-pressed={show3d} disabled={!available} onClick={()=>setChoice({world,mode:'3d'})}>{t('scene.3d')}</button><button type="button" aria-pressed={!show3d} onClick={()=>setChoice({world,mode:'2d'})}>{t('scene.2d')}</button></>}
+  </div>}
+ </div>
 }

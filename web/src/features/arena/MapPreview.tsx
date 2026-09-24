@@ -34,5 +34,5 @@ export function MapPreview({mapId,seed,bridgeProfile,participants}:{mapId:string
   },[key,mapId,seed,bridgeProfile])
   if(failure?.key===key)return <div className="canvas-loading" role="status">{t('Map preview unavailable')}<small>{failure.message}</small></div>
   if(loaded?.key!==key)return <div className="canvas-loading" role="status"><Loader2 className="spin"/>{t('Loading map…')}</div>
-  return <div style={{height:'100%',display:'flex',flexDirection:'column'}}><div style={{flex:1,minHeight:0}}><ArenaCanvas layout={loaded.layout} participants={participants.map((fly,i)=>({name:fly?.name||t(i===0?'Your fly':'Opponent'),color:fly?.color||(i===0?'mint':'violet')}))}/></div><MapPurposeLegend layout={loaded.layout}/></div>
+  return <div style={{height:'100%',display:'flex',flexDirection:'column'}}><div style={{flex:1,minHeight:0}}><ArenaCanvas key={key} layout={loaded.layout} participants={participants.map((fly,i)=>({name:fly?.name||t(i===0?'Your fly':'Opponent'),color:fly?.color||(i===0?'mint':'violet')}))}/></div><MapPurposeLegend layout={loaded.layout}/></div>
 }
