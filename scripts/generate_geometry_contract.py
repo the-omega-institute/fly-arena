@@ -38,6 +38,7 @@ def contract_fixture() -> dict:
         for probe in sorted(probe_catalog(), key=lambda item: item["id"])
     }
     return {
+        "pin_platform": sys.platform,
         "invalid_obstacles": INVALID_OBSTACLES,
         "bridge_digests": bridge_digests,
         "contract": {

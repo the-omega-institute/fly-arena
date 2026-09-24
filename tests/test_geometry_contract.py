@@ -47,6 +47,7 @@ def scene_payload(scene):
 
 def test_contract_fixture_covers_all_maps_and_seeds():
     assert FIXTURE["contract"]["id"] == "arena-geometry-v1"
+    assert FIXTURE["pin_platform"] == "darwin"
     assert set(FIXTURE["maps"]) == set(MAPS) and len(FIXTURE["maps"]) == 11
     for map_id, seeds in FIXTURE["maps"].items():
         for seed, expected in seeds.items():
@@ -64,6 +65,18 @@ def test_contract_fixture_covers_all_maps_and_seeds():
                 # geometry with the same platform tolerance as the base scene.
                 assert digest(reference) == FIXTURE["bridge_digests"][profile][map_id][seed]
                 assert_geometry_equal(scene_payload(arena_scene(map_id, int(seed), profile)), reference)
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin",
+    reason="scene digests are pinned on the macOS deployment platform; cross-platform bitwise equality is not promised (docs/OPERATIONS.md)",
+)
+@pytest.mark.parametrize("profile", ["legacy-v1", "sensorimotor-research-v2"])
+@pytest.mark.parametrize("map_id,seed", [
+    (map_id, seed) for map_id in sorted(MAPS) for seed in FIXTURE["maps"][map_id]
+])
+def test_generated_bridge_scene_digest_matches_macos_pin(map_id, seed, profile):
+    assert arena_scene(map_id, int(seed), profile)["sha256"] == FIXTURE["bridge_digests"][profile][map_id][seed]
 
 
 def test_geometry_comparison_accepts_roundoff_and_serialized_tuples():

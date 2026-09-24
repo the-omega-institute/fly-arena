@@ -68,3 +68,4 @@ pure and preserves valid input representations so existing seeded scene
 digests and MuJoCo collision inputs remain unchanged. The shared fixture at
 `tests/fixtures/geometry_contract.json` is generated from Python scenes and
 checked by both the Python and TypeScript test suites.
+Exact generated bridge-scene digest pins are enforced on the macOS deployment platform (recorded as `pin_platform: darwin` in the fixture), while tolerant structural checks run on all platforms because cross-platform bitwise equality is not promised (see [operations](OPERATIONS.md)).
