@@ -291,6 +291,7 @@ export const duelMessages = {
     "zh-CN": "预设：果园 · 种子 42 · 每场 10 秒。检查计划后创建双循环系列赛：换边两场，共 20 模拟秒。"
   },
 "New experiment · setup":{"en": "New experiment · setup", "zh-CN": "新实验 · 设置"},
+"Advanced settings":{"en": "Advanced settings", "zh-CN": "高级设置"},
 "Observation only — arrival time is not a scored outcome yet (#82). Failure to arrive stays visible; there is no competitive winner.":{"en": "Observation only — arrival time is not a scored outcome yet (#82). Failure to arrive stays visible; there is no competitive winner.", "zh-CN": "仅供观察 — 到达时间尚不能作为计分结果（#82）。未到达会如实保留；没有竞争胜者。"},
 "Raised terrain and ground routes have physical collisions. Observe recorded body motion, foot contact and falls. Navigation maps remain observation only (#82). Drag to orbit; scroll to zoom.":{"en": "Raised terrain and ground routes have physical collisions. Observe recorded body motion, foot contact and falls. Navigation maps remain observation only (#82). Drag to orbit; scroll to zoom.", "zh-CN": "立体地形与地面路线具有物理碰撞。观察记录的身体运动、足部接触和翻倒。导航地图仍仅供观察（#82）。拖动旋转视角，滚轮缩放。"}
 } as const

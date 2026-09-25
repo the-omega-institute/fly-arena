@@ -100,7 +100,14 @@ function ArenaScene({preview,scene,frame,next,alpha=0,color='mint',design=false,
   const body=scene?.body||preview?.body
   const shown=frame||preview?.frame
   const world=scene||layout
-  const framing=useMemo(()=>world&&layout&&!scene&&!preview?previewSceneFraming(arenaBounds(world),viewport.width/Math.max(1,viewport.height)):sceneFraming(world?arenaBounds(world):{min:[-5,-5,-.25],max:[5,5,2]},viewport.width/Math.max(1,viewport.height),design?33:40,!!world?.task),[world,layout,scene,preview,viewport.width,viewport.height,design])
+  const framing=useMemo(()=>{
+    const aspect=viewport.width/Math.max(1,viewport.height)
+    if(world&&layout&&!scene&&!preview){
+      const base=previewSceneFraming(arenaBounds(world),aspect),factor=.9
+      return {...base,position:base.target.map((value,axis)=>value+(base.position[axis]-value)*factor) as [number,number,number],distance:base.distance*factor}
+    }
+    return sceneFraming(world?arenaBounds(world):{min:[-5,-5,-.25],max:[5,5,2]},aspect,design?33:40,!!world?.task)
+  },[world,layout,scene,preview,viewport.width,viewport.height,design])
   const cameraPosition:[number,number,number]=design?[4,-6,3.5]:framing.position
   const cameraTarget:[number,number,number]=design?[0,0,.8]:framing.target
   const span=framing.span,shadowExtent=span*.8

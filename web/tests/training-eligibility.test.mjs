@@ -79,6 +79,8 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
  try{
   const fly={id:base.founder,name:'Fixture fly',spec:{model_profile:'malecns-lif-cpu-v1'}}
   await act(async()=>root.render(React.createElement(compiled.exports.TrainingSandbox,{flies:[fly,{...fly,id:base.opponent}],identity:null,selected:fly.id,maps,season:{connectome:{circuits:[]},training_bridge_profiles:trainingBridgeProfiles.map(id=>({id,ready:true}))},onLogin:noop,onSaved:noop,onCompete:noop,onReplay:noop})))
+  assert.equal(document.querySelector('.training-first-disclosure').open,false)
+  assert.equal(document.querySelector('.training-showcase-disclosure').open,false)
   const select=label=>[...document.querySelectorAll('label')].find(el=>el.firstChild?.textContent===label)?.querySelector('select')
   const button=label=>[...document.querySelectorAll('button')].find(el=>el.textContent.trim()===label)
   const change=async(el,value)=>{assert.ok(el);await act(async()=>{el.value=value;el.dispatchEvent(new dom.window.Event('change',{bubbles:true}))})}
