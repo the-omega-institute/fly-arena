@@ -220,6 +220,35 @@ low-stability component of the observed wall/drive interaction. That is a
 hypothesis, not evidence of prevention or righting. This replay provides neither
 the candidate's counterfactual response nor a paired candidate evaluation.
 
+## Why the v5 candidate failed — analysis plan
+
+This section is a plan for analyzing the recorded phase-2 arms; it intentionally
+does not report results. The comparison uses only each arm's receipt-bound
+`frames.json` and `events.json`. It labels candidate `motor_body_state` values
+as recorded, and labels pose-derived upright/rate values as proxies. It does
+not rerun either arm, infer wall contact from proximity, or treat a modeled
+propulsion factor as a measured force.
+
+Run the analysis for one seed with:
+
+```sh
+PYTHONPATH=src .venv/bin/python scripts/compare_phase2_arms.py \
+  var/research/issue82-phase2/study-20260924/seed-42
+```
+
+The script's outputs should distinguish these hypotheses:
+
+| Hypothesis | Output pattern to inspect | Evidence still not established |
+|---|---|---|
+| Attenuated propulsion leaves the fly pushed into walls. | Candidate modeled attenuation periods overlap recorded wall-contact onsets and the first-inversion context; compare candidate wall events and trajectory divergence with the baseline arm. | The output does not measure wall force, causality, or whether attenuation caused the contact. |
+| Correction amplifies roll on uneven support. | Recorded candidate roll/pitch rates and tarsal-support inputs change before the inversion; compare the candidate's left/right drive before each inversion with the baseline and inspect the context window. | Pose-rate proxies and drive asymmetry do not identify the applied restoring moment or prove that support was uneven. |
+| Earlier inversions arise from altered gait. | Candidate and baseline first-inversion times, trajectory-divergence time, drive histories, and candidate attenuation periods separate before the first inversion without a preceding recorded wall onset. | A paired observational comparison cannot isolate gait mechanics from body, contact, or neural feedback interactions. |
+
+The required per-seed report is the output of
+`scripts/compare_phase2_arms.py`; results and interpretations belong in a
+separate evidence record after review. This skeleton records the analysis
+questions only and does not fill in phase-2 results.
+
 ## Preregistered phase-2 protocol
 
 The protocol predates the replay diagnosis. The decision rule below is clarified
