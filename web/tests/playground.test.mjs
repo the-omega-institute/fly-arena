@@ -34,6 +34,7 @@ require.cache[spatialCanvasFile]={id:spatialCanvasFile,filename:spatialCanvasFil
  return React.createElement('div',{'data-spatial-canvas':true},props.nodes.filter(n=>n.position).map(n=>React.createElement('button',{key:n.id,'aria-label':'Spatial neuron '+n.id,'data-activity':n.activity===null?'missing':String(n.activity),onClick:()=>props.onFocus(n.id)},n.id)))
 }}}
 const {PlaygroundGuide}=require('./src/features/guide/PlaygroundGuide.js')
+const {ExperimentSetup}=require('./src/features/arena/ExperimentSetupPanel.js')
 const {WildTypeChallenge}=require('./src/features/arena/WildTypeChallenge.js')
 const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtype.js')
 const {DevelopersFeature}=require('./src/features/developers/DevelopersFeature.js')
@@ -53,6 +54,8 @@ test.beforeEach(()=>{
 const spec={schema_version:'flyspec/v1',name:'My fly',description:'',color:'mint',parent_id:null,connectome_sha256:'a'.repeat(64),model_profile:'malecns-lif-cpu-v1',weight_mutations:[],edge_deltas:[],neuron_parameters:{tau_scale:1,threshold_shift_mv:0},plasticity:'none'}
 const wt={id:'a'.repeat(32),name:'Canonical reference',spec,reference_kind:'wildtype'}
 const own={id:'b'.repeat(32),name:'My saved fly',spec:{...spec,parent_id:wt.id},reference_kind:'user'}
+const arenaMap={id:'orchard',name:'果园',english:'Orchard',description:'',size:100,color:'#91bca5',obstacles:[],food:[],modes:['forage','contest'],metadata:{training_eligible:true,competition_eligible:true}}
+const arenaSeason={match_profiles:[{id:'legacy-v1',name:'Legacy v1',ready:true}],sensory_profiles:[]}
 const noop=()=>{}
 const button=label=>{const el=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===label||b.getAttribute('aria-label')===label);assert.ok(el,`Missing button: ${label}`);return el}
 async function click(label){await act(async()=>button(label).click())}
@@ -98,6 +101,22 @@ test('WT challenge prepares the exact visible small preset and requires a saved 
  assert.match(document.body.textContent,/20 simulated seconds total/)
  await click('Prepare WT challenge')
  assert.deepEqual(plans,[{subject:own,reference:wt,map_id:'orchard',mode:'contest',duration_seconds:10,seed:42}])
+})
+test('prepared Arena hand-off opens and focuses its plan while a plain visit stays collapsed',async()=>{
+ const setup={selected:own.id,opponent:wt.id,mode:'contest',mapId:'orchard',seedText:'42',duration:10,bridgeProfile:'legacy-v1',sensoryProfile:'odor-only-v1'}
+ const setters=Object.fromEntries(Object.keys(setup).map(key=>['set'+key[0].toUpperCase()+key.slice(1),noop]))
+ const props={...setup,...setters,flies:[own,wt],identity:null,season:arenaSeason,maps:[arenaMap],busy:'',startMatch:async()=>{},onPreview:noop,onDesign:noop}
+ const originalScrollIntoView=dom.window.HTMLElement.prototype.scrollIntoView
+ const scrolls=[]
+ dom.window.HTMLElement.prototype.scrollIntoView=options=>scrolls.push(options)
+ await mount(ExperimentSetup,{...props,preparedPlan:false})
+ assert.equal(document.querySelector('.experiment-details').hidden,true)
+ await mount(ExperimentSetup,{...props,preparedPlan:true,onPreparedPlanShown:noop})
+ const summary=document.querySelector('.experiment-plan')
+ assert.equal(document.querySelector('.experiment-details').hidden,false)
+ assert.equal(document.activeElement,summary)
+ assert.deepEqual(scrolls,[{block:'start',behavior:'smooth'}])
+ dom.window.HTMLElement.prototype.scrollIntoView=originalScrollIntoView
 })
 test('AI instructions copy the actual origin without credentials and survive clipboard failure',async()=>{
  let copied='';let identityRequests=0

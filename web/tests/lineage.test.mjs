@@ -25,6 +25,14 @@ test('lineage layout is deterministic, readable by columns, and links only known
  assert.ok(first.paths.every(path=>path.path.startsWith('M ')))
 })
 
+test('lineage tie-breaking uses host-independent code-point ordering for IDs',()=>{
+ const nodes=[{id:'root',label:'Root',depth:0,relation:'center'},{id:'z',label:'Same label',depth:1,relation:'child'},{id:'\u00e4',label:'Same label',depth:1,relation:'child'}]
+ const edges=[{from:'root',to:'z',relation:'child'},{from:'root',to:'\u00e4',relation:'child'}]
+ const result=lineageLayout(nodes,edges,'root')
+ const point=id=>result.points.find(item=>item.node.id===id)
+ assert.ok(point('z').y<point('\u00e4').y)
+})
+
 test('layout keeps keyboard-facing marker nodes in the same geometry contract',()=>{
  const result=lineageLayout([{id:'center',label:'Center',depth:0,relation:'center'},{id:'marker',label:'More lineage…',depth:1,relation:'descendant',marker:true}], [{from:'center',to:'marker',relation:'descendant'}], 'center',160,80)
  const marker=result.points.find(point=>point.node.marker)

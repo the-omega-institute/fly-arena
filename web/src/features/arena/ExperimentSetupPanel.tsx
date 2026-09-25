@@ -1,6 +1,6 @@
 import {ObservationDuration} from './ObservationDuration'
 import {applyExperimentPreset,experimentPresets,presetAvailable} from './experimentPresets'
-import {useState} from 'react'
+import {useEffect,useRef,useState} from 'react'
 import type {Dispatch,SetStateAction} from 'react'
 import type {ArenaMap,Fly,Identity,Season} from '../../types'
 import {compatibleSensory,playableProfile} from '../../types'
@@ -11,10 +11,16 @@ import {buildExperimentPlan,experimentIntent,experimentScore,intentMode,opponent
 import type {ExperimentIntent,ExperimentPlan} from './experimentSetup'
 
 type Set<T>=Dispatch<SetStateAction<T>>
-type Props={flies:Fly[];identity:Identity|null;season:Season|null;maps:ArenaMap[];selected:string;setSelected:Set<string>;opponent:string;setOpponent:Set<string>;mode:string;setMode:Set<string>;mapId:string;setMapId:Set<string>;seedText:string;setSeedText:Set<string>;duration:number;setDuration:Set<number>;bridgeProfile:string;setBridgeProfile:Set<string>;sensoryProfile:string;setSensoryProfile:Set<string>;busy:string;startMatch:(plan:ExperimentPlan)=>Promise<void>;onPreview:()=>void;onDesign?:()=>void}
-export function ExperimentSetup({flies,identity,season,maps,selected,setSelected,opponent,setOpponent,mode,setMode,mapId,setMapId,seedText,setSeedText,duration,setDuration,bridgeProfile,setBridgeProfile,sensoryProfile,setSensoryProfile,busy,startMatch,onPreview,onDesign}:Props){
+type Props={flies:Fly[];identity:Identity|null;season:Season|null;maps:ArenaMap[];selected:string;setSelected:Set<string>;opponent:string;setOpponent:Set<string>;mode:string;setMode:Set<string>;mapId:string;setMapId:Set<string>;seedText:string;setSeedText:Set<string>;duration:number;setDuration:Set<number>;bridgeProfile:string;setBridgeProfile:Set<string>;sensoryProfile:string;setSensoryProfile:Set<string>;busy:string;startMatch:(plan:ExperimentPlan)=>Promise<void>;onPreview:()=>void;onDesign?:()=>void;preparedPlan?:boolean;onPreparedPlanShown?:()=>void}
+export function ExperimentSetup({flies,identity,season,maps,selected,setSelected,opponent,setOpponent,mode,setMode,mapId,setMapId,seedText,setSeedText,duration,setDuration,bridgeProfile,setBridgeProfile,sensoryProfile,setSensoryProfile,busy,startMatch,onPreview,onDesign,preparedPlan=false,onPreparedPlanShown}:Props){
  const {t,locale}=useI18n()
- const [detailsOpen,setDetailsOpen]=useState(false)
+ const [detailsOpen,setDetailsOpen]=useState(preparedPlan)
+ const planSummary=useRef<HTMLElement|null>(null)
+ useEffect(()=>{if(preparedPlan&&!detailsOpen)setDetailsOpen(true)},[preparedPlan,detailsOpen])
+ useEffect(()=>{
+  if(!preparedPlan||!detailsOpen)return
+  planSummary.current?.scrollIntoView?.({block:'start',behavior:'smooth'});planSummary.current?.focus?.({preventScroll:true});onPreparedPlanShown?.()
+ },[preparedPlan,detailsOpen,onPreparedPlanShown])
  const intent=experimentIntent(mode),subject=flies.find(f=>f.id===selected),rival=flies.find(f=>f.id===opponent)
  const {plan,errors}=buildExperimentPlan({selected,opponent,mode,mapId,seedText,duration,bridgeProfile,sensoryProfile},flies,maps,season)
  const eligibleMaps=maps.filter(m=>intentMode(intent,m)),selectedMap=maps.find(m=>m.id===mapId),profile=season?.match_profiles?.find(p=>p.id===bridgeProfile)
@@ -35,7 +41,7 @@ export function ExperimentSetup({flies,identity,season,maps,selected,setSelected
  <label className="field-label" htmlFor="experiment-senses">{t('Sensory input profile')}</label><select id="experiment-senses" aria-label={t('Sensory input profile')} value={sensoryProfile} onChange={e=>setSensoryProfile(e.target.value)}><option value="odor-only-v1">{t('Bilateral odor only')}</option>{sensoryProfile&&sensoryProfile!=='odor-only-v1'&&!season?.sensory_profiles?.some(p=>p.id===sensoryProfile)&&<option value={sensoryProfile} disabled>{sensoryProfile} · {t('Profile unavailable')}</option>}{season?.sensory_profiles?.filter(p=>p.id!=='odor-only-v1'&&(compatibleSensory(season,bridgeProfile,p.id)||p.id===sensoryProfile)).map(p=><option key={p.id} value={p.id} disabled={!p.ready||!compatibleSensory(season,bridgeProfile,p.id)}>{t(p.name||p.id)} · {t(p.ready&&compatibleSensory(season,bridgeProfile,p.id)?'Profile ready':'Profile unavailable')}</option>)}</select>
  <p className="capability-note">{t('Experimental sandbox. Results stay outside the public leaderboard. Neural dynamics, sensory encoding and motor readout are declared engineering models, not validated natural aggression or intelligence.')}</p></div></details>
  </div></div>
- <section className="experiment-plan" aria-label={t('Plan before submission')} aria-live="polite"><h3>{t('Plan before submission')}</h3><p><b>{subject?.name||t('Select a saved design')}</b>{intent!=='forage'&&<> vs <b>{rival?.name||t('Choose an opponent')}</b></>} · {selectedMap?(locale==='en'?selectedMap.english:selectedMap.name):t('Choose a map offered for this intent.')} · <code>{mode}</code></p>
+ <section ref={planSummary} tabIndex={-1} className="experiment-plan" aria-label={t('Plan before submission')} aria-live="polite"><h3>{t('Plan before submission')}</h3><p><b>{subject?.name||t('Select a saved design')}</b>{intent!=='forage'&&<> vs <b>{rival?.name||t('Choose an opponent')}</b></>} · {selectedMap?(locale==='en'?selectedMap.english:selectedMap.name):t('Choose a map offered for this intent.')} · <code>{mode}</code></p>
  <p><code>{selected||'—'}{intent!=='forage'&&<> / {opponent||'—'}</>}</code></p><p><code>{bridgeProfile||'—'} · {sensoryProfile}</code> · {t(playableProfile(profile)?'Profile ready':'Profile unavailable')}</p>
  <p>{intent==='forage'?t('One solo match per seed; no position-swapped pairing.'):t('Two matches per seed: your fly in slot 1, then slot 2. Positions are swapped with identical seeds and conditions.')}</p>
  <p>{t(experimentScore(mode,mapId,selectedMap?.metadata))}</p>

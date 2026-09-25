@@ -3,12 +3,19 @@ export type LineageEdge={from:string;to:string;relation:string}
 export type LineagePoint={x:number;y:number;width:number;height:number;node:LineageNode}
 export type LineagePath=LineageEdge&{path:string;selected:boolean}
 
+function compareCodePoints(a:string,b:string){
+ if(a===b)return 0
+ const left=Array.from(a,character=>character.codePointAt(0)!),right=Array.from(b,character=>character.codePointAt(0)!)
+ for(let i=0;i<Math.min(left.length,right.length);i++)if(left[i]!==right[i])return left[i]-right[i]
+ return left.length-right.length
+}
+
 /** Stable, side-effect-free coordinates for the 2-D lineage view. */
 export function lineageLayout(nodes:LineageNode[],edges:LineageEdge[],centerId:string,cardWidth=190,rowHeight=86){
  const byId=new Map(nodes.map(node=>[node.id,node]));
  const outgoing=new Map<string,LineageEdge[]>();const incoming=new Map<string,LineageEdge[]>()
  for(const edge of edges){if(!byId.has(edge.from)||!byId.has(edge.to)||edge.from===edge.to)continue;const from=outgoing.get(edge.from)||[];from.push(edge);outgoing.set(edge.from,from);const to=incoming.get(edge.to)||[];to.push(edge);incoming.set(edge.to,to)}
- const compare=(a:LineageNode,b:LineageNode)=>a.id===centerId?-1:b.id===centerId?1:a.depth-b.depth||a.label.localeCompare(b.label)||a.id.localeCompare(b.id)
+ const compare=(a:LineageNode,b:LineageNode)=>a.id===centerId?-1:b.id===centerId?1:a.depth-b.depth||a.label.localeCompare(b.label)||compareCodePoints(a.id,b.id)
  for(const list of outgoing.values())list.sort((a,b)=>compare(byId.get(a.to)!,byId.get(b.to)!))
  const roots=nodes.filter(node=>!(incoming.get(node.id)||[]).length).sort(compare)
  const yById=new Map<string,number>();const visiting=new Set<string>();const visited=new Set<string>();let cursor=0
