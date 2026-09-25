@@ -35,7 +35,8 @@ def validate_archive_member(member):
     if (not name or posix.is_absolute() or windows.is_absolute() or windows.drive or
             ".." in posix.parts or ".." in windows.parts):
         raise ValueError(f"Unsafe archive path: {name!r}")
-    if member.issym() or member.islnk() or member.isdev():
+    if (member.issym() or member.islnk() or member.isdev() or member.isfifo() or
+            not (member.isdir() or member.isfile())):
         raise ValueError(f"Unsafe archive member type: {name!r}")
     return member
 
@@ -71,16 +72,12 @@ def safe_extract(archive, destination):
 
 
 def remote_extraction_code(archive_path, destination, bundle_sha256):
-    """Return the Python 3.12+ extractor executed on the configured host."""
+    """Return the Python 3.9+ extractor executed on the configured host."""
     return textwrap.dedent(f"""
         import hashlib
         import io
         import pathlib
-        import sys
         import tarfile
-
-        if sys.version_info < (3, 12):
-            raise RuntimeError("Remote source synchronization requires Python 3.12 or newer")
 
         archive_path = pathlib.Path({str(archive_path)!r})
         bundle = bytes.fromhex(archive_path.read_text())
@@ -94,16 +91,29 @@ def remote_extraction_code(archive_path, destination, bundle_sha256):
             windows = pathlib.PureWindowsPath(member.name)
             if (not member.name or posix.is_absolute() or windows.is_absolute() or
                     windows.drive or ".." in posix.parts or ".." in windows.parts or
-                    member.issym() or member.islnk() or member.isdev()):
+                    member.issym() or member.islnk() or member.isdev() or member.isfifo() or
+                    not (member.isdir() or member.isfile())):
                 raise RuntimeError("Unsafe archive member: " + member.name)
             root = root.resolve()
-            if not (root / member.name).resolve().is_relative_to(root):
+            target = (root / member.name).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError:
                 raise RuntimeError("Unsafe archive path: " + member.name)
-            return tarfile.data_filter(member, root)
+            data_filter = getattr(tarfile, "data_filter", None)
+            if data_filter is not None:
+                try:
+                    member = data_filter(member, root)
+                except Exception as exc:
+                    raise RuntimeError("Unsafe archive member: " + member.name) from exc
+            return member
 
         with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
             members = [safe(member, destination) for member in archive.getmembers()]
-            archive.extractall(destination, members=members, filter=safe)
+            if getattr(tarfile, "data_filter", None) is not None:
+                archive.extractall(destination, members=members, filter=safe)
+            else:
+                archive.extractall(destination, members=members)
         archive_path.unlink()
         print("Source bundle verified and synchronized")
     """).strip()
@@ -123,6 +133,7 @@ def remote(command):
 
 def main():
     _, remote_path, _ = deployment_config()
+    remote_python = os.environ.get("ARENA_DEPLOY_PYTHON", "/usr/bin/python3").strip() or "/usr/bin/python3"
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode="w:gz") as tar:
         for item in (sys.argv[1:] or ["src", "scripts", "docs", "web/dist", "deploy", "README.md", "pyproject.toml", "uv.lock"]):
@@ -150,7 +161,7 @@ def main():
                 print(f"Transfer {min((i+1)*3000,len(bundle)):,}/{len(bundle):,} bytes", flush=True)
     remote(f"cat {shlex.quote(stage)}.* > {shlex.quote(stage + '.hex')}")
     code = remote_extraction_code(stage + ".hex", remote_path, hashlib.sha256(bundle).hexdigest())
-    print(remote(f"/usr/bin/python3 -c {shlex.quote(code)}"), flush=True)
+    print(remote(f"{shlex.quote(remote_python)} -c {shlex.quote(code)}"), flush=True)
     print(f"Synced {len(bundle):,} bytes to {remote_path}", flush=True)
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import ast
 import hashlib
 import io
 import importlib.util
@@ -100,10 +101,11 @@ def test_chunked_request_body_is_replayed_to_fastapi(tmp_path):
     assert response.json()["name"] == "streamed"
 
 
-def archive_bytes(member):
+def archive_bytes(*members):
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode="w:gz") as archive:
-        archive.addfile(member, io.BytesIO(b"payload") if member.isfile() else None)
+        for member in members:
+            archive.addfile(member, io.BytesIO(b"payload") if member.isfile() else None)
     return stream.getvalue()
 
 
@@ -162,11 +164,69 @@ def test_generated_remote_extractor_compiles_and_extracts(tmp_path):
     stage.write_text(archive.hex())
     destination = tmp_path / "remote"
     code = sync_mac.remote_extraction_code(stage, destination, hashlib.sha256(archive).hexdigest())
+    ast.parse(code, "<remote-extractor>", feature_version=(3, 9))
     compile(code, "<remote-extractor>", "exec")
     result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
     assert result.returncode == 0, result.stderr
     assert (destination / "nested/result.txt").read_text() == "payload"
     assert not stage.exists()
+
+
+@pytest.mark.parametrize("kind", ["absolute", "traversal", "symlink", "hardlink", "device", "fifo"])
+def test_generated_remote_extractor_rejects_unsafe_members(tmp_path, kind):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    names = {
+        "absolute": str(outside / "absolute.txt"),
+        "traversal": "../traversal.txt",
+        "symlink": "link",
+        "hardlink": "hard-link",
+        "device": "device",
+        "fifo": "fifo",
+    }
+    member = tarfile.TarInfo(names[kind])
+    if kind == "symlink":
+        member.type = tarfile.SYMTYPE
+        member.linkname = "../outside/linked.txt"
+    elif kind == "hardlink":
+        member.type = tarfile.LNKTYPE
+        member.linkname = "../outside/linked.txt"
+    elif kind == "device":
+        member.type = tarfile.CHRTYPE
+    elif kind == "fifo":
+        member.type = tarfile.FIFOTYPE
+    else:
+        member.size = len(b"payload")
+    before = tarfile.TarInfo("before.txt")
+    before.size = len(b"payload")
+    archive = archive_bytes(before, member)
+    stage = tmp_path / "bundle.hex"
+    stage.write_text(archive.hex())
+    destination = tmp_path / "remote"
+    code = sync_mac.remote_extraction_code(stage, destination, hashlib.sha256(archive).hexdigest())
+    ast.parse(code, "<remote-extractor>", feature_version=(3, 9))
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert not (destination / "before.txt").exists()
+    assert not any(outside.iterdir())
+
+
+def test_generated_remote_extractor_rejects_preexisting_symlink_directory(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    destination = tmp_path / "remote"
+    destination.mkdir()
+    (destination / "nested").symlink_to(outside, target_is_directory=True)
+    member = tarfile.TarInfo("nested/result.txt")
+    member.size = len(b"payload")
+    archive = archive_bytes(member)
+    stage = tmp_path / "bundle.hex"
+    stage.write_text(archive.hex())
+    code = sync_mac.remote_extraction_code(stage, destination, hashlib.sha256(archive).hexdigest())
+    ast.parse(code, "<remote-extractor>", feature_version=(3, 9))
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+    assert result.returncode != 0
+    assert not (outside / "result.txt").exists()
 
 
 def test_remote_wires_configured_host_and_principal(monkeypatch):
@@ -212,6 +272,7 @@ def test_deployment_config_reads_environment(monkeypatch):
 
 
 def test_sync_main_uses_configured_deployment_path(monkeypatch, tmp_path):
+    monkeypatch.delenv("ARENA_DEPLOY_PYTHON", raising=False)
     for name, value in {
         "ARENA_DEPLOY_HOST": "configured-host",
         "ARENA_DEPLOY_PATH": str(tmp_path / "remote-root"),
@@ -228,3 +289,22 @@ def test_sync_main_uses_configured_deployment_path(monkeypatch, tmp_path):
 
     assert any(command.startswith("mkdir -p") and str(tmp_path / "remote-root") in command for command in commands)
     assert any("/usr/bin/python3 -c" in command and str(tmp_path / "remote-root") in command for command in commands)
+
+
+def test_sync_main_uses_configured_remote_python(monkeypatch, tmp_path):
+    for name, value in {
+        "ARENA_DEPLOY_HOST": "configured-host",
+        "ARENA_DEPLOY_PATH": str(tmp_path / "remote-root"),
+        "ARENA_DEPLOY_PRINCIPAL": "configured-principal",
+        "ARENA_DEPLOY_PYTHON": "/opt/arena/.venv/bin/python",
+    }.items():
+        monkeypatch.setenv(name, value)
+    (tmp_path / "payload.txt").write_text("payload")
+    monkeypatch.setattr(sync_mac, "ROOT", tmp_path)
+    monkeypatch.setattr(sync_mac.sys, "argv", ["sync_mac.py", "payload.txt"])
+    commands = []
+    monkeypatch.setattr(sync_mac, "remote", lambda command: commands.append(command) or "")
+
+    sync_mac.main()
+
+    assert any("/opt/arena/.venv/bin/python -c" in command for command in commands)
