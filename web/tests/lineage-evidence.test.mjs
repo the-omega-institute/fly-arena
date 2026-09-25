@@ -85,7 +85,7 @@ test('App life handoff builds the existing paired tournament against the exact p
  const source=fs.readFileSync(path.join(web,'src/App.tsx'),'utf8')
  const callback=source.slice(source.indexOf("{tab==='life'" )).match(/onCompete=\{(.*?)\} onReplay=/)[1]
  const state={flies:[],duration:2}
- const setters=['setLifeComparisonFlies','setBranchFly','setSelected','setOpponent','setMode','setMapId','setDuration','setFocused','setPlay']
+ const setters=['setPreparedArenaPlan','setLifeComparisonFlies','setBranchFly','setSelected','setOpponent','setMode','setMapId','setDuration','setFocused','setPlay']
  const values=setters.map(name=>value=>{const key=name.slice(3,4).toLowerCase()+name.slice(4);state[key]=typeof value==='function'?value(state[key]):value})
  const prepare=Function(...setters,'flies','duration','matchingWildType','return '+callback)(...values,[],2,()=>null)
  prepare(own,fly)

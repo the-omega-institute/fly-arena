@@ -92,6 +92,11 @@ for(const locale of ['en','zh-CN'])test(`question cards have explicit native but
   return React.createElement(ExperimentSetup,{...values,...setters,flies:[subject,wt,spoof],identity:null,season,maps,busy:'',startMatch:()=>assert.fail('No computation'),onPreview:()=>previews.push(true),onDesign:noop})
  }
  await mount(Setup,{})
+ assert.equal(document.querySelector('.experiment-details').hidden,true)
+ assert.equal(document.querySelector('.advanced-settings').open,false)
+ await act(async()=>document.querySelector('.custom-experiment').click())
+ assert.equal(document.querySelector('.experiment-details').hidden,false)
+ assert.equal(document.querySelector('.advanced-settings').open,false)
  const cards=[...document.querySelectorAll('.experiment-preset')]
  assert.equal(cards.length,3)
  for(const [index,card] of cards.entries()){

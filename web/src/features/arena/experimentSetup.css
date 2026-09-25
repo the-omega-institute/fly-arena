@@ -25,3 +25,4 @@
 .experiment-preset button{align-self:flex-start;border:1px solid currentColor;padding:9px 12px;border-radius:6px;font-weight:600}
 .experiment-preset button:focus-visible{outline:3px solid var(--accent,#39745b);outline-offset:3px}
 @media(max-width:900px){.experiment-presets{grid-template-columns:1fr}}
+.custom-experiment{margin-bottom:18px}.experiment-details{min-width:0}.advanced-settings{margin:18px 0 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.advanced-settings summary{cursor:pointer;padding:13px 0;font-size:12px;font-weight:600;list-style:none}.advanced-settings summary::before{content:'+';display:inline-block;width:18px;color:var(--muted)}.advanced-settings[open] summary::before{content:'−'}.advanced-settings>div{padding-bottom:8px}.advanced-settings .field-label:first-child{margin-top:4px}

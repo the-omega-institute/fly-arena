@@ -34,9 +34,11 @@ require.cache[spatialCanvasFile]={id:spatialCanvasFile,filename:spatialCanvasFil
  return React.createElement('div',{'data-spatial-canvas':true},props.nodes.filter(n=>n.position).map(n=>React.createElement('button',{key:n.id,'aria-label':'Spatial neuron '+n.id,'data-activity':n.activity===null?'missing':String(n.activity),onClick:()=>props.onFocus(n.id)},n.id)))
 }}}
 const {PlaygroundGuide}=require('./src/features/guide/PlaygroundGuide.js')
+const {ExperimentSetup}=require('./src/features/arena/ExperimentSetupPanel.js')
 const {WildTypeChallenge}=require('./src/features/arena/WildTypeChallenge.js')
 const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtype.js')
 const {DevelopersFeature}=require('./src/features/developers/DevelopersFeature.js')
+const {EvolutionSignal,recordedParentSignal}=require('./src/features/training/EvolutionSignal.js')
 const {I18nProvider,Preferences}=require('./src/shared/i18n.js')
 let dom,root,originals
 test.beforeEach(()=>{
@@ -52,6 +54,8 @@ test.beforeEach(()=>{
 const spec={schema_version:'flyspec/v1',name:'My fly',description:'',color:'mint',parent_id:null,connectome_sha256:'a'.repeat(64),model_profile:'malecns-lif-cpu-v1',weight_mutations:[],edge_deltas:[],neuron_parameters:{tau_scale:1,threshold_shift_mv:0},plasticity:'none'}
 const wt={id:'a'.repeat(32),name:'Canonical reference',spec,reference_kind:'wildtype'}
 const own={id:'b'.repeat(32),name:'My saved fly',spec:{...spec,parent_id:wt.id},reference_kind:'user'}
+const arenaMap={id:'orchard',name:'果园',english:'Orchard',description:'',size:100,color:'#91bca5',obstacles:[],food:[],modes:['forage','contest'],metadata:{training_eligible:true,competition_eligible:true}}
+const arenaSeason={match_profiles:[{id:'legacy-v1',name:'Legacy v1',ready:true}],sensory_profiles:[]}
 const noop=()=>{}
 const button=label=>{const el=[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===label||b.getAttribute('aria-label')===label);assert.ok(el,`Missing button: ${label}`);return el}
 async function click(label){await act(async()=>button(label).click())}
@@ -97,6 +101,22 @@ test('WT challenge prepares the exact visible small preset and requires a saved 
  assert.match(document.body.textContent,/20 simulated seconds total/)
  await click('Prepare WT challenge')
  assert.deepEqual(plans,[{subject:own,reference:wt,map_id:'orchard',mode:'contest',duration_seconds:10,seed:42}])
+})
+test('prepared Arena hand-off opens and focuses its plan while a plain visit stays collapsed',async()=>{
+ const setup={selected:own.id,opponent:wt.id,mode:'contest',mapId:'orchard',seedText:'42',duration:10,bridgeProfile:'legacy-v1',sensoryProfile:'odor-only-v1'}
+ const setters=Object.fromEntries(Object.keys(setup).map(key=>['set'+key[0].toUpperCase()+key.slice(1),noop]))
+ const props={...setup,...setters,flies:[own,wt],identity:null,season:arenaSeason,maps:[arenaMap],busy:'',startMatch:async()=>{},onPreview:noop,onDesign:noop}
+ const originalScrollIntoView=dom.window.HTMLElement.prototype.scrollIntoView
+ const scrolls=[]
+ dom.window.HTMLElement.prototype.scrollIntoView=options=>scrolls.push(options)
+ await mount(ExperimentSetup,{...props,preparedPlan:false})
+ assert.equal(document.querySelector('.experiment-details').hidden,true)
+ await mount(ExperimentSetup,{...props,preparedPlan:true,onPreparedPlanShown:noop})
+ const summary=document.querySelector('.experiment-plan')
+ assert.equal(document.querySelector('.experiment-details').hidden,false)
+ assert.equal(document.activeElement,summary)
+ assert.deepEqual(scrolls,[{block:'start',behavior:'smooth'}])
+ dom.window.HTMLElement.prototype.scrollIntoView=originalScrollIntoView
 })
 test('AI instructions copy the actual origin without credentials and survive clipboard failure',async()=>{
  let copied='';let identityRequests=0
@@ -163,6 +183,26 @@ test('public gallery exposes real generations and branches without starting comp
  await click('Save a copy and prepare training');assert.equal(branched[0].id,fly.id);assert.equal(branched[0].runId,run.id)
  assert.deepEqual(requests.map(r=>r[1]),['GET'])
  globalThis.fetch=()=>{throw Error('Unexpected network')}
+})
+
+test('training signals resolve generation-zero and random-search parents from actual founder records',async()=>{
+ const founder='f'.repeat(32),generationZero='0'.repeat(32),randomCandidate='1'.repeat(32)
+ const verified={id:'founder-record',status:'verified',request:{fly_ids:[founder]}}
+ const failed={id:'failed-founder-record',status:'failed',request:{fly_ids:[founder]}}
+ const parentMember={fly_id:founder,matches:[{id:'member-founder-record',status:'verified',request:{fly_ids:[founder]}}]}
+ const generationZeroParent=recordedParentSignal(founder,[{fly_id:generationZero,matches:[]}],[verified,failed])
+ const randomSearchParent=recordedParentSignal(founder,[{fly_id:randomCandidate,matches:[]}],[verified,failed])
+ assert.equal(generationZeroParent?.fly_id,founder)
+ assert.deepEqual(generationZeroParent?.matches,[verified])
+ assert.equal(randomSearchParent?.fly_id,founder)
+ assert.deepEqual(randomSearchParent?.matches,[verified])
+ assert.equal(recordedParentSignal(founder,[parentMember],[verified])?.matches[0].id,'member-founder-record')
+ assert.equal(recordedParentSignal(null,[],[verified]),undefined)
+ await mount(EvolutionSignal,{candidate:{fly_id:generationZero,matches:[]}})
+ assert.match(document.body.textContent,/No parent comparison exists/)
+ const descriptor=(food,path)=>({behavior:[{schema:'sustained-foraging-v1',food,latter_half_food:food/2,upright_fraction:1}],task:{path_length_mm:[path]}})
+ await mount(EvolutionSignal,{candidate:{fly_id:generationZero,matches:[{id:'candidate-condition',status:'verified',request:{fly_ids:[generationZero],map_id:'orchard',mode:'forage',seed:42,duration_seconds:10},result:descriptor(3,30)}]},parent:{fly_id:founder,matches:[{id:'parent-condition',status:'verified',request:{fly_ids:[founder],map_id:'orchard',mode:'forage',seed:42,duration_seconds:10},result:descriptor(2,20)}]}})
+ assert.match(document.body.textContent,/Compared recorded condition pairs: 1/)
 })
 
 test('experiment guide opens recorded candidate and baseline, explains inputs and leaves missing data unknown',async()=>{
