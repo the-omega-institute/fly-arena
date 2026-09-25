@@ -10,6 +10,36 @@ node.
 
 `python scripts/sync_mac.py` sends an explicit source + built-web archive through NyxID exec, checks its SHA256 remotely, then extracts it. It does not transfer raw data, credentials, user databases or node configuration. Run `npm run build --prefix web` first. The remote directory is a deployment copy, not a Git checkout; the reviewable source lives on the feature branch in GitHub.
 
+Sync uses hex chunks that stay within the command-length assumption of the
+NyxID exec path. The defaults are one upload worker, 6,000 hex characters per
+chunk, and eight retries for HTTP 429 or transient HTTP 5xx responses. Tune a
+single run with `ARENA_SYNC_WORKERS`, `ARENA_SYNC_CHUNK_CHARS` (1--6,000), and
+`ARENA_SYNC_MAX_RETRIES`; these settings do not change the deployment target.
+Upload failures and successful extraction both remove that run's
+`.sync-<uuid>.*` staging files on a best-effort basis. A successful sync prints
+the exact remote dry-run cleanup command; review its table before applying it.
+
+## Deployment cleanup
+
+Cleanup is an allowlisted maintenance operation and is dry-run by default. It
+requires `ARENA_DEPLOY_PATH` or an explicit `--root` and reports each selected
+path, category, size, action and the total bytes:
+
+```sh
+python scripts/cleanup_deploy.py --root "${ARENA_DEPLOY_PATH}"
+python scripts/cleanup_deploy.py --root "${ARENA_DEPLOY_PATH}" --apply
+```
+
+The optional retention controls are `--keep-releases` (default 2),
+`--import-age-days` (default 7), and `--keep-backups` (default 5). The script
+can remove only old root-level `.sync-*` files, older release snapshots under
+`var/releases`, old `var/*-import-*` staging directories, old SQLite backup
+files named `var/arena-backup-*.sqlite3`, and sibling candidate checkouts with
+no process using them. It never selects the live database, research, run,
+artifact, data, log, virtual-environment or service-definition paths. Symlink
+roots are rejected and directory scans, size calculations and deletion do not
+follow symlinks out of the deployment root.
+
 To make a real replay visible on a source-only deployment, first create a
 read-only bundle from a verified match:
 
