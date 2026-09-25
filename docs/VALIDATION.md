@@ -6,10 +6,10 @@ Updated 2026-09-25. This is a living implementation report, not certification th
 
 Measured 2026-09-25 on branch `chore/public-release-prep`. These are the current command results for this release; the sections below are dated historical snapshots and are not current test results.
 
-- `PYTHONPATH=src /Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python -m pytest -q -m "not integration"`: 947 passed, 11 skipped, 3 deselected, 2 warnings in 238.86 seconds.
-- `cd web && npm test` with Node `v26.3.0`: 270 passed, 0 failed.
-- `cd web && env PATH="/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/node22/node_modules/.bin:/opt/homebrew/bin:/usr/bin:/bin" npm run test:journeys` with the supplied `/private/tmp/claude-501/-Users-lexa-Desktop-lexa-omega-fly-arena/d65d5b94-72e2-42bf-a52a-f6c68eea22b1/scratchpad/node22/node_modules/.bin/node` (`v22.23.3`): 81 passed, 0 failed.
-- `cd web && npm run build` with Node `v26.3.0`: passed; 2,273 modules transformed. The existing Vite chunk-size warning remains.
+- `PYTHONPATH=src uv run pytest -q -m "not integration"`: 947 passed, 11 skipped, 3 deselected, 2 warnings in 238.86 seconds.
+- `cd web && npm test` with Node 26: 270 passed, 0 failed.
+- `cd web && npm run test:journeys` with Node 22: 81 passed, 0 failed.
+- `cd web && npm run build` with Node 26: passed; 2,273 modules transformed. The existing Vite chunk-size warning remains.
 
 ## Dated historical snapshot: Confirmed locally (2026-09-16)
 
