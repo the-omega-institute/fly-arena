@@ -32,3 +32,30 @@ test('layout keeps keyboard-facing marker nodes in the same geometry contract',(
  assert.ok(marker.y>0)
  assert.ok(result.width>160&&result.height>=110)
 })
+
+test('layout separates real branches and marks the selected ancestor path',()=>{
+ const nodes=[
+  {id:'root',label:'Root',depth:-1,relation:'ancestor'},
+  {id:'center',label:'Duplicate name',depth:0,relation:'center'},
+  {id:'sibling',label:'Duplicate name',depth:0,relation:'sibling'},
+  {id:'child-a',label:'Child',depth:1,relation:'descendant'},
+  {id:'child-b',label:'Child',depth:1,relation:'descendant'},
+  {id:'more',label:'More lineage…',depth:2,relation:'descendant',marker:true},
+ ]
+ const edges=[
+  {from:'root',to:'center',relation:'parent'},
+  {from:'root',to:'sibling',relation:'sibling'},
+  {from:'center',to:'child-a',relation:'child'},
+  {from:'center',to:'child-b',relation:'child'},
+  {from:'child-a',to:'more',relation:'descendant'},
+ ]
+ const result=lineageLayout(nodes,edges,'center',180,96)
+ const point=id=>result.points.find(item=>item.node.id===id)
+ assert.equal(point('center').x,point('sibling').x)
+ assert.notEqual(point('center').y,point('sibling').y)
+ assert.notEqual(point('child-a').y,point('child-b').y)
+ assert.deepEqual(new Set(result.selectedPath),new Set(['root','center']))
+ assert.equal(result.paths.find(edge=>edge.from==='root'&&edge.to==='center').selected,true)
+ assert.equal(result.paths.find(edge=>edge.from==='root'&&edge.to==='sibling').selected,false)
+ assert.ok(result.paths.find(edge=>edge.from==='center'&&edge.to==='child-a').path.startsWith('M '))
+})
