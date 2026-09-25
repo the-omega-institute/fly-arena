@@ -37,6 +37,7 @@ const {PlaygroundGuide}=require('./src/features/guide/PlaygroundGuide.js')
 const {WildTypeChallenge}=require('./src/features/arena/WildTypeChallenge.js')
 const {matchingWildType,wildTypeChallenge}=require('./src/features/arena/wildtype.js')
 const {DevelopersFeature}=require('./src/features/developers/DevelopersFeature.js')
+const {EvolutionSignal,recordedParentSignal}=require('./src/features/training/EvolutionSignal.js')
 const {I18nProvider,Preferences}=require('./src/shared/i18n.js')
 let dom,root,originals
 test.beforeEach(()=>{
@@ -163,6 +164,26 @@ test('public gallery exposes real generations and branches without starting comp
  await click('Save a copy and prepare training');assert.equal(branched[0].id,fly.id);assert.equal(branched[0].runId,run.id)
  assert.deepEqual(requests.map(r=>r[1]),['GET'])
  globalThis.fetch=()=>{throw Error('Unexpected network')}
+})
+
+test('training signals resolve generation-zero and random-search parents from actual founder records',async()=>{
+ const founder='f'.repeat(32),generationZero='0'.repeat(32),randomCandidate='1'.repeat(32)
+ const verified={id:'founder-record',status:'verified',request:{fly_ids:[founder]}}
+ const failed={id:'failed-founder-record',status:'failed',request:{fly_ids:[founder]}}
+ const parentMember={fly_id:founder,matches:[{id:'member-founder-record',status:'verified',request:{fly_ids:[founder]}}]}
+ const generationZeroParent=recordedParentSignal(founder,[{fly_id:generationZero,matches:[]}],[verified,failed])
+ const randomSearchParent=recordedParentSignal(founder,[{fly_id:randomCandidate,matches:[]}],[verified,failed])
+ assert.equal(generationZeroParent?.fly_id,founder)
+ assert.deepEqual(generationZeroParent?.matches,[verified])
+ assert.equal(randomSearchParent?.fly_id,founder)
+ assert.deepEqual(randomSearchParent?.matches,[verified])
+ assert.equal(recordedParentSignal(founder,[parentMember],[verified])?.matches[0].id,'member-founder-record')
+ assert.equal(recordedParentSignal(null,[],[verified]),undefined)
+ await mount(EvolutionSignal,{candidate:{fly_id:generationZero,matches:[]}})
+ assert.match(document.body.textContent,/No parent comparison exists/)
+ const descriptor=(food,path)=>({behavior:[{schema:'sustained-foraging-v1',food,latter_half_food:food/2,upright_fraction:1}],task:{path_length_mm:[path]}})
+ await mount(EvolutionSignal,{candidate:{fly_id:generationZero,matches:[{id:'candidate-condition',status:'verified',request:{fly_ids:[generationZero],map_id:'orchard',mode:'forage',seed:42,duration_seconds:10},result:descriptor(3,30)}]},parent:{fly_id:founder,matches:[{id:'parent-condition',status:'verified',request:{fly_ids:[founder],map_id:'orchard',mode:'forage',seed:42,duration_seconds:10},result:descriptor(2,20)}]}})
+ assert.match(document.body.textContent,/Compared recorded condition pairs: 1/)
 })
 
 test('experiment guide opens recorded candidate and baseline, explains inputs and leaves missing data unknown',async()=>{

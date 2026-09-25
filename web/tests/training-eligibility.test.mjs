@@ -16,12 +16,12 @@ const eligibility=await moduleAt('../src/features/training/trainingEligibility.t
 const {mapEligibility}=await moduleAt('../src/types.ts')
 const {trainingMapIds,trainingBridgeProfiles,trainingEligibilityProblem,eligibleTrainingMaps}=eligibility
 const plan=await moduleAt('../src/features/training/plan.ts')
-const {recordedDescriptorDeltas,recordedDescriptorSummary}=await moduleAt('../src/features/training/recordedDescriptors.ts')
+const {recordedDescriptorDeltas,recordedDescriptorSummary,recordedDescriptorComparison,recordedDescriptorRecords}=await moduleAt('../src/features/training/recordedDescriptors.ts')
 const {shortHorizonTrainingGuidance}=await moduleAt('../src/features/training/planGuidance.ts')
 const {trainingMessages}=await moduleAt('../src/shared/messages/training.ts')
 const base={population:2,generations:1,budget:16,duration:1,seed:42,circuits:['olfactory'],name:'Contract test',mode:'forage',founder:'a'.repeat(32),opponent:'b'.repeat(32)}
 const maps=[...trainingMapIds,'maze','switchback','labyrinth','duel','unknown'].map(id=>({id,name:id,english:id,description:'',task:id==='blank'?{}:undefined}))
-const trainingMatch=(flyIds,result,status='verified')=>({id:'m',status,request:{fly_ids:flyIds},result})
+const trainingMatch=(flyIds,result,status='verified',condition={})=>({id:'m',status,request:{fly_ids:flyIds,map_id:'orchard',mode:'forage',seed:42,duration_seconds:10,bridge_profile:'legacy-v1',sensory_profile:'odor-only-v1',...condition},result})
 const behavior=(food,upright)=>({schema:'sustained-foraging-v1',food,latter_half_food:food/2,upright_fraction:upright,recorded_seconds:2,first_inversion_s:null,fitness:food*upright})
 
 test('frontend map and bridge lists exactly equal both backend training declarations',()=>{
@@ -150,6 +150,54 @@ test('descriptor deltas expose recorded change without using fitness or missing 
   {key:'path_length_mm',delta:2,candidate:6,parent:4}
  ])
  assert.deepEqual(recordedDescriptorDeltas(candidate,'candidate',[], 'parent'),[])
+})
+
+test('descriptor deltas pair identical map, seed, duration, bridge, sensory, mode, slot and opponent conditions',()=>{
+ const result=(food,path)=>({behavior:[behavior(food,1)],task:{path_length_mm:[path]}})
+ const slotOneResult=(food,path)=>({behavior:[behavior(0,1),behavior(food,1)],task:{path_length_mm:[0,path]}})
+ const partial={behavior:[null],task:null}
+ const candidate=[
+  trainingMatch(['candidate'],result(10,100),'verified',{seed:1}),
+  trainingMatch(['candidate'],result(14,140),'verified',{seed:2}),
+  trainingMatch(['candidate'],partial,'verified',{seed:3}),
+  trainingMatch(['candidate'],result(1,10),'verified',{map_id:'orchard',seed:4}),
+  trainingMatch(['candidate'],result(1,10),'verified',{map_id:'orchard',seed:5}),
+  trainingMatch(['candidate'],result(1,10),'verified',{map_id:'orchard',seed:7,duration_seconds:20}),
+  trainingMatch(['candidate','opponent-a'],result(1,10),'verified',{mode:'contest',seed:8}),
+  trainingMatch(['candidate','opponent-a'],result(1,10),'verified',{mode:'contest',seed:9}),
+  trainingMatch(['candidate'],result(99,999),'failed',{seed:1})
+ ]
+ const parent=[
+  trainingMatch(['parent'],result(4,40),'verified',{seed:1}),
+  trainingMatch(['parent'],result(8,80),'verified',{seed:2}),
+  trainingMatch(['parent'],partial,'verified',{seed:3}),
+  trainingMatch(['parent'],result(1,10),'verified',{map_id:'scarcity',seed:4}),
+  trainingMatch(['parent'],result(1,10),'verified',{map_id:'orchard',seed:6}),
+  trainingMatch(['parent'],result(1,10),'verified',{map_id:'orchard',seed:7}),
+  trainingMatch(['opponent-a','parent'],slotOneResult(1,10),'verified',{mode:'contest',seed:8}),
+  trainingMatch(['parent','opponent-b'],result(1,10),'verified',{mode:'contest',seed:9})
+ ]
+ const comparison=recordedDescriptorComparison(candidate,'candidate',parent,'parent')
+ assert.equal(recordedDescriptorRecords(candidate,'candidate').length,8,'failed sessions are not verified descriptor records')
+ assert.equal(comparison.pairs.length,3,'two complete and one partial condition pair are retained')
+ assert.equal(comparison.unmatchedCandidate.length,5)
+ assert.equal(comparison.unmatchedParent.length,5)
+ assert.equal(comparison.unavailableCandidate.length,1)
+ assert.equal(comparison.unavailableParent.length,1)
+ assert.deepEqual(comparison.deltas.find(item=>item.key==='food'),{key:'food',candidate:12,parent:6,delta:6})
+ assert.deepEqual(comparison.deltas.find(item=>item.key==='path_length_mm'),{key:'path_length_mm',candidate:120,parent:60,delta:60})
+ assert.equal(comparison.pairs[2].candidate.conditionKey,comparison.pairs[2].parent.conditionKey)
+})
+
+test('no identical recorded condition keys produce no delta, rather than a condition mix',()=>{
+ const result=food=>({behavior:[behavior(food,1)],task:{path_length_mm:[food]}})
+ const comparison=recordedDescriptorComparison(
+  [trainingMatch(['candidate'],result(8),'verified',{map_id:'orchard',seed:11})],'candidate',
+  [trainingMatch(['parent'],result(2),'verified',{map_id:'scarcity',seed:11})],'parent')
+ assert.equal(comparison.pairs.length,0)
+ assert.deepEqual(comparison.deltas,[])
+ assert.equal(comparison.unmatchedCandidate.length,1)
+ assert.equal(comparison.unmatchedParent.length,1)
 })
 
 test('short food horizons receive non-blocking guidance only',()=>{

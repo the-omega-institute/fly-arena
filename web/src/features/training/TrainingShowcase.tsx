@@ -10,11 +10,11 @@ import {ExperimentGuide} from './ExperimentGuide'
 import {summarizeRun,type ComparableRun} from './comparison'
 import {ConditionResults} from './ConditionResults'
 import type {ConditionResult} from './ConditionResults'
-import {EvolutionSignal} from './EvolutionSignal'
+import {EvolutionSignal,recordedParentSignal} from './EvolutionSignal'
 import {algorithmName} from './algorithms'
 import './training.css'
 export type PublishedRun=Omit<ComparableRun,'members'> & {best_fly_id:string;members:{generation:number;slot:number;fitness:number;fly_id:string;fly:Fly;matches:Match[];condition_results:ConditionResult[]}[]}
-export function TrainingShowcase({maps,onReplay,onBranch,copyAvailable=false,busy=false,revision=0}:{maps:ArenaMap[];onReplay:(m:Match)=>void;onBranch:(fly:Fly,spec:ComparableRun['spec'],runId:string)=>void;copyAvailable?:boolean;busy?:boolean;revision?:number}){
+export function TrainingShowcase({maps,matches=[],onReplay,onBranch,copyAvailable=false,busy=false,revision=0}:{maps:ArenaMap[];matches?:Match[];onReplay:(m:Match)=>void;onBranch:(fly:Fly,spec:ComparableRun['spec'],runId:string)=>void;copyAvailable?:boolean;busy?:boolean;revision?:number}){
  const {t}=useI18n();const [runs,setRuns]=useState<PublishedRun[]>([]);const [selected,setSelected]=useState(()=>new URLSearchParams(typeof location==='undefined'?'':location.hash.slice(1)).get('showcase')||'');const [generation,setGeneration]=useState(0);const [error,setError]=useState('');const [loading,setLoading]=useState(true)
  useEffect(()=>{const c=new AbortController();setLoading(true);api<PublishedRun[]>('/training-showcase',{signal:c.signal}).then(data=>{setRuns(data);setError('')}).catch(e=>{if(!c.signal.aborted)setError(String(e))}).finally(()=>{if(!c.signal.aborted)setLoading(false)});return()=>c.abort()},[revision])
  useEffect(()=>{const sync=()=>{setSelected(new URLSearchParams(location.hash.slice(1)).get('showcase')||'');setGeneration(0)};window.addEventListener('hashchange',sync);window.addEventListener('popstate',sync);return()=>{window.removeEventListener('hashchange',sync);window.removeEventListener('popstate',sync)}},[])
@@ -36,14 +36,14 @@ export function TrainingShowcase({maps,onReplay,onBranch,copyAvailable=false,bus
     <LineageBehavior key={current.id} run={current} onReplay={onReplay}/>
     <div className="generation-list">{Array.from({length:current.spec.generations},(_,g)=><button key={g} className={generation===g?'active':''} onClick={()=>setGeneration(g)}><span>{current.spec.strategy==='random_search'?'R':'G'}{g+1}</span><small>{current.members.filter(m=>m.generation===g).length} {t('evaluated')}</small></button>)}</div>
     <p className="training-hint">{t('Round best')}: {round?.best?.toFixed(4)??'—'} · {t('Historical best')}: {round?.bestSoFar?.toFixed(4)??'—'}</p>
-    <div className="showcase-individuals">{current.members.filter(m=>m.generation===generation).map(m=><article key={m.fly_id} className="training-individual">
+    <div className="showcase-individuals">{current.members.filter(m=>m.generation===generation).map(m=>{const parentId=m.fly.spec.parent_id;const parentSignal=recordedParentSignal(parentId,current.members,matches);return <article key={m.fly_id} className="training-individual">
       <span className="tiny-label">{current.spec.strategy==='random_search'?'R':'G'}{m.generation+1} · {m.slot+1}{m.fly_id===current.best_fly_id?' · '+t('Best so far'):''}</span><h3>{m.fly.name}</h3><a className="text-link" href={lifeHash(m.fly_id)}>{t('Open life record')}</a>
-      <div className="individual-score"><span>{t('Candidate fitness')}</span><strong>{m.fitness.toFixed(3)}</strong></div><EvolutionSignal candidate={m} parent={current.members.find(candidate=>candidate.fly_id===m.fly.spec.parent_id)}/>
+      <div className="individual-score"><span>{t('Candidate fitness')}</span><strong>{m.fitness.toFixed(3)}</strong></div><EvolutionSignal candidate={m} parent={parentSignal}/>
       <p>{t('Parent')} · {m.fly.spec.parent_id?.slice(0,8)} · {t('Mutation budget')} {m.fly.report.budget_used.toFixed(2)}</p>
       <div className="individual-genes">{m.fly.spec.weight_mutations.length?m.fly.spec.weight_mutations.map(w=><span key={w.selector}>{t(w.selector)} ×{w.scale.toFixed(3)}</span>):<span>{t('Baseline')}</span>}</div>
       <ConditionResults results={m.condition_results} maps={maps} onReplay={onReplay}/>
       <button className="secondary" disabled={!copyAvailable||busy} onClick={()=>onBranch(m.fly,current.spec,current.id)}>{t('Save a copy and prepare training')}<ArrowRight size={14}/></button>
-    </article>)}</div>
+    </article>})}</div>
    </>}
    <TrainingComparison runs={runs} maps={maps} flies={runs.flatMap(r=>r.members.map(m=>m.fly))} onOpen={selectRun}/>
   </>}

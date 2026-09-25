@@ -56,4 +56,11 @@ export const trainingMessages = {
   'Recorded second-half food':{'en':'Recorded second-half food','zh-CN':'记录后半程摄取量'},
   'Recorded upright fraction':{'en':'Recorded upright fraction','zh-CN':'记录正立比例'},
   'Recorded path length':{'en':'Recorded path length','zh-CN':'记录路径长度'},
+  'No parent comparison exists.':{'en':'No parent comparison exists.','zh-CN':'不存在可用的亲代对照。'},
+  'No comparable recorded conditions.':{'en':'No comparable recorded conditions.','zh-CN':'没有可比较的已记录条件。'},
+  'Compared recorded condition pairs':{'en':'Compared recorded condition pairs','zh-CN':'已比较的已记录条件对'},
+  'Candidate-only recorded conditions':{'en':'Candidate-only recorded conditions','zh-CN':'仅候选者拥有的已记录条件'},
+  'Parent-only recorded conditions':{'en':'Parent-only recorded conditions','zh-CN':'仅亲代拥有的已记录条件'},
+  'Candidate unavailable recorded conditions':{'en':'Candidate unavailable recorded conditions','zh-CN':'候选者描述量不可用的已记录条件'},
+  'Parent unavailable recorded conditions':{'en':'Parent unavailable recorded conditions','zh-CN':'亲代描述量不可用的已记录条件'},
 } as const
