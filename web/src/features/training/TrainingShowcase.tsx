@@ -10,6 +10,7 @@ import {ExperimentGuide} from './ExperimentGuide'
 import {summarizeRun,type ComparableRun} from './comparison'
 import {ConditionResults} from './ConditionResults'
 import type {ConditionResult} from './ConditionResults'
+import {EvolutionSignal} from './EvolutionSignal'
 import {algorithmName} from './algorithms'
 import './training.css'
 export type PublishedRun=Omit<ComparableRun,'members'> & {best_fly_id:string;members:{generation:number;slot:number;fitness:number;fly_id:string;fly:Fly;matches:Match[];condition_results:ConditionResult[]}[]}
@@ -37,7 +38,7 @@ export function TrainingShowcase({maps,onReplay,onBranch,copyAvailable=false,bus
     <p className="training-hint">{t('Round best')}: {round?.best?.toFixed(4)??'—'} · {t('Historical best')}: {round?.bestSoFar?.toFixed(4)??'—'}</p>
     <div className="showcase-individuals">{current.members.filter(m=>m.generation===generation).map(m=><article key={m.fly_id} className="training-individual">
       <span className="tiny-label">{current.spec.strategy==='random_search'?'R':'G'}{m.generation+1} · {m.slot+1}{m.fly_id===current.best_fly_id?' · '+t('Best so far'):''}</span><h3>{m.fly.name}</h3><a className="text-link" href={lifeHash(m.fly_id)}>{t('Open life record')}</a>
-      <div className="individual-score"><span>{t('Candidate fitness')}</span><strong>{m.fitness.toFixed(3)}</strong></div>
+      <div className="individual-score"><span>{t('Candidate fitness')}</span><strong>{m.fitness.toFixed(3)}</strong></div><EvolutionSignal candidate={m} parent={current.members.find(candidate=>candidate.fly_id===m.fly.spec.parent_id)}/>
       <p>{t('Parent')} · {m.fly.spec.parent_id?.slice(0,8)} · {t('Mutation budget')} {m.fly.report.budget_used.toFixed(2)}</p>
       <div className="individual-genes">{m.fly.spec.weight_mutations.length?m.fly.spec.weight_mutations.map(w=><span key={w.selector}>{t(w.selector)} ×{w.scale.toFixed(3)}</span>):<span>{t('Baseline')}</span>}</div>
       <ConditionResults results={m.condition_results} maps={maps} onReplay={onReplay}/>
