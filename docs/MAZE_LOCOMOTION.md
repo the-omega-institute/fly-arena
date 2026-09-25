@@ -220,34 +220,103 @@ low-stability component of the observed wall/drive interaction. That is a
 hypothesis, not evidence of prevention or righting. This replay provides neither
 the candidate's counterfactual response nor a paired candidate evaluation.
 
-## Why the v5 candidate failed — analysis plan
+## Why the v5 candidate failed - measured comparison
 
-This section is a plan for analyzing the recorded phase-2 arms; it intentionally
-does not report results. The comparison uses only each arm's receipt-bound
-`frames.json` and `events.json`. It labels candidate `motor_body_state` values
-as recorded, and labels pose-derived upright/rate values as proxies. It does
-not rerun either arm, infer wall contact from proximity, or treat a modeled
-propulsion factor as a measured force.
+This section reports a recording-only comparison of the five receipt-bound
+phase-2 pairs. It uses the comparison script at
+`82d56191f0555190a3b3e55c52ea1df34ce8c7d973d671788783ec0ce8d86351` and the
+compact [arm-comparison evidence](evidence/maze-phase2-20260924-arm-comparison.json).
+The source files were not rerun or modified. Recorded candidate
+`motor_body_state` values are labeled as recorded. The `upright_z`, roll-rate
+and pitch-rate values used here come from those candidate recordings; they are
+not inferred from the trajectory. The attenuation factor is explicitly a
+modelled value computed from recorded inputs and candidate receipt
+configuration, not a measured force or actuator torque.
 
-Run the analysis for one seed with:
+The exact per-seed command was run from `/Users/macstudio/fly-arena-mvp` with
+the Mac Studio deploy environment:
 
 ```sh
-PYTHONPATH=src .venv/bin/python scripts/compare_phase2_arms.py \
-  var/research/issue82-phase2/study-20260924/seed-42
+for seed in {42..46}; do
+  PYTHONPATH=src /Users/macstudio/fly-arena-mvp/.venv/bin/python \
+    scripts/compare_phase2_arms.py \
+    "var/research/issue82-phase2/study-20260924/seed-$seed"
+done
 ```
 
-The script's outputs should distinguish these hypotheses:
+The comparison uses a 5.0 s drive window ending at each arm's first recorded
+inversion, an initial-pose-relative inversion threshold of `upright_z < 0`,
+recorded `environment_contact`/wall-contact onsets only, and a 1 mm relative
+XY path-separation threshold. All pairs have 3,601 common recorded timestamps.
+The evidence file records the condensation rule: correction-input time series
+were replaced by their key list, long attenuation lists were reduced to count
+plus their first 40 entries, and trajectory samples were kept every 100th
+sample. The values below are the retained scalars and short context lists.
 
-| Hypothesis | Output pattern to inspect | Evidence still not established |
+### Per-seed outcome and contact context
+
+Later first inversion is favorable. The candidate was worse in seeds 42, 45
+and 46, and later in seeds 43 and 44, matching the preregistered negative
+set-level verdict.
+
+| Seed | First inversion baseline -> candidate (s) | Candidate change (s) | Inversion episodes, baseline -> candidate | Wall-onset count before first inversion, baseline -> candidate | Last candidate onset -> inversion (s) | First >1 mm divergence / maximum (s / mm) |
+|---:|---:|---:|---|---:|---:|---:|
+| 42 (worse) | 51.75 -> 17.75 | -34.00 | 5 (5 recovered) -> 1 (0 recovered) | 196 -> 170 | 17.66 -> 17.75 (0.09) | 1.40 / 26.3820 |
+| 43 (improved) | 1.50 -> 22.30 | +20.80 | 1 (0 recovered) -> 2 (1 recovered) | 1 -> 61 | 21.42 -> 22.30 (0.88) | 0.80 / 12.5115 |
+| 44 (improved) | 27.95 -> 36.15 | +8.20 | 4 (3 recovered) -> 4 (3 recovered) | 33 -> 110 | 35.96 -> 36.15 (0.19) | 1.35 / 27.5695 |
+| 45 (worse) | 20.75 -> 13.50 | -7.25 | 4 (3 recovered) -> 1 (0 recovered) | 16 -> 37 | 13.01 -> 13.50 (0.49) | 2.75 / 18.1253 |
+| 46 (worse) | 28.20 -> 9.10 | -19.10 | 1 (0 recovered) -> 1 (0 recovered) | 39 -> 27 | 8.95 -> 9.10 (0.15) | 2.75 / 18.0703 |
+
+Every candidate first inversion had a recorded wall-onset event shortly before
+it, with lead times from 0.09 to 0.88 s. That association is also present in
+every baseline arm, with lead times from 0.02 to 0.37 s. It therefore does not
+separate the candidate failure from baseline behavior. The paired trajectories
+also diverged above 1 mm in 0.80 to 2.75 s, well before some first inversions;
+the paired recordings are not identical histories after the intervention.
+
+### What each hypothesis supports
+
+| Hypothesis | Verdict with these recordings | Measured finding |
 |---|---|---|
-| Attenuated propulsion leaves the fly pushed into walls. | Candidate modeled attenuation periods overlap recorded wall-contact onsets and the first-inversion context; compare candidate wall events and trajectory divergence with the baseline arm. | The output does not measure wall force, causality, or whether attenuation caused the contact. |
-| Correction amplifies roll on uneven support. | Recorded candidate roll/pitch rates and tarsal-support inputs change before the inversion; compare the candidate's left/right drive before each inversion with the baseline and inspect the context window. | Pose-rate proxies and drive asymmetry do not identify the applied restoring moment or prove that support was uneven. |
-| Earlier inversions arise from altered gait. | Candidate and baseline first-inversion times, trajectory-divergence time, drive histories, and candidate attenuation periods separate before the first inversion without a preceding recorded wall onset. | A paired observational comparison cannot isolate gait mechanics from body, contact, or neural feedback interactions. |
+| Attenuated propulsion leaves the fly pushed into walls. | **Not distinguishable** | The candidate has one modelled attenuation period from 0.05 to 180.00 s in every seed, with a modelled minimum factor of 0.2; its last recorded wall onset precedes the first inversion in all five seeds. However, candidate wall-onset counts are lower than baseline in 42 (170 vs 196) and 46 (27 vs 39), and higher in 43 (61 vs 1), 44 (110 vs 33) and 45 (37 vs 16). The mixed outcome and absence of wall force or torque measurements do not support a causal claim that attenuation left the fly pushed into a wall. |
+| Correction amplifies roll on uneven support. | **Not distinguishable** | The candidate context contains recorded state changes compatible with this mechanism. At -0.5 s and at inversion, respectively, candidate roll/pitch rates and left/right support fractions were: seed 42, (-31.4405, -10.9143; 0.333/0.333) -> (6.6801, 33.4309; 0/0); 43, (-45.9494, -15.1985; 0.333/0.333) -> (72.1953, -24.2903; 0.333/0); 44, (-44.6385, -8.0468; 0.333/0.333) -> (-11.6947, 60.2970; 0.667/0); 45, (6.2504, 5.5813; 0.333/0.667) -> (-101.9974, -27.5445; 0/0); and 46, (-0.5156, -3.3628; 1/0.333) -> (2.7289, 26.6599; 0.333/0). These are recorded inputs/state observations, not the applied restoring moment. Seed 42 has equal support at both listed pre-inversion points, and no run records the force or torque that would establish amplification. |
+| Earlier inversions arise from altered gait. | **Not distinguishable** | The 5 s recorded drive summaries differ between arms, but not in one outcome-predicting direction. Baseline -> candidate left/right means were 42: (0.026123, 0.192558) -> (0.021705, 0.169419); 43: (0.353577, 0.222643) -> (0.309100, 0.121433); 44: (0.234217, 0.101615) -> (0.361011, 0.079261); 45: (0.212820, 0.108537) -> (0.225417, 0.177709); and 46: (0.441050, 0.199162) -> (0.327839, 0.093109). Candidate first inversion was earlier in 42/45/46 but later in 43/44, while trajectory divergence exceeded 1 mm in every pair. Altered recorded drive is supported as a correlate; altered gait as the cause of the earlier inversions is not identified. |
 
-The required per-seed report is the output of
-`scripts/compare_phase2_arms.py`; results and interpretations belong in a
-separate evidence record after review. This skeleton records the analysis
-questions only and does not fill in phase-2 results.
+The candidate attenuation periods are modelled from recorded correction inputs
+and receipt configuration. Their per-seed reported maximum factors were 0.999432,
+0.999916, 0.999682, 0.999532 and 0.999988 for seeds 42 through 46,
+respectively; the baseline attenuation status is unavailable because the
+baseline receipt contains no candidate correction configuration. These values
+must not be read as measured propulsion or wall force.
+
+### What remains unestablished
+
+The recordings establish paired timing, recorded contact onsets, bilateral
+drives, candidate state inputs and trajectory separation. They do not establish
+wall reaction forces, foot-ground forces, actuator torques, individual foothold
+geometry, the applied correction moment, or a causal role for contact-driven
+neural feedback. A 20 Hz pose/contact record also cannot resolve events between
+samples. Baseline pose-rate values are proxies when the candidate state fields
+are absent, so their rates cannot be treated as a direct force or controller
+comparison. None of these observations is a biological activity or behavior
+claim.
+
+### Minimal next experiment (not run)
+
+Use a preregistered short mechanics intervention with the same initial state,
+body, timestep, seed and measured pre-inversion drive history. The minimum
+diagnostic is a 2 x 2 comparison of walls present/absent and the existing
+candidate correction off/on, replaying the common drive open-loop with neural
+feedback disabled. Record contact forces and torques if exposed by the
+engine, alongside contact points, support, pose and bilateral drive. Add one
+matched closed-loop pair with the same initial state to test whether feedback
+changes the result. A wall-specific inversion that disappears without walls
+would support a mechanics interaction; a candidate-only change under equal wall
+conditions with a corresponding support/roll change would support a correction
+interaction; divergence without walls or feedback would support an altered
+drive/body mechanism. This is a mechanics diagnosis using existing profiles,
+not a synthetic behavioral recording, and it requires no gain change or
+scripted steering. It was not run for this report.
 
 ## Preregistered phase-2 protocol
 

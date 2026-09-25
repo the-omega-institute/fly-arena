@@ -1,0 +1,140 @@
+{
+  "schema": "maze-phase2-arm-comparison-evidence/v1",
+  "study": "issue82-phase2/study-20260924",
+  "comparison_script": {
+    "path": "scripts/compare_phase2_arms.py",
+    "sha256": "82d56191f0555190a3b3e55c52ea1df34ce8c7d973d671788783ec0ce8d86351"
+  },
+  "condensation_note": "Source reports were condensed before review: correction_inputs time series were dropped and replaced by their key list; long propulsion_attenuation lists were truncated to count plus their first 40 entries; trajectory samples were decimated every 100th sample. This evidence file retains only fields cited in docs/MAZE_LOCOMOTION.md.",
+  "analysis_policy": {
+    "recording_only": true,
+    "drive_window_s": 5.0,
+    "inversion_definition": "first recorded thorax pose sample with initial-pose-relative upright_z < 0",
+    "wall_onset_definition": "recorded wall_contact/environment_contact event before the first inversion; no proximity inference",
+    "trajectory_threshold_mm": 1.0,
+    "common_recorded_timestamps": 3601
+  },
+  "provenance": {
+    "candidate_correction_inputs": "recorded motor_body_state",
+    "baseline_missing_correction_inputs": "pose_derived_proxy or unavailable",
+    "attenuation_status": {"baseline": "unavailable", "candidate": "available"}
+  },
+  "candidate_attenuation_model": "modelled from recorded correction inputs and candidate receipt configuration; not a measured force or torque",
+  "seeds": [
+    {
+      "seed": 42,
+      "outcome": "worse",
+      "first_inversion_s": {"baseline": 51.75, "candidate": 17.75, "candidate_minus_baseline": -34.0},
+      "inversion_episodes": {
+        "baseline": {"total": 5, "recovered": 5},
+        "candidate": {"total": 1, "recovered": 0}
+      },
+      "wall_onsets_before_first_inversion": {
+        "baseline": {"count": 196, "last_time_s": 51.73},
+        "candidate": {"count": 170, "last_time_s": 17.66}
+      },
+      "trajectory_divergence": {"first_over_threshold_s": 1.4, "max_separation_mm": 26.382008138511747},
+      "candidate_attenuation": {"period": {"start_s": 0.05, "end_s": 180.0, "samples": 3600, "min_factor": 0.2, "max_factor": 0.9994317101148634}},
+      "drive_before_first_inversion": {
+        "baseline": {"left_mean": 0.026123, "right_mean": 0.192558},
+        "candidate": {"left_mean": 0.021705, "right_mean": 0.169419}
+      },
+      "candidate_context": {
+        "offset_minus_0_5_s": {"roll_rate": -31.44054434112074, "pitch_rate": -10.914309581642792, "support_left": 0.3333333333333333, "support_right": 0.3333333333333333},
+        "at_inversion": {"roll_rate": 6.680074749852343, "pitch_rate": 33.43085312574937, "support_left": 0.0, "support_right": 0.0}
+      }
+    },
+    {
+      "seed": 43,
+      "outcome": "improved",
+      "first_inversion_s": {"baseline": 1.5, "candidate": 22.3, "candidate_minus_baseline": 20.8},
+      "inversion_episodes": {
+        "baseline": {"total": 1, "recovered": 0},
+        "candidate": {"total": 2, "recovered": 1}
+      },
+      "wall_onsets_before_first_inversion": {
+        "baseline": {"count": 1, "last_time_s": 1.3},
+        "candidate": {"count": 61, "last_time_s": 21.42}
+      },
+      "trajectory_divergence": {"first_over_threshold_s": 0.8, "max_separation_mm": 12.511540971199352},
+      "candidate_attenuation": {"period": {"start_s": 0.05, "end_s": 180.0, "samples": 3600, "min_factor": 0.2, "max_factor": 0.99991641861074}},
+      "drive_before_first_inversion": {
+        "baseline": {"left_mean": 0.3535766666666666, "right_mean": 0.22264333333333336},
+        "candidate": {"left_mean": 0.3091, "right_mean": 0.121433}
+      },
+      "candidate_context": {
+        "offset_minus_0_5_s": {"roll_rate": -45.94944318961978, "pitch_rate": -15.198534382485848, "support_left": 0.3333333333333333, "support_right": 0.3333333333333333},
+        "at_inversion": {"roll_rate": 72.19525006889212, "pitch_rate": -24.29032465326337, "support_left": 0.3333333333333333, "support_right": 0.0}
+      }
+    },
+    {
+      "seed": 44,
+      "outcome": "improved",
+      "first_inversion_s": {"baseline": 27.95, "candidate": 36.15, "candidate_minus_baseline": 8.2},
+      "inversion_episodes": {
+        "baseline": {"total": 4, "recovered": 3},
+        "candidate": {"total": 4, "recovered": 3}
+      },
+      "wall_onsets_before_first_inversion": {
+        "baseline": {"count": 33, "last_time_s": 27.92},
+        "candidate": {"count": 110, "last_time_s": 35.96}
+      },
+      "trajectory_divergence": {"first_over_threshold_s": 1.35, "max_separation_mm": 27.56945645291543},
+      "candidate_attenuation": {"period": {"start_s": 0.05, "end_s": 180.0, "samples": 3600, "min_factor": 0.2, "max_factor": 0.9996824585986033}},
+      "drive_before_first_inversion": {
+        "baseline": {"left_mean": 0.23421699999999998, "right_mean": 0.101615},
+        "candidate": {"left_mean": 0.3610110000000001, "right_mean": 0.079261}
+      },
+      "candidate_context": {
+        "offset_minus_0_5_s": {"roll_rate": -44.638452883445694, "pitch_rate": -8.046847498464434, "support_left": 0.3333333333333333, "support_right": 0.3333333333333333},
+        "at_inversion": {"roll_rate": -11.69469252180279, "pitch_rate": 60.29695940827598, "support_left": 0.6666666666666666, "support_right": 0.0}
+      }
+    },
+    {
+      "seed": 45,
+      "outcome": "worse",
+      "first_inversion_s": {"baseline": 20.75, "candidate": 13.5, "candidate_minus_baseline": -7.25},
+      "inversion_episodes": {
+        "baseline": {"total": 4, "recovered": 3},
+        "candidate": {"total": 1, "recovered": 0}
+      },
+      "wall_onsets_before_first_inversion": {
+        "baseline": {"count": 16, "last_time_s": 20.39},
+        "candidate": {"count": 37, "last_time_s": 13.01}
+      },
+      "trajectory_divergence": {"first_over_threshold_s": 2.75, "max_separation_mm": 18.125309775410734},
+      "candidate_attenuation": {"period": {"start_s": 0.05, "end_s": 180.0, "samples": 3600, "min_factor": 0.2, "max_factor": 0.9995317373054146}},
+      "drive_before_first_inversion": {
+        "baseline": {"left_mean": 0.21281999999999995, "right_mean": 0.108537},
+        "candidate": {"left_mean": 0.22541699999999998, "right_mean": 0.177709}
+      },
+      "candidate_context": {
+        "offset_minus_0_5_s": {"roll_rate": 6.250403548776991, "pitch_rate": 5.58128510049048, "support_left": 0.3333333333333333, "support_right": 0.6666666666666666},
+        "at_inversion": {"roll_rate": -101.99737865674311, "pitch_rate": -27.544527968171213, "support_left": 0.0, "support_right": 0.0}
+      }
+    },
+    {
+      "seed": 46,
+      "outcome": "worse",
+      "first_inversion_s": {"baseline": 28.2, "candidate": 9.1, "candidate_minus_baseline": -19.1},
+      "inversion_episodes": {
+        "baseline": {"total": 1, "recovered": 0},
+        "candidate": {"total": 1, "recovered": 0}
+      },
+      "wall_onsets_before_first_inversion": {
+        "baseline": {"count": 39, "last_time_s": 27.83},
+        "candidate": {"count": 27, "last_time_s": 8.95}
+      },
+      "trajectory_divergence": {"first_over_threshold_s": 2.75, "max_separation_mm": 18.070290576103087},
+      "candidate_attenuation": {"period": {"start_s": 0.05, "end_s": 180.0, "samples": 3600, "min_factor": 0.2, "max_factor": 0.9999880297995514}},
+      "drive_before_first_inversion": {
+        "baseline": {"left_mean": 0.44105000000000005, "right_mean": 0.19916199999999995},
+        "candidate": {"left_mean": 0.32783899999999994, "right_mean": 0.093109}
+      },
+      "candidate_context": {
+        "offset_minus_0_5_s": {"roll_rate": -0.5156003100659307, "pitch_rate": -3.3627572270267247, "support_left": 1.0, "support_right": 0.3333333333333333},
+        "at_inversion": {"roll_rate": 2.728907263629033, "pitch_rate": 26.659919032379936, "support_left": 0.3333333333333333, "support_right": 0.0}
+      }
+    }
+  ]
+}
