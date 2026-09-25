@@ -12,6 +12,7 @@ import shlex
 import subprocess
 import sys
 import tarfile
+import textwrap
 import uuid
 from pathlib import PurePosixPath, PureWindowsPath
 
@@ -39,18 +40,73 @@ def validate_archive_member(member):
     return member
 
 
-def safe_archive_filter(member, destination):
+def _confine_archive_member(member, destination):
     member = validate_archive_member(member)
+    root = Path(destination).resolve()
+    target = (root / member.name).resolve()
+    if not target.is_relative_to(root):
+        raise ValueError(f"Unsafe archive path: {member.name!r}")
+    return member
+
+
+def safe_archive_filter(member, destination):
+    member = _confine_archive_member(member, destination)
     data_filter = getattr(tarfile, "data_filter", None)
-    return data_filter(member, destination) if data_filter else member
+    if data_filter:
+        try:
+            return data_filter(member, destination)
+        except tarfile.FilterError as exc:
+            raise ValueError(f"Unsafe archive member: {member.name!r}") from exc
+    return member
 
 
 def safe_extract(archive, destination):
-    members = [validate_archive_member(member) for member in archive.getmembers()]
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    members = [safe_archive_filter(member, destination) for member in archive.getmembers()]
     if "filter" in inspect.signature(archive.extractall).parameters:
         archive.extractall(destination, members=members, filter=safe_archive_filter)
     else:
         archive.extractall(destination, members=members)
+
+
+def remote_extraction_code(archive_path, destination, bundle_sha256):
+    """Return the Python 3.12+ extractor executed on the configured host."""
+    return textwrap.dedent(f"""
+        import hashlib
+        import io
+        import pathlib
+        import sys
+        import tarfile
+
+        if sys.version_info < (3, 12):
+            raise RuntimeError("Remote source synchronization requires Python 3.12 or newer")
+
+        archive_path = pathlib.Path({str(archive_path)!r})
+        bundle = bytes.fromhex(archive_path.read_text())
+        if hashlib.sha256(bundle).hexdigest() != {bundle_sha256!r}:
+            raise RuntimeError("Source bundle checksum mismatch")
+        destination = pathlib.Path({str(destination)!r})
+        destination.mkdir(parents=True, exist_ok=True)
+
+        def safe(member, root):
+            posix = pathlib.PurePosixPath(member.name)
+            windows = pathlib.PureWindowsPath(member.name)
+            if (not member.name or posix.is_absolute() or windows.is_absolute() or
+                    windows.drive or ".." in posix.parts or ".." in windows.parts or
+                    member.issym() or member.islnk() or member.isdev()):
+                raise RuntimeError("Unsafe archive member: " + member.name)
+            root = root.resolve()
+            if not (root / member.name).resolve().is_relative_to(root):
+                raise RuntimeError("Unsafe archive path: " + member.name)
+            return tarfile.data_filter(member, root)
+
+        with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
+            members = [safe(member, destination) for member in archive.getmembers()]
+            archive.extractall(destination, members=members, filter=safe)
+        archive_path.unlink()
+        print("Source bundle verified and synchronized")
+    """).strip()
 
 
 def remote(command):
@@ -93,26 +149,7 @@ def main():
             if i % 20 == 0:
                 print(f"Transfer {min((i+1)*3000,len(bundle)):,}/{len(bundle):,} bytes", flush=True)
     remote(f"cat {shlex.quote(stage)}.* > {shlex.quote(stage + '.hex')}")
-    code = (
-        "import hashlib,io,inspect,tarfile,pathlib\n"
-        f"p=pathlib.Path({stage + '.hex'!r});b=bytes.fromhex(p.read_text())\n"
-        f"assert hashlib.sha256(b).hexdigest()=={hashlib.sha256(bundle).hexdigest()!r}\n"
-        f"root=pathlib.Path({remote_path!r})\n"
-        "def safe(m,d):\n"
-        " q=pathlib.PurePosixPath(m.name);w=pathlib.PureWindowsPath(m.name)\n"
-        " if (not m.name or q.is_absolute() or w.is_absolute() or w.drive or '..' in q.parts or '..' in w.parts or m.issym() or m.islnk() or m.isdev()):\n"
-        "  raise RuntimeError('unsafe archive member: '+m.name)\n"
-        " f=getattr(tarfile,'data_filter',None)\n"
-        " return f(m,d) if f else m\n"
-        "with tarfile.open(fileobj=io.BytesIO(b),mode='r:gz') as a:\n"
-        " members=[safe(m,root) for m in a.getmembers()]\n"
-        " if 'filter' in inspect.signature(a.extractall).parameters:\n"
-        "  a.extractall(root,members=members,filter=safe)\n"
-        " else:\n"
-        "  a.extractall(root,members=members)\n"
-        "p.unlink()\n"
-        "print('Source bundle verified and synchronized')"
-    )
+    code = remote_extraction_code(stage + ".hex", remote_path, hashlib.sha256(bundle).hexdigest())
     print(remote(f"/usr/bin/python3 -c {shlex.quote(code)}"), flush=True)
     print(f"Synced {len(bundle):,} bytes to {remote_path}", flush=True)
 

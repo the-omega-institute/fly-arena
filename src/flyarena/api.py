@@ -108,14 +108,16 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
                 return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
             # Read at most one bounded stream before handing the body to FastAPI. A
             # missing or false Content-Length must not turn into an unbounded body().
-            chunks = []
+            body = bytearray()
             received = 0
             async for chunk in request.stream():
                 received += len(chunk)
                 if received > MAX_REQUEST_BYTES:
                     return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
-                chunks.append(chunk)
-            request._body = b"".join(chunks)
+                body.extend(chunk)
+            if size and received != int(size):
+                return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
+            request._body = bytes(body)
         response = await call_next(request)
         if request.url.path.startswith("/api/v1/auth") or request.url.path == "/api/v1/me":
             response.headers["Cache-Control"] = "no-store"

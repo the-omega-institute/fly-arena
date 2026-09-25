@@ -18,6 +18,6 @@ In the first recorded controls, no input produced zero activity. At 1.5 s the od
 
 ## Compute and queue
 
-Browser playback and 3D previews do not require the 4060. Current production neural simulation uses CPU/Numba with MuJoCo; offline images can use the RTX 4060. Interactive matches precede recent evolution evaluations, while jobs waiting at least ten minutes return to oldest-first priority. Research jobs and matches alternate when both are waiting. Running jobs finish without preemption.
+Browser playback and 3D previews do not require the GPU worker. Current production neural simulation uses CPU/Numba with MuJoCo; offline images can use the GPU worker. Interactive matches precede recent evolution evaluations, while jobs waiting at least ten minutes return to oldest-first priority. Research jobs and matches alternate when both are waiting. Running jobs finish without preemption.
 
 The queue displays current match position and approximate time based on the last 30 verified completions, including their queue wait. This is a conservative historical estimate, not a deadline. Without samples, or when research work may intervene, the wait is unknown. The local worker remains serial; this change does not add a distributed scheduler.

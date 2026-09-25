@@ -2,12 +2,14 @@
 // browser. Every request is intercepted; no listener, backend or live auth used.
 import assert from 'node:assert/strict'
 import {readFile,mkdir,writeFile} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
 import {resolve,extname} from 'node:path'
 import {fileURLToPath} from 'node:url'
 import {flies as fixtureFlies,catalog} from './ui-fixtures.mjs'
-const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'/tmp/fly-arena-browser-qa/node_modules/playwright/index.mjs')
+const playwrightModule=process.env.PLAYWRIGHT_MODULE;if(!playwrightModule)throw new Error('Set PLAYWRIGHT_MODULE to the installed Playwright module')
+const {chromium}=await import(playwrightModule)
 const dist=fileURLToPath(new URL('../dist/',import.meta.url))
-const output=process.env.QA_OUTPUT||'/tmp/fly-arena-ui-fix-v3'
+const output=process.env.QA_OUTPUT||`${tmpdir()}/fly-arena-ui-fix-v3`
 await mkdir(output,{recursive:true})
 const browser=await chromium.launch({headless:true})
 const context=await browser.newContext({viewport:{width:1440,height:1100},locale:'en-US',colorScheme:'light'})

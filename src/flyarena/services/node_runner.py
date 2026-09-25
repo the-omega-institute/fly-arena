@@ -68,7 +68,7 @@ def run(ident: str):
         status = json.loads((path/'status.json').read_text())
     try:
         # All heavy jobs on this node share one lock, including operator experiments.
-        with Path(os.environ.get('ARENA_NODE_LOCK', '/tmp/fly-arena-gpu.lock')).open('a') as lock:
+        with Path(os.environ.get('ARENA_NODE_LOCK', str(VAR / 'gpu.lock'))).open('a') as lock:
             fcntl.flock(lock, fcntl.LOCK_EX)
             from ..compiler import Compiler
             from ..connectome import Connectome

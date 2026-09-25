@@ -234,7 +234,7 @@ modelled value computed from recorded inputs and candidate receipt
 configuration, not a measured force or actuator torque.
 
 The exact per-seed command was run from the configured deployment root with the
-Mac Studio deploy environment. Set `ARENA_DEPLOY_PATH` to that root before
+configured deployment host deploy environment. Set `ARENA_DEPLOY_PATH` to that root before
 running it:
 
 ```sh
@@ -334,7 +334,7 @@ pairs and their negative set-level verdict are reported below.
 | Contact model | `engineered-kernel-contact-v1` |
 | Horizon | 180 s simulated |
 | Seeds | 42, 43, 44, 45, 46 |
-| Execution | Mac Studio, serialized one run at a time |
+| Execution | configured deployment host, serialized one run at a time |
 | Baseline | current selected motor profile, with the same body/readout/runtime |
 | Candidate | `dn-cpg-recovery-v5-candidate`, sandbox observation only |
 
@@ -401,7 +401,7 @@ later study; they do not establish biological righting or competition fitness.
 
 ## Phase-2 execution harness
 
-Run the frozen ten observations **on Mac Studio**, from its matching source and
+Run the frozen ten observations **on configured deployment host**, from its matching source and
 prepared environment. This invokes `runner.simulate` directly, with the existing
 WT artifact and research-v2 readout. SQLite is opened read-only to obtain the WT;
 no match, job, standings or leaderboard row is created. Each child exits before
@@ -490,7 +490,7 @@ subsequently completed and is reported below.
 ## Completed phase-2 study: 2026-09-24
 
 **Preregistered verdict: negative.** All ten 180-second observations completed
-on Mac Studio in 21,892.84 wall seconds (6 h 4 min 53 s). Seeds 43 and 44
+on configured deployment host in 21,892.84 wall seconds (6 h 4 min 53 s). Seeds 43 and 44
 improved under the joint rule; seeds 42, 45 and 46 were negative. There were
 no incomplete or invalid pairs, no reported protocol violations and no recorded
 execution errors. Issue #82 remains unresolved. This candidate does not meet
@@ -526,7 +526,7 @@ Original recordings remain at
 deployment root is intentionally not recorded here).
 
 A separate [post-completion evidence audit](evidence/maze-phase2-20260924-audit.json)
-rechecked all ten observations on Mac Studio without running another simulation
+rechecked all ten observations on configured deployment host without running another simulation
 or rewriting the original study evidence. It checked canonical study/manifest/
 receipt digests, frozen harness and analyzer hashes, all 60 receipt-bound files
 (including neural and physical checkpoints), all ten 3,601-frame grids, bounded

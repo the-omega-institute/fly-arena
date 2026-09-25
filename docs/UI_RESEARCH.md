@@ -1,6 +1,6 @@
 # Research UI integration and verification
 
-This frontend implements the coordinator-approved interface and integration additions in `/tmp/fly-upgrade-interface.md`. The integration UI slice owns `web/` and this document. It does not alter scientific sources, decoders, sensors, training identity, stored experiments, immutable artifacts, or backend admission rules.
+This frontend implements the coordinator-approved interface and integration additions from the `<workspace-root>/fly-upgrade-interface.md` snapshot. The integration UI slice owns `web/` and this document. It does not alter scientific sources, decoders, sensors, training identity, stored experiments, immutable artifacts, or backend admission rules.
 
 ## Scientific reports and scene rendering
 
@@ -45,7 +45,7 @@ The final production build and 14 Node contract tests pass. The build retains th
 Actual browser QA served the production build directly from the isolated **127.0.0.1:8082** API, with `--no-worker` and:
 
 ```
-ARENA_VAR=/var/folders/jd/5x6vvk8d4yzcmtmp7mjw_9nw0000gn/T/fly-platform-real-e2e-1pal0f07
+ARENA_VAR="${ARENA_VAR:?Set ARENA_VAR to an isolated run directory}"
 ```
 
 The real read-only experiment is **`9320e8fad58f4e59bf50b91f1ff4e38b`**, complete with three independent frozen reports. Its returned receipt references are:
@@ -66,15 +66,15 @@ At the observed QA point the service advertised v2 match readiness as false beca
 
 `web/tests/ui-fixtures.mjs` uses `TEST-` identities, synthetic geometry and deliberately non-scientific receipt strings. Every fixture mutation is intercepted in the isolated browser. Fixture coverage includes scene food/walls with correct physical proportions, owner and non-owner labels, unavailable profile reasons, missing/censored/no-effect data, partial/failed/mismatched trials, strict admission errors, bounded annotation suggestions and hashes, compiler intervention details, complete spec round trips, save navigation, same-color replay identity, explicit match/tournament profiles, server rejection without fallback, authenticated local identity verification, locales/themes/mobile and deep-link history.
 
-`web/tests/real-ui-smoke.mjs` uses the actual HTTP API, does not inject auth or response fixtures, and blocks non-GET/HEAD API requests. The fixture suite and real suite write separate evidence JSON. Artifacts are under `/tmp/fly-arena-browser-qa/integration-ui/`, including `fixture-checks.json`, `real-smoke.json`, real comparison screenshots for both locales/themes, mobile screenshots, annotation design evidence and the real Arena profile state. Desktop/light, fixture scene and real mobile screenshots were visually reviewed.
+`web/tests/real-ui-smoke.mjs` uses the actual HTTP API, does not inject auth or response fixtures, and blocks non-GET/HEAD API requests. The fixture suite and real suite write separate evidence JSON. Set `QA_OUTPUT` to an isolated run directory; it contains `fixture-checks.json`, `real-smoke.json`, real comparison screenshots for both locales/themes, mobile screenshots, annotation design evidence and the real Arena profile state. Desktop/light, fixture scene and real mobile screenshots were visually reviewed.
 
 Reproduce with an authorized isolated API serving `web/dist`:
 
 ```sh
 npm --prefix web test
 npm --prefix web run build
-PLAYWRIGHT_BROWSERS_PATH=/tmp/fly-arena-browser-qa/browsers QA_BASE_URL=http://127.0.0.1:8082 npm --prefix web run test:ui
-PLAYWRIGHT_BROWSERS_PATH=/tmp/fly-arena-browser-qa/browsers QA_BASE_URL=http://127.0.0.1:8082 npm --prefix web run test:ui:real
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:?Set PLAYWRIGHT_BROWSERS_PATH}" QA_BASE_URL=http://127.0.0.1:8082 npm --prefix web run test:ui
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:?Set PLAYWRIGHT_BROWSERS_PATH}" QA_BASE_URL=http://127.0.0.1:8082 npm --prefix web run test:ui:real
 ```
 
 `QA_EXPERIMENT_ID`, `QA_OUTPUT` and `PLAYWRIGHT_MODULE` are configurable. For development, `ARENA_API_URL=http://127.0.0.1:8082 npm --prefix web run dev -- --port 5174 --strictPort` isolates the Vite proxy; the ordinary default remains port 8080. The UI worker stops its isolated API and Vite process before completion. No commits, pushes, deployment, live auth activation or external messages are part of this slice.
@@ -97,7 +97,7 @@ Reproduce without starting a service:
 ```sh
 npm --prefix web test
 npm --prefix web run build
-PLAYWRIGHT_BROWSERS_PATH=/tmp/fly-arena-browser-qa/browsers npm --prefix web run test:ui:transitions
+PLAYWRIGHT_BROWSERS_PATH="${PLAYWRIGHT_BROWSERS_PATH:?Set PLAYWRIGHT_BROWSERS_PATH}" npm --prefix web run test:ui:transitions
 ```
 
-Synthetic browser results and screenshots are written to `/tmp/fly-arena-ui-fix-v3/` by default (`QA_OUTPUT` overrides this): `transitions.json`, `slow-B.png`, `failed-B-dark-zh-mobile.png`, and `final-C-light-en.png`. They are UI regression evidence, not scientific trials or backend qualification. Earlier scientific and UI evidence remains preserved. The coordinator will issue the new source/build snapshot after this worker completes.
+Synthetic browser results and screenshots are written to the configured `QA_OUTPUT` directory: `transitions.json`, `slow-B.png`, `failed-B-dark-zh-mobile.png`, and `final-C-light-en.png`. They are UI regression evidence, not scientific trials or backend qualification. Earlier scientific and UI evidence remains preserved. The coordinator will issue the new source/build snapshot after this worker completes.

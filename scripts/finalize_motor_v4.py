@@ -23,7 +23,7 @@ def main():
     assert current == source, 'Full scientific source changed after cohort began'
     before = read(parent/'preservation-before.json')
     assert all(file_sha(ROOT/p)==sha for p,sha in before.items()), 'Historical/frozen evidence changed'
-    frozen = read(ROOT/'var/sshx/research-upgrade/policy-v3-frozen.json')
+    frozen = read(ROOT/'var/research-validation/policy-v3-frozen.json')
     assert all(file_sha(ROOT/p)==sha for p,sha in frozen['hashes'].items()), 'Policy freeze changed'
     rows = {}
     for name in ['heldout-left','heldout-right','bifurcation-left','bifurcation-right']:

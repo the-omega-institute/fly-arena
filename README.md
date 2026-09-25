@@ -16,7 +16,7 @@ These surfaces expose recorded evidence and modeled mechanisms separately. A rep
 
 ## Run locally
 
-Requires Python 3.12, Node 22+ and at least 8 GB free memory for preparation and two-fly experiments; allow several GB of disk. Mac Studio is the primary deployment target. Linux CPU also supports the simulation; browser rendering uses the viewer's GPU.
+Requires Python 3.12, Node 22+ and at least 8 GB free memory for preparation and two-fly experiments; allow several GB of disk. configured deployment host is the primary deployment target. Linux CPU also supports the simulation; browser rendering uses the viewer's GPU.
 
 ```sh
 uv sync --python 3.12

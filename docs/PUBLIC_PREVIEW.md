@@ -4,7 +4,7 @@ The repository is public and the frontend is published to GitHub Pages. An
 explicit workflow dispatch builds and tests the web app, embeds the repository
 variable `ARENA_PREVIEW_API`, and deploys it to `fly.omega.gift`.
 
-The API and simulations run on Mac Studio. Set `ARENA_WEB_ORIGIN=https://fly.omega.gift` on that API process to permit browser calls from exactly that origin. With `ARENA_APP_ORIGIN` set, the Pages workflow publishes a same-origin entry to the complete application; the API's `/auth/config` then reports whether live NyxID OIDC login is enabled. Without that entry, the static preview uses the existing local designer bearer flow. OpenAPI docs, AI prompts, anatomy and morphology requests use the same configured API origin.
+The API and simulations run on configured deployment host. Set `ARENA_WEB_ORIGIN=https://fly.omega.gift` on that API process to permit browser calls from exactly that origin. With `ARENA_APP_ORIGIN` set, the Pages workflow publishes a same-origin entry to the complete application; the API's `/auth/config` then reports whether live NyxID OIDC login is enabled. Without that entry, the static preview uses the existing local designer bearer flow. OpenAPI docs, AI prompts, anatomy and morphology requests use the same configured API origin.
 
 For the initial trial, a persistent cloudflared process exposes the loopback API through a temporary HTTPS URL. The URL may change if the tunnel restarts: update `ARENA_PREVIEW_API` and dispatch the Pages workflow again. This is a trial deployment, not a stable compute endpoint. Existing queue and designer limits apply.
 

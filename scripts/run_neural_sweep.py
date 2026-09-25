@@ -1,7 +1,7 @@
 """Run budgeted circuit mutations under matched sensory input; no embodied fitness claim.
 
 Example: arena's Python scripts/run_neural_sweep.py --data data --output var/sweep-01
-On a shared node, run under: flock /tmp/fly-arena-gpu.lock <command>
+On a shared node, run under: flock "${ARENA_VAR:?Set ARENA_VAR}/gpu.lock" <command>
 """
 from __future__ import annotations
 import argparse

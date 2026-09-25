@@ -1,6 +1,6 @@
 """Export map PNGs and recorded anatomical poses as MP4; never advance physics.
 
-See docs/rendering.md for the verified RTX 4060 / WSL environment.
+See docs/rendering.md for the verified GPU worker rendering environment.
 """
 from __future__ import annotations
 
