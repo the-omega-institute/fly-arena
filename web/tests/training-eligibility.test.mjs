@@ -16,9 +16,13 @@ const eligibility=await moduleAt('../src/features/training/trainingEligibility.t
 const {mapEligibility}=await moduleAt('../src/types.ts')
 const {trainingMapIds,trainingBridgeProfiles,trainingEligibilityProblem,eligibleTrainingMaps}=eligibility
 const plan=await moduleAt('../src/features/training/plan.ts')
+const {recordedDescriptorDeltas,recordedDescriptorSummary}=await moduleAt('../src/features/training/recordedDescriptors.ts')
+const {shortHorizonTrainingGuidance}=await moduleAt('../src/features/training/planGuidance.ts')
 const {trainingMessages}=await moduleAt('../src/shared/messages/training.ts')
 const base={population:2,generations:1,budget:16,duration:1,seed:42,circuits:['olfactory'],name:'Contract test',mode:'forage',founder:'a'.repeat(32),opponent:'b'.repeat(32)}
 const maps=[...trainingMapIds,'maze','switchback','labyrinth','duel','unknown'].map(id=>({id,name:id,english:id,description:'',task:id==='blank'?{}:undefined}))
+const trainingMatch=(flyIds,result,status='verified')=>({id:'m',status,request:{fly_ids:flyIds},result})
+const behavior=(food,upright)=>({schema:'sustained-foraging-v1',food,latter_half_food:food/2,upright_fraction:upright,recorded_seconds:2,first_inversion_s:null,fitness:food*upright})
 
 test('frontend map and bridge lists exactly equal both backend training declarations',()=>{
  const source=fs.readFileSync(new URL('../../src/flyarena/services/training.py',import.meta.url),'utf8')
@@ -69,7 +73,7 @@ for(const locale of ['en','zh-CN'])test(`training controls preserve eligibility 
   '../arena/MapPreview':{MapPreview:props=>React.createElement('div',{'data-preview-map':props.mapId,'data-preview-bridge':props.bridgeProfile})},
   '../guide/nextAction':{useGuideEvidence:()=>({record:null,error:''})},
   './FirstExperimentGuide':{FirstExperimentGuide:noop},'./AlgorithmPicker':{AlgorithmPicker:noop},'./TrainingShowcase':{TrainingShowcase:noop},'./algorithms':{algorithmName:id=>id},
-  './TrainingComparison':{TrainingComparison:noop},'./TrainingWorkload':{TrainingWorkload:noop},'./ConditionResults':{ConditionResults:noop},'./comparison':{evaluationConditions:spec=>spec.evaluation_conditions||[{map_id:spec.map_id,seed:spec.seed}]}
+  './TrainingComparison':{TrainingComparison:noop},'./TrainingWorkload':{TrainingWorkload:noop},'./ConditionResults':{ConditionResults:noop},'./EvolutionSignal':{EvolutionSignal:noop},'./planGuidance':{shortHorizonTrainingGuidance:()=>null},'./comparison':{evaluationConditions:spec=>spec.evaluation_conditions||[{map_id:spec.map_id,seed:spec.seed}]}
  }
  const source=fs.readFileSync(new URL('../src/features/training/TrainingSandbox.tsx',import.meta.url),'utf8')
  const {outputText}=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}})
@@ -123,4 +127,32 @@ test('catalog flags can further restrict both training selectors and admission',
  const metadata={training_eligible:false}
  assert.deepEqual(eligibleTrainingMaps([{id:'orchard',metadata}]),[])
  assert.ok(trainingEligibilityProblem('orchard','legacy-v1','forage',metadata))
+})
+
+test('descriptor extraction uses only verified recorded fields for the named fly',()=>{
+ const summary=recordedDescriptorSummary([
+  trainingMatch(['parent','child'],{behavior:[behavior(1,.5),behavior(0,.8)],task:{path_length_mm:[3,7]}}),
+  trainingMatch(['child'],{behavior:[behavior(4,1)],task:{path_length_mm:[9]}},'running'),
+  trainingMatch(['other'],{behavior:[behavior(99,0)],task:{path_length_mm:[99]}})
+ ],'child')
+ assert.deepEqual(summary,{food:0,latter_half_food:0,upright_fraction:.8,path_length_mm:7})
+})
+
+test('descriptor deltas expose recorded change without using fitness or missing values as zero',()=>{
+ const parent=[trainingMatch(['parent'],{behavior:[behavior(0,.5)],task:{path_length_mm:[4]}})]
+ const candidate=[trainingMatch(['candidate'],{behavior:[behavior(0,.75)],task:{path_length_mm:[6]}})]
+ assert.deepEqual(recordedDescriptorDeltas(candidate,'candidate',parent,'parent'),[
+  {key:'food',delta:0,candidate:0,parent:0},
+  {key:'latter_half_food',delta:0,candidate:0,parent:0},
+  {key:'upright_fraction',delta:.25,candidate:.75,parent:.5},
+  {key:'path_length_mm',delta:2,candidate:6,parent:4}
+ ])
+ assert.deepEqual(recordedDescriptorDeltas(candidate,'candidate',[], 'parent'),[])
+})
+
+test('short food horizons receive non-blocking guidance only',()=>{
+ assert.match(shortHorizonTrainingGuidance({duration:1,fitnessObjective:'food'}),/verified intake/)
+ assert.match(shortHorizonTrainingGuidance({duration:2,fitnessObjective:'sustained-foraging-v1'}),/5 seconds/)
+ assert.equal(shortHorizonTrainingGuidance({duration:3,fitnessObjective:'food'}),null)
+ assert.equal(shortHorizonTrainingGuidance({duration:1,fitnessObjective:'other-v2'}),null)
 })

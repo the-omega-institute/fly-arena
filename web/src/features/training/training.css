@@ -22,3 +22,4 @@
 .training-setup>section{overflow-wrap:anywhere}
 .training-setup>section code{white-space:pre-wrap}
 .algorithm-options input[type=radio]{width:14px;height:14px;padding:0;margin:3px 0 0;flex-shrink:0;accent-color:var(--accent)}
+.training-warning{border-left:3px solid #bc7253;padding-left:10px}.evolution-signal{margin:10px 0 12px;padding:9px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);font-size:11px;line-height:1.5}.evolution-signal-title{display:flex;flex-wrap:wrap;gap:6px;align-items:baseline;font-weight:600}.evolution-signal-title small{font-weight:400;color:var(--muted)}.evolution-signal>small{display:block;color:var(--muted);margin-top:4px}.evolution-signal-values{display:grid;gap:4px;margin-top:6px}.evolution-signal-values span{display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}.evolution-signal-values b{font-weight:600}.evolution-signal-values small{color:var(--muted)}
