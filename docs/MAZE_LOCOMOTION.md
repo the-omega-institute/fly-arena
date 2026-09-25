@@ -39,7 +39,7 @@ nonexistent receipt hash for the entire match file.
 Reproduce the verified diagnosis with the requested interpreter:
 
 ```sh
-PYTHONPATH=src /Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python \
+PYTHONPATH=src uv run python \
   scripts/analyze_maze_locomotion.py var/research/issue82/replay-gallery-v1 \
   --window 45 65 --rows 45 50 51 51.5 51.7 51.75 51.8 52 54 54.15 60 65 \
   --output var/research/issue82/diagnosis.json
@@ -171,7 +171,7 @@ imposed body-test commands, with no neural simulation, target steering, route
 following, pose edit or upright reset, and no recovery candidate selected.
 
 ```sh
-PYTHONPATH=src /Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python \
+PYTHONPATH=src uv run python \
   scripts/probe_maze_locomotion.py --seconds 5 --seed 42 \
   --output var/research/issue82/body-probe.json
 ```
@@ -233,12 +233,13 @@ not inferred from the trajectory. The attenuation factor is explicitly a
 modelled value computed from recorded inputs and candidate receipt
 configuration, not a measured force or actuator torque.
 
-The exact per-seed command was run from `/Users/macstudio/fly-arena-mvp` with
-the Mac Studio deploy environment:
+The exact per-seed command was run from the configured deployment root with the
+Mac Studio deploy environment. Set `ARENA_DEPLOY_PATH` to that root before
+running it:
 
 ```sh
 for seed in {42..46}; do
-  PYTHONPATH=src /Users/macstudio/fly-arena-mvp/.venv/bin/python \
+  PYTHONPATH=src uv run python \
     scripts/compare_phase2_arms.py \
     "var/research/issue82-phase2/study-20260924/seed-$seed"
 done
@@ -320,11 +321,11 @@ scripted steering. It was not run for this report.
 
 ## Preregistered phase-2 protocol
 
-The protocol predates the replay diagnosis. The decision rule below is clarified
-before any phase-2 run: later first inversion is favorable, censoring is explicit,
+The protocol predates the replay diagnosis. The decision rule below was clarified
+before the phase-2 run: later first inversion is favorable, censoring is explicit,
 and goal contact is descriptive rather than an acceptance criterion. The seeds,
-horizon and four-of-five threshold are retained. No phase-2 baseline/candidate
-pair was executed in this follow-up.
+horizon and four-of-five threshold were retained. The completed baseline/candidate
+pairs and their negative set-level verdict are reported below.
 
 | Item | Frozen value |
 |---|---|
@@ -407,9 +408,9 @@ no match, job, standings or leaderboard row is created. Each child exits before
 the next begins. The explicit output directory is also the resume handle:
 
 ```sh
-cd /Users/macstudio/fly-arena-mvp
+cd "${ARENA_DEPLOY_PATH:?Set ARENA_DEPLOY_PATH}"
 ARENA_DATA="$PWD/data" ARENA_VAR="$PWD/var" PYTHONPATH=src \
-  .venv/bin/python scripts/run_maze_phase2.py \
+  uv run python scripts/run_maze_phase2.py \
   --horizon 180 --seeds 42 43 44 45 46 \
   --output var/research/issue82-phase2/preregistered-v1
 ```
@@ -459,10 +460,10 @@ and behavior make this an estimate rather than a promised deadline.
 Local real smoke command (two simulated seconds, seed 42, **both** profiles):
 
 ```sh
-ARENA_DATA=/Users/lexa/Desktop/lexa/omega/fly-arena/data \
-ARENA_VAR=/Users/lexa/Desktop/lexa/omega/fly-arena/var \
+ARENA_DATA="${ARENA_DATA:?Set ARENA_DATA}" \
+ARENA_VAR="${ARENA_VAR:?Set ARENA_VAR}" \
 PYTHONPATH=src \
-  /Users/lexa/Desktop/lexa/omega/fly-arena/.venv/bin/python \
+  uv run python \
   scripts/run_maze_phase2.py --dry-run
 ```
 
@@ -482,8 +483,8 @@ harness, including preflight and analysis). Evidence is retained at
 used the full retained graph (165,122 neurons, 25,563,197 edges). Both short
 runs had upright fraction 1.0 and no sampled inversion; these are short-window
 observations only. The report is explicitly outside the preregistered protocol
-and has no set-level verdict. The complete five-seed, 180-second Mac Studio
-study has **not** been executed by this implementation task.
+and has no set-level verdict. The complete five-seed, 180-second study was
+subsequently completed and is reported below.
 
 
 ## Completed phase-2 study: 2026-09-24
@@ -521,7 +522,8 @@ and sampled duration, pre-inversion drive statistics, path length, coverage,
 paired differences and source/receipt bindings. The frozen study digest is
 `93659137407be6a093d51842adebc738ac0e4a2166050b99620a69fd5d10394b`.
 Original recordings remain at
-`/Users/macstudio/fly-arena-mvp/var/research/issue82-phase2/study-20260924/`.
+`${ARENA_DEPLOY_PATH}/var/research/issue82-phase2/study-20260924/` (the
+deployment root is intentionally not recorded here).
 
 A separate [post-completion evidence audit](evidence/maze-phase2-20260924-audit.json)
 rechecked all ten observations on Mac Studio without running another simulation

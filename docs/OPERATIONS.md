@@ -1,6 +1,12 @@
 # Operations · Genesis Alpha
 
-The deployment lives in `/Users/macstudio/fly-arena-mvp` on `macstudio-ssh` (NyxID principal `macstudio`). Confirm the host and paths before changing them. An isolated `.bootstrap` environment provides uv; `.venv` holds the locked application dependencies. No GitHub account credentials are copied to the node.
+The deployment target is supplied at run time through `ARENA_DEPLOY_PATH`,
+`ARENA_DEPLOY_HOST`, and `ARENA_DEPLOY_PRINCIPAL`. `scripts/sync_mac.py`
+fails clearly when any of these values is unset; do not commit their deployment
+specific values. Confirm the configured host and path before changing them. An
+isolated `.bootstrap` environment provides uv; `.venv` holds the locked
+application dependencies. No GitHub account credentials are copied to the
+node.
 
 `python scripts/sync_mac.py` sends an explicit source + built-web archive through NyxID exec, checks its SHA256 remotely, then extracts it. It does not transfer raw data, credentials, user databases or node configuration. Run `npm run build --prefix web` first. The remote directory is a deployment copy, not a Git checkout; the reviewable source lives on the feature branch in GitHub.
 

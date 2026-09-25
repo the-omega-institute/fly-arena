@@ -109,7 +109,10 @@ Arena 应学其版本化裁决、artifact custody、可复现证据和分离的�
 
 ## 6. NyxID / Heca / Ornn
 
-NyxID：读取本地 [官方仓库](https://github.com/ChronoAIProject/NyxID) checkout 的 `skills/nyxid/SKILL.md`、相关 node/service CLI 参考；使用已安装 CLI 做服务发现和只读 SSH 查询。确认可以提供节点代理和凭据注入；Arena 的业务权限、排名、quota 与仿真仍需自己的实现。
+NyxID：读取 [官方仓库](https://github.com/ChronoAIProject/NyxID) 的公开
+`skills/nyxid/SKILL.md` 和相关 node/service CLI 参考；使用已安装 CLI 做
+服务发现和只读 SSH 查询。确认可以提供节点代理和凭据注入；Arena 的业务
+权限、排名、quota 与仿真仍需自己的实现。
 
 Heca：读取 [heca-artifacts README](https://github.com/getheca/heca-artifacts)，该公开仓库是 release mirror，源码在私库。文档声明 host 通过 desktop app/headless daemon 运行，可由 Web app 经 NyxID 登录访问。没有把它当 GPU 集群调度器，也没有安装/升级 daemon。
 
@@ -123,7 +126,7 @@ Ornn 的合适位置是分发 `fruit-fly-designer` 能力；用户自带任意 a
 
 | 节点/服务 | 观察 | 尚未证明 |
 |---|---|---|
-| `macstudio` / `macstudio-ssh` | NyxID online，SSH principal `macstudio` 可执行只读命令 | 可用算力余量、FlyGym/Eon 依赖、长期负载 |
+| `ARENA_DEPLOY_HOST` / `ARENA_DEPLOY_PRINCIPAL` 配置的部署节点 | NyxID online，可执行只读命令 | 可用算力余量、FlyGym/Eon 依赖、长期负载 |
 | `deepevo-4060-1-local` / local bridge | NyxID online/dispatchable | 显存、驱动、GPU 运算与渲染可用性 |
 | `local-gpu-4060-wsl` | offline | 是否旧部署/同一物理机器 |
 | `deepevo-4060-1` | offline | 是否旧部署/同一物理机器 |
@@ -137,7 +140,11 @@ sysctl -n hw.memsize                    → 103079215104 bytes = 96 GiB
 sysctl -n hw.ncpu                       → 28
 ```
 
-远端非交互 PATH 找不到 `heca`；检查常见安装位置后，使用 `/Users/macstudio/.local/bin/heca --json daemon status` 确认 daemon 运行，版本 `0.1.0-nightly-20260914-1`、mode `standalone`、agent_count `0`。`daemon relay-status` 返回 enabled=true、state=connected。未据此推断 GPU 或 Arena worker 已部署。本机工作区的 Heca daemon 未运行，与远端 Mac Studio 区分。
+配置的部署环境非交互 PATH 当时找不到可选的 Heca CLI；通过该环境提供的
+只读 daemon status 查询确认版本 `0.1.0-nightly-20260914-1`、mode
+`standalone`、agent_count `0`。`daemon relay-status` 返回
+enabled=true、state=connected。未据此推断 GPU 或 Arena worker 已部署，
+也不记录安装目录或本机工作区路径。
 
 4060 的 `deepevo-4060-ssh` 服务声明 online；分别用它允许的 `zwlexa`、`lexa`、`ubuntu` principal 尝试 `uname` 和 `nvidia-smi` 查询，均在执行前返回 `ssh_node_key_missing`（404，error code 1011）。没有成功运行 GPU 命令，没有修改 SSH 绑定，也没有把“节点在线”记为“GPU 已验证”。local HTTP bridge 存在，但本轮未获得其已声明的硬件查询 API，因此没有猜测并调用执行端点。
 

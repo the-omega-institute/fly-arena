@@ -4,7 +4,7 @@
 
 ## 当前已交付：rounds 1–2
 
-Round 1 ships the 3D Phenotype Lab scene view, the map registry with explicit observation-only maze status, a unified Arena setup, and the science guide. Round 2 ships the life lineage tree, receipt-backed replay inspection, the `arena-geometry-v1` geometry contract, and the issue-82 phase-1 diagnosis with its preregistered phase-2 study runner. The phase-2 implementation has a verified short smoke run; the complete five-seed 180-second run remains a separately scheduled study. These surfaces keep modeled behavior, recorded observations and unavailable evidence labeled separately.
+Round 1 ships the 3D Phenotype Lab scene view, the map registry with explicit observation-only maze status, a unified Arena setup, and the science guide. Round 2 ships the life lineage tree, receipt-backed replay inspection, the `arena-geometry-v1` geometry contract, and the issue-82 phase-1 diagnosis with its preregistered phase-2 study runner. The complete five-seed 180-second phase-2 study is complete with a **negative** preregistered verdict: seeds 42, 45 and 46 were negative, seeds 43 and 44 improved, and the candidate is not promoted. The round-5 analysis and read-only evidence audit are retained in [MAZE_LOCOMOTION](MAZE_LOCOMOTION.md) and `docs/evidence/`. These surfaces keep modeled behavior, recorded observations and unavailable evidence labeled separately.
 
 ## 已上线的用户闭环
 
