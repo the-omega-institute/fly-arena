@@ -17,7 +17,7 @@
 
 **科学表达**：连接组是真实结构数据，神经动力学、感觉编码、身体控制仍是模型。脑图亮度只能来自该个体的实际记录，未采样节点不能伪造活动；同步变化本身不等于因果。WT 指采用基线参数的模型对照，不能把数字果蝇宣称为与真实果蝇完全等价。训练得分与未参与优化条件下的表现分开展示。
 
-**工程方式**：复用 Python/Numba、MuJoCo 和 Three.js，暂不整体重写 C++。4060 可访问时优先串行排队运行计算任务，记录实际执行节点；网页渲染和离线 GPU 渲染分别说明。按可使用的增量完成必要 CI、及时合并正常 PR 并发布；不新增多轮评审或逐文件哈希流程。先贯通已有用户流程，再扩展地图和算法，不用新增接口数量替代可见成果。
+**工程方式**：复用 Python/Numba、MuJoCo 和 Three.js，暂不整体重写 C++。GPU worker 可访问时优先串行排队运行计算任务，记录实际执行节点；网页渲染和离线 GPU 渲染分别说明。按可使用的增量完成必要 CI、及时合并正常 PR 并发布；不新增多轮评审或逐文件哈希流程。先贯通已有用户流程，再扩展地图和算法，不用新增接口数量替代可见成果。
 
 **总体验收**：新用户能独立完成“设计 → 同条件预览 → 三维比赛与同步脑图 → 选择算法演化 → 查看并保存后代 → 与 WT/亲代/其他设计对比”。源码、CI、部署、浏览器实际体验分别记录；文档写好不代表 Goal 完成。后文保留详细方案和历史实验，历史进度不作为当前在线能力的承诺。
 
@@ -83,7 +83,7 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 
 **当前回放入口**：<http://127.0.0.1:8080/#tab=arena&match=fc85117ae7f445e7af279296163f73c9>（依赖本机已有服务）。
 
-**交付原则**：复用 Python/Numba、MuJoCo、Three.js，暂不重写 C++；4060 可访问时优先串行排队，报告实际运行位置；每个可用增量完成必要 CI 后及时合并和发布。真实连接组约束结构，感觉编码、动力学和动作读出仍是模型假设；活动亮度来自实际记录，不能宣称数字果蝇已等同真实生物。
+**交付原则**：复用 Python/Numba、MuJoCo、Three.js，暂不重写 C++；GPU worker 可访问时优先串行排队，报告实际运行位置；每个可用增量完成必要 CI 后及时合并和发布。真实连接组约束结构，感觉编码、动力学和动作读出仍是模型假设；活动亮度来自实际记录，不能宣称数字果蝇已等同真实生物。
 
 **最终验收**：用户能独立完成“设计 → 预览 → 三维比赛与同步脑图 → 演化 → 查看并保存后代 → 与 WT/亲代/公开设计对比”，每步都有可操作入口和可理解结果。本文写完不代表总 Goal 完成。下方保留详细方案与历史记录，旧进度描述以本节及最新交付记录为准。
 
@@ -99,13 +99,13 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 
 > **用户确认的总目标（2026-09-19）**：用公开的真实果蝇神经连接组作为 canonical brain，让人和 AI 在其基础上修改神经参数、选择演化算法、设计数字果蝇，并把它们放入可渲染的三维竞技环境中竞争、学习和演化。每次设计都必须能回放为一条可观察、可复现、可审计的生命记录：用户能同时看到果蝇身体、感觉观测、脑区/神经元活动、动作、事件、资源变化和比赛结果，并能沿谱系解释一项修改如何影响行为。
 
-本 Goal 的完成标准是“用户真正能使用并理解研究对象”，而不是只提供接口或一个抽象分数。第一优先级是可观看的单体觅食闭环，随后扩展到脑图编辑与预览、可选演化算法、双体竞技、AI 提交和 NyxID 一次性授权接口。实现继续以 Python、MuJoCo、NumPy/Numba 和 Three.js 为主，4060 承担长回放与批量评估，Mac Studio 承担交互服务；只有 profiling 证明必要时才迁移 C++/CUDA。
+本 Goal 的完成标准是“用户真正能使用并理解研究对象”，而不是只提供接口或一个抽象分数。第一优先级是可观看的单体觅食闭环，随后扩展到脑图编辑与预览、可选演化算法、双体竞技、AI 提交和 NyxID 一次性授权接口。实现继续以 Python、MuJoCo、NumPy/Numba 和 Three.js 为主，GPU worker 承担长回放与批量评估，configured deployment host 承担交互服务；只有 profiling 证明必要时才迁移 C++/CUDA。
 
 **当前状态（2026-09-20 更新）**：沿用已有 active Goal，产品目标尚未完成。已具备单蝇30秒觅食、同条件WT对照、两场换位的30秒双蝇竞争、同步参赛脑图，以及两代CEM演化的本地公开回放。回放可生成后代草稿并导出给AI；身体跟随镜头与脑图观察对象同步。新后端部署、浏览器视觉验收，以及完整在线“设计—预览—训练—保存后代—竞技”仍待完成。
 
-**已有行为与限制**：Nectar单蝇30秒摄取14.3608，18.46秒再次接触另一处食物，全程未记录倒置；WT同条件摄取0.508，12.30秒倒置。两场换位竞争中，Nectar/WT摄取分别为20/0和10.4504/0.0688；第二场双方消耗同一份食物。但两场所有参赛者最终都倒置，10秒后均无摄取，持续身体控制与竞争仍未达标。共享动作读出此前用Nectar校准，单种子结果不能证明普遍优势。上述计算实际在本机arm64 CPU运行，不能称为4060计算或渲染。
+**已有行为与限制**：Nectar单蝇30秒摄取14.3608，18.46秒再次接触另一处食物，全程未记录倒置；WT同条件摄取0.508，12.30秒倒置。两场换位竞争中，Nectar/WT摄取分别为20/0和10.4504/0.0688；第二场双方消耗同一份食物。但两场所有参赛者最终都倒置，10秒后均无摄取，持续身体控制与竞争仍未达标。共享动作读出此前用Nectar校准，单种子结果不能证明普遍优势。上述计算实际在本机arm64 CPU运行，不能称为GPU worker计算或渲染。
 
-**代码交付**：[PR #58](https://github.com/the-omega-institute/fly-arena/pull/58) 已合并，提交为 `a632fbf5d14503771ced9ee87cc422bc8acd2328`；本工作区 main 已同步。以本工作区作为后续源码入口，`/private/tmp/fly-arena-release-candidate` 保留作此前实验与构建的来源。相关本地检查为后端506通过、11跳过、3排除；前端78项检查、32项DOM流程检查和生产构建通过，GitHub后端与前端CI也已通过。检查通过与源码合并不等于新后端已经部署或浏览器视觉验收完成。
+**代码交付**：[PR #58](https://github.com/the-omega-institute/fly-arena/pull/58) 已合并，提交为 `a632fbf5d14503771ced9ee87cc422bc8acd2328`；本工作区 main 已同步。以本工作区作为后续源码入口；此前实验与构建来源仅以 `<workspace-root>` 标识。相关本地检查为后端506通过、11跳过、3排除；前端78项检查、32项DOM流程检查和生产构建通过，GitHub后端与前端CI也已通过。检查通过与源码合并不等于新后端已经部署或浏览器视觉验收完成。
 
 **已完成的演化样本**：可选训练目标 `sustained-foraging-v1` 为（总摄取 + 后半程摄取）× 未倒置时间比例；事件提供摄取量，实际胸部姿态提供时间加权的未倒置比例。这是工程选择目标，不改变比赛胜负。WT起点的2代×2个体×10秒CEM实验已完成，training 为 `1a28e44233cc4cc193db90b9065c1516`，无需重启。四个个体各1001帧、实际脑图和亲子关系已通过本地8080的HTTP核对；最优后代已保存在独立研究库，尚不等于保存到用户账号。
 
@@ -152,7 +152,7 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 | 新用户与 AI 入口 | 解释脑图来源、仿真假设和操作步骤；提供 AI 提交与评估示例 | 新用户能完成设计到回放；AI 能使用同一接口贡献候选 |
 | 简单登录接口 | 独立 NyxID 身份适配接口，目标为一次授权后复用登录状态 | 接口准备好；正式对接按用户后续安排进行 |
 
-**工程方案**：复用 Python/Numba、MuJoCo 和 Three.js；先不重写 C++。网页与 AI 共用 FlySpec，所有算法共用比赛评估入口，身体和脑图共用仿真时钟。4060 优先排队处理长实验、批量评估和渲染，Mac Studio 承担交互服务；每次报告实际运行位置。每个可用增量完成相关 CI 后及时合并、部署并提供入口。
+**工程方案**：复用 Python/Numba、MuJoCo 和 Three.js；先不重写 C++。网页与 AI 共用 FlySpec，所有算法共用比赛评估入口，身体和脑图共用仿真时钟。GPU worker 优先排队处理长实验、批量评估和渲染，configured deployment host 承担交互服务；每次报告实际运行位置。每个可用增量完成相关 CI 后及时合并、部署并提供入口。
 
 **科学边界**：真实连接组提供结构约束，不能单靠连接关系推断全部真实权重和神经动力学。感觉编码、动作解码、模型参数及其学习方法都是需要研究的部分。脑图亮度必须来自仿真活动；活动先后出现本身不能证明因果。不得把短时吃到食物、分数上涨或测试通过当作“与真实果蝇一样”或总 Goal 完成。
 
@@ -167,7 +167,7 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 - 比赛支持自己、WT 和公开设计，先做好有限食物争夺，再扩展复杂地形与攻击/逃避；保留换位对照，胜负依据来自实际行为与资源变化。
 - 演化支持选择优化算法和兼容的神经模型/学习规则；先展示实际运行的算法样本，再接通自定义策略沙箱。记录亲代、设计差异、实验条件和行为，后代可以继续训练或参赛。
 - 网页与 AI 共用提交、评估和回放接口，提供清楚的首次使用指引和 AI 示例。NyxID 保留简单的一次授权身份接口，正式联调按用户后续安排。
-- 复用现有 Python/Numba、MuJoCo、Three.js，不先重写 C++。优先排队使用 4060，明确每次实际运行位置。完成相关 CI 后及时合并和交付可用增量，不新增多轮审批或逐文件哈希流程。
+- 复用现有 Python/Numba、MuJoCo、Three.js，不先重写 C++。优先排队使用 GPU worker，明确每次实际运行位置。完成相关 CI 后及时合并和交付可用增量，不新增多轮审批或逐文件哈希流程。
 
 **整体验收**：实际走通“设计 → 刺激预览 → 三维比赛与同步脑图 → 选择演化策略 → 查看后代和谱系 → 与 WT/亲代/公开设计对比”。短时摄取、单场分数、页面构建成功都不代表总目标完成。沿用已有 active Goal；不重复创建，不重跑已完成实验。
 
@@ -179,7 +179,7 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 2. **交付可理解的真实比赛**：保留两场已完成换位竞争，展示双方共享食物、物理接触、脑活动和倒置失败；比赛对照图已生成并检查，地址为 `/examples/enclosed-duel-comparison.png`；页面视觉验收仍待完成。不要重新启动已完成的实验。两场数据各3001帧，已通过现有8080服务HTTP核对。
 3. **贯通完整使用路径**：自己的设计 → 同条件WT刺激预览 → 三维比赛与同步脑图 → 选择算法产生后代 → 保存后代继续训练或PK。优先解决新后端尚未部署导致的流程断点，区分公开样本、可编辑草稿与实际在线能力。
 4. **改善行为并展示演化**：先解决接触后的倒置和持续觅食，再用未参与调整的种子比较WT、亲代与后代。展示实际跑出的多算法轨迹；自定义策略调用同一个评估入口，保留成功、失败和亲子关系。
-5. **及时交付**：完成相关CI后提交、合并和发布可用增量，给出可打开的入口。记录实际算力位置；4060可访问时优先串行排队，不把本机CPU结果写成远端GPU成果。
+5. **及时交付**：完成相关CI后提交、合并和发布可用增量，给出可打开的入口。记录实际算力位置；GPU worker可访问时优先串行排队，不把本机CPU结果写成远端GPU成果。
 
 已完成的研究回放入口（依赖本地8080服务运行）：
 
@@ -221,7 +221,7 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 
 **实现主线**：`FlySpec → 感觉编码 → 连接组动力学 → 动作解码 → MuJoCo 身体与环境 → 同步记录 → Three.js 身体 + 脑图 + 时间轴`。优化器生成下一批 FlySpec 并复用同一个评估入口。记录实验条件和谱系即可支持研究复查，不额外引入逐文件审批或多轮人工评审。
 
-**执行约束**：优先把长实验排到 4060；未实际连接节点时明确执行位置，不把本机实验称为远端运行。复用现有计算任务，先检查状态与产物再恢复，不重复启动昂贵实验。每个可用增量完成必要 CI 后及时合并、部署并给出入口；总 Goal 在真实用户流程验收前保持 active。
+**执行约束**：优先把长实验排到 GPU worker；未实际连接节点时明确执行位置，不把本机实验称为远端运行。复用现有计算任务，先检查状态与产物再恢复，不重复启动昂贵实验。每个可用增量完成必要 CI 后及时合并、部署并给出入口；总 Goal 在真实用户流程验收前保持 active。
 
 ## 执行 Goal：让用户看见自己设计的大脑如何形成行为
 
@@ -243,7 +243,7 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 
 **算法边界**：可修改权重、神经元参数和受支持的学习规则。神经动力学模型与候选优化算法分别选择，并标明兼容组合。随机搜索、CEM 等可调用非可微仿真；Adam/BPTT 只有在可微脑模型或明确声明的代理目标上才开放，不能宣称能直接对任意 MuJoCo 比赛端到端反传。最终表现仍由同一真实仿真评估。
 
-**最小工程边界**：沿用现有代码，不为本轮重写 C++ 或新增微服务。网页与 AI 共用 FlySpec；训练策略共用评估入口；NyxID、Heca 和可选 Ornn 位于身份、算力及 agent 工具层。4060 优先排队执行长实验和批量评估，Mac Studio 提供交互服务；节点不可用时明确报告实际执行位置。只运行与改动相关的 CI 和必要的用户流程检查，每个可用增量及时合并、部署并交付可打开的入口。
+**最小工程边界**：沿用现有代码，不为本轮重写 C++ 或新增微服务。网页与 AI 共用 FlySpec；训练策略共用评估入口；NyxID、Heca 和可选 Ornn 位于身份、算力及 agent 工具层。GPU worker 优先排队执行长实验和批量评估，configured deployment host 提供交互服务；节点不可用时明确报告实际执行位置。只运行与改动相关的 CI 和必要的用户流程检查，每个可用增量及时合并、部署并交付可打开的入口。
 
 **完成判定**：必须实际走通“设计 → 刺激预览 → 三维比赛与同步脑图 → 选择算法 → 查看后代 → 与 WT/亲代对比”这条用户路径，并展示至少一组有完整行为记录的演化样本。接口存在、测试通过、文件达到 30 秒或神经图发亮，都不能单独代替这项验收。观察到的活动相关性不自动证明因果；需要时通过同条件对照、连接扰动或消融来检验解释。
 
@@ -264,9 +264,9 @@ PR #68 已通过前后端 CI 并合并，本地 main 同步至 `c90c143`，现�
 
 这是一条持续交付顺序，不要求等六项全部完成才发布。每个可用增量通过相关 CI 后及时合并并更新预览；不新增逐文件审批或重复评审。研究记录保留样本、父代、参数、算法、环境、输入、活动、行为和结果，重点是能复查生命演化过程。
 
-**任务交接**：此前 4060 实验目录 `/tmp/fly-arena-multimodal-48-ceaa4f8` 的最终状态本次未重新查询，不能据此声称远端已有新回放。最近本机封闭果园实验的实际终止状态见文末；继续执行时先检查已有产物和任务状态，再决定恢复或重新排队，避免重复启动。
+**任务交接**：此前 GPU worker 实验目录 `<deployment-job-root>/multimodal-48-ceaa4f8` 的最终状态本次未重新查询，不能据此声称远端已有新回放。最近本机封闭果园实验的实际终止状态见文末；继续执行时先检查已有产物和任务状态，再决定恢复或重新排队，避免重复启动。
 
-**最小架构**：网页设计和 AI 共用 FlySpec → 参数与预算检查 → 感觉编码、连接组动力学、动作解码和 MuJoCo 环境循环 → 统一回放记录 → 三维场景与脑图同步展示。演化策略反复调用同一个评估入口，生命账本记录每次候选与父代。沿用 Python/Numba、MuJoCo 和 Three.js，先不重写 C++；Mac Studio 提供交互服务，4060 优先排队执行长实验与批量评估。
+**最小架构**：网页设计和 AI 共用 FlySpec → 参数与预算检查 → 感觉编码、连接组动力学、动作解码和 MuJoCo 环境循环 → 统一回放记录 → 三维场景与脑图同步展示。演化策略反复调用同一个评估入口，生命账本记录每次候选与父代。沿用 Python/Numba、MuJoCo 和 Three.js，先不重写 C++；configured deployment host 提供交互服务，GPU worker 优先排队执行长实验与批量评估。
 
 **科学说明也是页面指引的一部分**：公开连接组提供真实结构约束，神经动力学、突触强度、感觉编码和身体控制仍包含模型假设。“基于真实果蝇连接组”不等于“编辑后的数字果蝇与真实果蝇完全一样”。页面应说明数据来源、采用的模型、已验证能力与实验性质。
 
@@ -405,7 +405,7 @@ LIF 使用脉冲密度和膜电位，rate 模型使用连续活动值和相对�
 
 ## 技术路线
 
-暂不重写 C++。继续使用 Python、MuJoCo、NumPy/Numba、Three.js 和现有 API；4060 用于长任务、批量评估和高质量回放渲染，Mac Studio 提供交互服务。只有 profiling 证明神经计算热点并且接口稳定后，才考虑把明确的热点迁移到 C++/CUDA。
+暂不重写 C++。继续使用 Python、MuJoCo、NumPy/Numba、Three.js 和现有 API；GPU worker 用于长任务、批量评估和高质量回放渲染，configured deployment host 提供交互服务。只有 profiling 证明神经计算热点并且接口稳定后，才考虑把明确的热点迁移到 C++/CUDA。
 
 ## 第一项必须交付的可见成果
 
@@ -496,7 +496,7 @@ TruTuring 的可借鉴点是把运行过程当作可验证的 harness：输入�
 
 ## 资源与工程路线
 
-Mac Studio 运行交互 API、网页和轻量预览；4060 节点优先运行全图神经计算、30–60 秒生命回放、批量候选评估和渲染。GPU 任务通过队列和单节点锁串行调度，前端能看到排队、运行、失败和产物链接。每次完成一条可观看的回放就发布一个可用增量，不等待所有竞技模式完成。
+configured deployment host 运行交互 API、网页和轻量预览；GPU worker 节点优先运行全图神经计算、30–60 秒生命回放、批量候选评估和渲染。GPU 任务通过队列和单节点锁串行调度，前端能看到排队、运行、失败和产物链接。每次完成一条可观看的回放就发布一个可用增量，不等待所有竞技模式完成。
 
 先保持 Python、MuJoCo、NumPy/Numba 和 Three.js 的接口稳定。只有 profiling 明确指出神经计算热点，且 Python 版本已有可复现实验和测试，才把独立热点迁移到 C++/CUDA；C++ 不是第一阶段的交付条件。
 
@@ -504,7 +504,7 @@ Mac Studio 运行交互 API、网页和轻量预览；4060 节点优先运行全
 
 1. 修正观测与神经输入的边界，保持已校准的 odor-only 行为基线；固定脑图显示样本，使活动按 canonical neuron ID 映射，未采样节点显示为未采样。
 2. 已加入 MuJoCo 口器接触探针和食物 contact buffer 读取；下一步要把同一证据展示在公开回放中，并完成浏览器肉眼检查。
-3. 已生成并登记一条 30 秒、确实发生接触和摄取的正式多模态生命回放；当前 4060 的 NyxID DNS 暂不可用，因此这条证据由 Mac Studio CPU 完成，仍绑定完整运行时和独立裁判。下一步需要完成浏览器肉眼检查与更复杂地图的同等验收。
+3. 已生成并登记一条 30 秒、确实发生接触和摄取的正式多模态生命回放；当前 GPU worker 的 NyxID DNS 暂不可用，因此这条证据由 configured deployment host CPU 完成，仍绑定完整运行时和独立裁判。下一步需要完成浏览器肉眼检查与更复杂地图的同等验收。
 4. 合并设计页的 FlySpec 与 mutation budget，提供固定刺激预览和真实环境评估。
 5. 接入随机搜索、遗传算法和 CEM 的可选实验配置，展示至少两条真实演化谱系。
 6. 增加双体竞技、脑图对比、AI 提交和 NyxID 身份适配器。
@@ -519,7 +519,7 @@ Mac Studio 运行交互 API、网页和轻量预览；4060 节点优先运行全
 
 ## 阶段一长回放证据
 
-第一条达到阶段一时长要求的长回放已经在 4060 节点完成，并通过本机独立裁判：
+第一条达到阶段一时长要求的长回放已经在 GPU worker 节点完成，并通过本机独立裁判：
 
 ```text
 match:       7eaac6f54a0c4e9a9a0067c5dfd0b4ae
@@ -534,15 +534,15 @@ receipt:     e5d230721163763d2ec8f1314cc24a712938c219ca2f8c80659f91bf0b677cdb
 
 事件时间轴包含气味检测、几何视觉目标观测、口器接触、5 次摄取和出界；完整 `brain-0.npz`、`physics.npz`、`frames.json`、`events.json` 和 `receipt.json` 均保存在本机预览的不可变 run 目录。回放有 3001 帧、48 个固定 canonical 神经元样本，采样活动中有 98,756 个非零值，最大值为 444.4147。receipt 继续明确声明：嗅觉是当前神经输入，视觉是工程化观测，旧回放的触碰也是距离观测；这条记录证明了长时可审计的生命闭环和数据链，还不证明生物学视觉或触觉已经完成校准。
 
-射线视觉增量也在 4060 的隔离 staging `/tmp/fly-arena-raycast-v1` 中完成了短回放验证。该回放为 1 秒、101 帧、`final_tick=10000`，状态为 `verified`，receipt 为 `f0bad79cc2bb0de4f44eb3dd146992009f12829fe9b5375ff756c61d2aa76d15`。receipt 的视觉传感器版本为 `raycast_engineered_observation_v1`，场景 body manifest 中包含 5 个 food geoms；整段有 178 个非零视觉采样，最大值为 1.0，视觉事件标记为 `raycast_engineered_geometry`。这证明射线观测已经在完整连接组和 MuJoCo 场景中运行并被裁判接受，仍然不把工程化视觉观测冒充为已经校准的视觉神经输入。
+射线视觉增量也在 GPU worker 的隔离 staging `<deployment-job-root>/raycast-v1` 中完成了短回放验证。该回放为 1 秒、101 帧、`final_tick=10000`，状态为 `verified`，receipt 为 `f0bad79cc2bb0de4f44eb3dd146992009f12829fe9b5375ff756c61d2aa76d15`。receipt 的视觉传感器版本为 `raycast_engineered_observation_v1`，场景 body manifest 中包含 5 个 food geoms；整段有 178 个非零视觉采样，最大值为 1.0，视觉事件标记为 `raycast_engineered_geometry`。这证明射线观测已经在完整连接组和 MuJoCo 场景中运行并被裁判接受，仍然不把工程化视觉观测冒充为已经校准的视觉神经输入。
 
-物理触碰的隔离仿真证据在本地 MaleCNS artifact 上完成。目录 `/tmp/fly-arena-mujoco-contact-replay-near` 使用 1 秒、10000 physics ticks 的单体 forage run；receipt 为 `c9248ce565196ac9df7685d1c068d7d763acb03ced80c5bc130ccfed177a2feb`。在食物附近出生的受控场景于 tick 0 记录 `food_contact`，事件包含 `observation: mujoco_food_contact` 和 `food: ["food-0"]`；101 个 replay frames 中有 2 帧触碰为 ON，所有帧的 provenance 为 `mujoco_food_contact_observation_v1`。这条记录证明触碰事件确实来自物理 contact buffer；该受控场景使用静音隔离运行，尚未作为标准地图的排名证据提交。它仍然是工程化的接触探针观测，不等于已经完成触觉神经编码或生物学验证。
+物理触碰的隔离仿真证据在本地 MaleCNS artifact 上完成。目录 `<workspace-root>/mujoco-contact-replay-near` 使用 1 秒、10000 physics ticks 的单体 forage run；receipt 为 `c9248ce565196ac9df7685d1c068d7d763acb03ced80c5bc130ccfed177a2feb`。在食物附近出生的受控场景于 tick 0 记录 `food_contact`，事件包含 `observation: mujoco_food_contact` 和 `food: ["food-0"]`；101 个 replay frames 中有 2 帧触碰为 ON，所有帧的 provenance 为 `mujoco_food_contact_observation_v1`。这条记录证明触碰事件确实来自物理 contact buffer；该受控场景使用静音隔离运行，尚未作为标准地图的排名证据提交。它仍然是工程化的接触探针观测，不等于已经完成触觉神经编码或生物学验证。
 
 本次接触增量的验证结果：后端完整测试 `441 passed, 4 skipped`；前端 `npm run build --prefix web` 成功。新增的物理接触单元测试同时检查食物 contact geom、口器接触探针、遮挡射线和有限物理 rollout。构建仍有 Vite 关于 bundle 大小的提示，但没有类型或生产构建错误。
 
 ## 当前公开回放：标准场景生命闭环短验证
 
-在修正口器 contact probe 后，Mac Studio 本地生成并通过独立裁判了一条标准 `orchard / contest / seed 42` 回放：
+在修正口器 contact probe 后，configured deployment host 本地生成并通过独立裁判了一条标准 `orchard / contest / seed 42` 回放：
 
 ```text
 match:       de796b637f094429b763c3bfc9260211
@@ -588,7 +588,7 @@ receipt 中的 profile 明确绑定了五个通道、MaleCNS 视觉左右群组�
 
 ## 正式 30 秒多模态生命回放
 
-在 Mac Studio 上用当前 `engineered-multimodal-v1` profile 完成了第一条连续 30 秒单体觅食记录。它没有把视觉、嗅觉、触碰或神经状态拼接到旧回放，而是从 tick 0 连续运行到 tick 300000，并通过本机独立裁判：
+在 configured deployment host 上用当前 `engineered-multimodal-v1` profile 完成了第一条连续 30 秒单体觅食记录。它没有把视觉、嗅觉、触碰或神经状态拼接到旧回放，而是从 tick 0 连续运行到 tick 300000，并通过本机独立裁判：
 
 ```text
 match:               0aefa99328034f458d89aa68242364fe
@@ -671,11 +671,11 @@ judge:                event-conservation-v1
 
 ## 部署可见性增量：精选回放只读资产
 
-研究工作区的 SQLite、完整脑 checkpoint 和账户记录属于私有运行数据，不能随着源代码复制到 Mac Studio。为保证用户仍能打开真实生命样本，新增 `scripts/bundle_replay.py`：它从一条已验证比赛的单次 attempt 读取 `scene.json`、`frames.json`、`events.json` 和 `receipt.json`，先逐项验证 receipt 中的 SHA-256，再生成 `var/research/replay-gallery-v1/*-match.json` 及四个浏览器资产。包中明确记录比赛请求、结果、attempt 和 receipt 哈希，并排除数据库、全量 `brain-*.npz`、`physics.npz`、编译工件和账户字段。
+研究工作区的 SQLite、完整脑 checkpoint 和账户记录属于私有运行数据，不能随着源代码复制到 configured deployment host。为保证用户仍能打开真实生命样本，新增 `scripts/bundle_replay.py`：它从一条已验证比赛的单次 attempt 读取 `scene.json`、`frames.json`、`events.json` 和 `receipt.json`，先逐项验证 receipt 中的 SHA-256，再生成 `var/research/replay-gallery-v1/*-match.json` 及四个浏览器资产。包中明确记录比赛请求、结果、attempt 和 receipt 哈希，并排除数据库、全量 `brain-*.npz`、`physics.npz`、编译工件和账户字段。
 
 API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读取这些只读精选资产。这样部署实例即使没有源 SQLite，也会把实际验证过的比赛列在首页并提供相同的三维场景、时间轴、事件和 provenance；公开资产不会成为可写训练会话。同步通过 `scripts/sync_mac.py var/research/replay-gallery-v1` 在维护窗口中显式执行，不会把 `var/` 默认打进源代码包。
 
-当前本地已为 `aca9ac97af8a4cfcb863c3b45da5e857` 的 attempt 2 生成 68,547,647 字节精选包；它保持 30 秒双体竞争、slot 1 摄取和独立 receipt，不把旧回放与新回放拼接。NyxID 节点查询在 2026-09-19 仍因 `nyx-api.chrono-ai.fun` DNS 不可达而未能执行远端同步，因此没有声称 Mac Studio 或 4060 已更新；待连接恢复后按上述显式资产包流程同步并重新做 API smoke。
+当前本地已为 `aca9ac97af8a4cfcb863c3b45da5e857` 的 attempt 2 生成 68,547,647 字节精选包；它保持 30 秒双体竞争、slot 1 摄取和独立 receipt，不把旧回放与新回放拼接。NyxID 节点查询在 2026-09-19 仍因配置的服务端点不可达而未能执行远端同步，因此没有声称部署主机或 GPU worker 已更新；待连接恢复后按上述显式资产包流程同步并重新做 API smoke。
 
 ## 精选回放保留参赛设计
 
@@ -687,7 +687,7 @@ API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读�
 
 已移除 API 对多模态比赛的本机旁路，并让节点 `describe` 接收所选 sensory profile。新节点会返回完整的感觉编码配置；旧节点忽略新参数时会被配置对比拒绝。连接失败返回 503，不降级到仅嗅觉或本机运行。配置了节点的 Legacy 比赛按配置调度，即使节点与应用主机的运行时相同也交给节点；科研 v2 继续使用原来的本机执行路径。
 
-本机完成了一次实际节点协议验证（不经过 SSH，不代表 4060 执行）：独立节点进程重新编译 Nectar，在完整 165,122 神经元、25,563,197 条连接上运行 `scarcity / forage / seed 42 / 1s / engineered-multimodal-v1`，传回回放后由独立裁判验证。101 个身体帧包含 100 个神经输入帧，接触 tick 3600，摄取 ticks 4000、4500、5000，总摄取 1.1232；receipt 为 `851df9603ace59bb9dd61c9f76aadf1a69ebb20c6c87f6edd5b9c837ab25b579`。摘要保存在 `docs/evidence/multimodal-node-smoke.json`，原始文件在本地 `var/research/node-multimodal-smoke/092c0b3a0f6b4d35b6a1bdb7e16176af/evidence`。
+本机完成了一次实际节点协议验证（不经过 SSH，不代表 GPU worker 执行）：独立节点进程重新编译 Nectar，在完整 165,122 神经元、25,563,197 条连接上运行 `scarcity / forage / seed 42 / 1s / engineered-multimodal-v1`，传回回放后由独立裁判验证。101 个身体帧包含 100 个神经输入帧，接触 tick 3600，摄取 ticks 4000、4500、5000，总摄取 1.1232；receipt 为 `851df9603ace59bb9dd61c9f76aadf1a69ebb20c6c87f6edd5b9c837ab25b579`。摘要保存在 `docs/evidence/multimodal-node-smoke.json`，原始文件在本地 `var/research/node-multimodal-smoke/092c0b3a0f6b4d35b6a1bdb7e16176af/evidence`。
 
 节点相关 14 项测试通过，覆盖多模态比赛/系列赛提交、配置不匹配、断线不自动改为本机执行、幂等重试和相同运行时的节点调度。NyxID 查询本轮仍无法连接服务器刷新会话，因此远端排队与实际部署验收仍未完成。
 
@@ -705,7 +705,7 @@ API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读�
 - PR #51 合并命令返回 `401 Unauthorized / Requires authentication`；CI 通过与合并完成是不同状态，后续需重新确认远端 PR 状态。
 - 封闭果园实验 `177b18a418104697b2d9544168d0c873`（attempt 1）已异常退出：heartbeat 报 `Worker lease is no longer active`，随后 finish 报 `Rejected stale worker result`。不能继续把它描述为正在运行或已经成功。
 - 隔离实验目录：`var/research/enclosure-pilot/9f3c60a2ee46407fb721a0148eea7830`。保留已有产物；下一步先查租约失效原因及可恢复状态，再排队完成真实行为样本。本次整理只更新文档，没有重启实验。
-- 下一项产品交付仍是持续行为的同步回放与可展开脑图；远端部署、4060 新地图渲染和最新页面的视觉验收尚未在本次核实，不能记为完成。
+- 下一项产品交付仍是持续行为的同步回放与可展开脑图；远端部署、GPU worker 新地图渲染和最新页面的视觉验收尚未在本次核实，不能记为完成。
 
 ## 同屏生命剧场：全脑功能活动概览
 
@@ -715,7 +715,7 @@ API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读�
 
 55 项前端测试和生产构建通过，包括零活动与缺失记录的区分、同一色标随时间更新、双果蝇图形标识不冲突和原有参赛者身份。浏览器视觉验收尚未完成，不将 React 服务端渲染测试称为真实浏览器验收。
 
-运行交接：`177b18a418104697b2d9544168d0c873` 的 attempt 2 使用本机 arm64 CPU；NyxID 再次连接失败，本机 Heca daemon 未运行，因此没有声称已在 4060 执行或已同步 Mac Studio。PR #51 已确认于 `2026-09-19T06:29:05Z` 合并。
+运行交接：`177b18a418104697b2d9544168d0c873` 的 attempt 2 使用本机 arm64 CPU；NyxID 再次连接失败，本机 Heca daemon 未运行，因此没有声称已在 GPU worker 执行或已同步 configured deployment host。PR #51 已确认于 `2026-09-19T06:29:05Z` 合并。
 
 ## 物理修正：透明口器探针不再参与墙体与对手推挤
 
@@ -743,7 +743,7 @@ API 的 `/matches`、`/matches/{id}` 和 replay artifact 路由现在同时读�
 
 PR #54 已通过完整前后端 CI，并经正式 PR 合并 API 合并为 `deae24d0d3d7403514af1e1159b1987d8137c54e`。本地 `http://127.0.0.1:8080` 已加载新生产构建 `index-Cb9OkpL_.js`；实际 HTTP 检查确认 v2 感觉配置可选、原有回放可读。记录在 `var/research/environment-touch/http-smoke.json`。这只证明服务、构建与接口已更新，不替代浏览器视觉验收或完整连接组行为实验。
 
-完整连接组旧物理对照最近进度为 80%，修复碰撞后的 5 秒对照仍在同一计算锁后排队。当前首页样本仍是旧回放，新感觉配置尚无发布的完整连接组生命样本。NyxID 最近返回会话过期，因此尚未完成本轮 4060 实验与远端部署。Goal 保持 active。
+完整连接组旧物理对照最近进度为 80%，修复碰撞后的 5 秒对照仍在同一计算锁后排队。当前首页样本仍是旧回放，新感觉配置尚无发布的完整连接组生命样本。NyxID 最近返回会话过期，因此尚未完成本轮 GPU worker 实验与远端部署。Goal 保持 active。
 
 
 ## 已发布的短程单体回放与完整事件导航
@@ -764,7 +764,7 @@ PR #55 经完整前后端 CI 后已合并为 `cd6e43b22973c2113f5c28a15cdfe6ea63
 - 新版接触摄取样本 `937499d2a29e447993e5543f89735e0e` 完成 1 秒完整连接组仿真，实际食物接触在 0.36 秒，摄取事件在 0.40 / 0.45 / 0.50 秒，总摄取 1.0552。记录包含 101 帧；0.37 秒的身体接触观测和实际神经输入均为 touch=1。它证明短时接近、接触和摄取链条存在，尚不能证明持续觅食或生物学等价。
 - 三份样本均已加入本地公开回放目录，保留原始规则与实验条件。新版短样本已通过现有 `127.0.0.1:8080` 服务实际 HTTP 读取记录和数据；浏览器视觉验收仍未完成。
 - 回放新增约 5 秒一段的行为导航：使用实际采样边界，显示胸部 XY 路径、净位移、摄取增量以及各类接触事件数，点击回到该段起点，身体和脑图沿现有时间轴同步。缺失数据保留为空；移动、神经输出和得分不自动解释为成功觅食。
-- 本轮所有神经实验都在本地 arm64 CPU 执行，未使用远端 4060。新后端预览服务的启动被自动审批拒绝，旧服务仍在运行；静态前端与已有回放可单独更新，不能把它说成后端规则部署完成。
+- 本轮所有神经实验都在本地 arm64 CPU 执行，未使用远端 GPU worker。新后端预览服务的启动被自动审批拒绝，旧服务仍在运行；静态前端与已有回放可单独更新，不能把它说成后端规则部署完成。
 
 ## 2026-09-19：触觉刺激响应的直接对照
 
@@ -781,7 +781,7 @@ PR #55 经完整前后端 CI 后已合并为 `cd6e43b22973c2113f5c28a15cdfe6ea63
 
 ### 已有实际产物
 
-- 实验源快照：`/private/tmp/fly-arena-touch-response`；可复查增量：`var/research/touch-response/touch-response.patch`；实现说明：`var/research/touch-response/implementation.json`。
+- 实验源快照：`<workspace-root>/touch-response`；可复查增量：`var/research/touch-response/touch-response.patch`；实现说明：`var/research/touch-response/implementation.json`。
 - 两组实验均使用完整保留的 MaleCNS 图（165,122 个神经元、25,563,197 条连接）、同一 Nectar 设计、seed 42 和接触后才能摄取的规则。每组只对比原触觉配置与实验性的 8 mV 配置；这不是生理参数校准，也不是演化改善证明。
 - 2 秒对照：0.36 秒食物接触；候选 0.40 秒出现已记录触觉活动，0.41 秒开始出现运动输出和位置差异；双方约 1.35 秒越界。摄取分别为 1.0552 / 1.0608，微小分差不能支持更会觅食的结论。
 - 10 秒封闭果园对照：双方 0.62 秒接触食物，最后一次摄取均为 0.75 秒。候选 0.66 秒出现触觉活动，0.67 秒出现运动与位置差异。双方首次翻倒为 1.71 / 1.74 秒，后续大部分记录处于倒置状态；路径长度增加包含滚动或滑动，不能当作持续觅食。
@@ -806,28 +806,28 @@ PR #55 经完整前后端 CI 后已合并为 `cd6e43b22973c2113f5c28a15cdfe6ea63
 3. 发布能持续探索并完成后续摄取的样本，让用户在一个页面同时查看身体、环境、感觉、脑图和事件；再验收设计修改前后、WT 与自定义果蝇的同条件对照。
 4. 在这个可观看的闭环上推进双体资源竞争和可选算法演化，展示真实父代/后代、成功/失败轨迹与 AI 提交入口。
 
-本地离线 MuJoCo 导出因 CoreGraphics 上下文创建失败，未生成新 PNG 或视频；4060 渲染仍待执行。此前远端执行、PR #57 分支更新和新 8081 服务启动被自动审批拒绝，相关具体请求仍待回复；这些限制不影响本次 Goal 文档更新。后续交付须明确区分本地产物、已合并代码、实际部署和用户页面验收。
+本地离线 MuJoCo 导出因 CoreGraphics 上下文创建失败，未生成新 PNG 或视频；GPU worker 渲染仍待执行。此前远端执行、PR #57 分支更新和新 8081 服务启动被自动审批拒绝，相关具体请求仍待回复；这些限制不影响本次 Goal 文档更新。后续交付须明确区分本地产物、已合并代码、实际部署和用户页面验收。
 
 
 ## 最新增量：恢复障碍力反馈并展示实际身体（2026-09-19）
 
 已确认一个集成缺陷：自定义障碍物参与 MuJoCo 碰撞，但没有登记进 `world.ground_geoms`；FlyGym 步态观测用 `ground_only=True` 筛选时丢失腿部障碍力。真实物理回归在修正前失败，修正后通过。修正仅在身体与地面传感器设置完成后、Simulation 映射几何 ID 前登记障碍，不改变神经输入、碰撞掩码或食物/对手的分类。地形测试与对手排除测试共 15 项通过。
 
-修正位于 `/private/tmp/fly-arena-terrain-feedback`，两文件增量保存在 `var/research/terrain-feedback/terrain-feedback.patch`；尚未推送、合并或部署新后端。原始科学快照继续保留。
+修正位于 `<workspace-root>/terrain-feedback`，两文件增量保存在 `var/research/terrain-feedback/terrain-feedback.patch`；尚未推送、合并或部署新后端。原始科学快照继续保留。
 
 **行为结果**：固定运动指令的 3 秒对照中，两种反馈仍会撞墙翻倒。随后完成同一 Nectar、enclosure、seed 42、8 mV 感觉配置的 3 秒完整连接组仿真；与旧 10 秒样本的前 3 秒比较，障碍接触前身体、运动驱动和神经记录相同，1.60 秒起身体位置出现差异。首次倒置由 1.74 秒推迟至 1.97 秒，但摄取仍为 0.6176，最后摄取仍在 0.75 秒。因此仅修复反馈不能算持续觅食完成。
 
 新回放已发布到本地目录，并经现有 HTTP 服务读取确认：
 http://127.0.0.1:8080/#tab=arena&match=c45f6f8bb9954b9d905b0ef4024659ba
 
-**直接可看的产物**：新增 `scripts/render_observation.py`，无需 OpenGL，使用 CPU 从记录的 FlyGym 网格与几何姿态导出身体图，同时展示实际触觉/下行群体活动与胸部倾角。旧样本和修正样本图分别为 `var/research/terrain-feedback/recorded-observation.png` 与 `var/research/terrain-feedback/corrected-observation.png`，均已逐图检查。它们是科学观察图，不替代网页视觉验收，也不是 4060 渲染。
+**直接可看的产物**：新增 `scripts/render_observation.py`，无需 OpenGL，使用 CPU 从记录的 FlyGym 网格与几何姿态导出身体图，同时展示实际触觉/下行群体活动与胸部倾角。旧样本和修正样本图分别为 `var/research/terrain-feedback/recorded-observation.png` 与 `var/research/terrain-feedback/corrected-observation.png`，均已逐图检查。它们是科学观察图，不替代网页视觉验收，也不是 GPU worker 渲染。
 
 **下一项行为研究**：当前 `calibrate.target` 仅用气味构造左右运动目标，平均驱动恒为 0.85；训练样本不包括停下摄食、障碍转向或翻倒恢复。应复用已有训练与评估入口，先明确感觉通道能否区分这些情形，再优化神经—动作响应，使用完整身体回放比较实际摄取、稳定性与后续行为。不要把增强电流、延后翻倒或走得更远单独当作任务学会了。Goal 继续保持 active。
 
 
 ## 已完成的本地增量：训练感觉配置与真实演化样本
 
-此前比赛支持多模态感觉，但 `TrainingSpec` 未携带感觉配置，训练评估会默认仅嗅觉。新实现让训练计划、节点运行时、所有代际/地图/交换位置评估、后代对战、分支训练和两个 AI 客户端使用同一 `sensory_profile`。不同感觉模式会在算法对比中标为不同条件。网页根据服务公开的 `training_sensory_profiles` 展示可用选项；旧后端没有这个字段时保持仅嗅觉入口，避免提交后被忽略。新实现位于 `/private/tmp/fly-arena-training-senses`，可复查补丁为 `var/research/training-senses/training-senses.patch`。
+此前比赛支持多模态感觉，但 `TrainingSpec` 未携带感觉配置，训练评估会默认仅嗅觉。新实现让训练计划、节点运行时、所有代际/地图/交换位置评估、后代对战、分支训练和两个 AI 客户端使用同一 `sensory_profile`。不同感觉模式会在算法对比中标为不同条件。网页根据服务公开的 `training_sensory_profiles` 展示可用选项；旧后端没有这个字段时保持仅嗅觉入口，避免提交后被忽略。新实现位于 `<workspace-root>/training-senses`，可复查补丁为 `var/research/training-senses/training-senses.patch`。
 
 48 项后端训练/节点测试、68 项前端测试、12 项真实 React DOM 用户流程测试及生产构建通过。新增画廊定位参数 `#tab=train&showcase=ID`，用于无需登录直接分享公开演化样本；浏览器真实视觉验收仍未完成。
 
@@ -848,7 +848,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 ## 公开演化后代成为自己的实验起点：本地验证完成
 
-- 实现快照：`/private/tmp/fly-arena-gallery-clone`；相对训练感觉版本的完整增量保存在 `var/research/gallery-clone/gallery-clone.patch`。主工作区原有改动已保留。
+- 实现快照：`<workspace-root>/gallery-clone`；相对训练感觉版本的完整增量保存在 `var/research/gallery-clone/gallery-clone.patch`。主工作区原有改动已保留。
 - 画廊提供显式“保存副本并准备训练”：登录后复制完整 FlySpec，生成归属当前用户的新 ID，保留公开样本为亲代；重试返回同一副本。保存本身不启动比赛或训练。网页恢复来源地图、种子、时长和感觉配置，用户再选择策略并开始。
 - 公开生命档案能读取文件画廊中的亲代、来源与比赛观察；公开样本不可批注。私有数据库个体不会因公开文件中的同 ID 而被公开。文件样本的档案将用户引导回来源轨迹保存副本，避免以不存在于数据库的 ID 开始训练。
 - 实际样本验证：复制 G1.2 `f011f616deed4a12bc1fdf466221478a`，保留 165,122 神经元、25,563,197 条连接的完整设计与编译权重身份。副本 `692b090705654c9eb27d4edc4017bf39` 能被新训练受理，原始 301 帧观察可读取。验证使用独立本地数据库和进程内 API；没有启动 TCP 服务或新比赛。验证训练已停止。
@@ -860,7 +860,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 ## 分离接触输入与动作学习：一次可观看的身体改善
 
-执行快照：`/private/tmp/fly-arena-contact-control`；相对 gallery-clone 的增量保存在 `var/research/contact-control/contact-control.patch`。新增感觉模式 `engineered-contact-context-v1` 将真实口器接触非耗尽食物映射到官方 gustatory 神经群，将真实环境接触按当前胸部坐标中的左右侧映射到带侧别注释的 tactile 群。地面支撑、空食物及接触探针有明确排除规则。8 mV 输入及动作目标仍是工程假设。
+执行快照：`<workspace-root>/contact-control`；相对 gallery-clone 的增量保存在 `var/research/contact-control/contact-control.patch`。新增感觉模式 `engineered-contact-context-v1` 将真实口器接触非耗尽食物映射到官方 gustatory 神经群，将真实环境接触按当前胸部坐标中的左右侧映射到带侧别注释的 tactile 群。地面支撑、空食物及接触探针有明确排除规则。8 mV 输入及动作目标仍是工程假设。
 
 先做身体诊断：固定前行的 3 秒对照在 1.68 秒翻倒；按真实食物接触暂停的诊断保持直立。该诊断不经过大脑、未计资源耗尽，不计作比赛。随后使用 canonical LIF 全脑产生的下行活动，在 16 个受控刺激片段上拟合动作读出，在另外 8 个片段上观察输出。运行时解码器只读取下行神经活动，不接收食物坐标或直接接触标记。完整校准数据、矩阵与假设保存在 contact-control 研究目录。
 
@@ -871,7 +871,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 | 原气味解码器 | 0.6128 | 1.92 秒 | 0.75 秒 | `cea493461ec6437d98e11865a2011c15` |
 | 接触响应解码器 | 0.964 | 5 秒内未观察到 | 1.45 秒 | `65bceb3623514b2a80d772f820ec11b0` |
 
-用户入口：<http://127.0.0.1:8080/#tab=arena&match=65bceb3623514b2a80d772f820ec11b0>。现有服务读取新回放，前端版本为 `index-tYQP7dIa.js`，可通过回放说明打开匹配对照。实际 HTTP 检查确认新示例、501 帧、完整设计与味觉/左右触觉响应；CPU 科学渲染使用实际身体网格和记录姿态，已查看导出图片。没有把这些检查当作浏览器或 4060 的视觉验收。
+用户入口：<http://127.0.0.1:8080/#tab=arena&match=65bceb3623514b2a80d772f820ec11b0>。现有服务读取新回放，前端版本为 `index-tYQP7dIa.js`，可通过回放说明打开匹配对照。实际 HTTP 检查确认新示例、501 帧、完整设计与味觉/左右触觉响应；CPU 科学渲染使用实际身体网格和记录姿态，已查看导出图片。没有把这些检查当作浏览器或 GPU worker 的视觉验收。
 
 关键限制：短期没有翻倒不等于稳定觅食。新回放在 0.61 秒接触第一处食物后出现味觉活动和驱动下降，但未及时停留；1.44 秒又接触另一食物，后段没有继续摄取。接下来应检查接触到首个神经响应、到动作下降的时延，并比较 WT 与 Nectar 在同一解码器下的表现；据此改进停留与再探索，扩展更长窗口和未参与优化的种子。保留失败与短期改善两类记录，总 Goal 继续 active。
 
@@ -884,7 +884,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 10 秒降低增益实验已完成，保留原始 Nectar 基因，动作读出权重人为乘 0.55，不能称为演化出的基因。第一次食物接触为 0.95–1.38 秒，持续约 430 ms；味觉群在 1.00 秒超过 1 Hz，运动驱动均值在 1.16 秒低于 0.1。共同前 5 秒的摄取为 4.9416，原增益对照为 0.964。后续仍失败：最后摄取 2.85 秒，6.19 秒首次翻倒，食物未耗尽，未达到持续觅食。两份运行的 runtime 只有动作读出权重不同，request 只有观察时长不同。
 
-实现快照 `/private/tmp/fly-arena-response-story`，补丁 `var/research/response-story/response-story.patch`。32 项回放/真实 React DOM 交互检查和生产构建通过。现有 8080 静态页面已更新为 `index-ZomAvV8M.js`；实际 HTTP 读取确认新回放的 1001 帧和设计记录。身体网格、姿态及神经曲线的 CPU 科学图片已检查，不能替代浏览器或 4060 渲染验收。新后端和远端部署仍未完成。
+实现快照 `<workspace-root>/response-story`，补丁 `var/research/response-story/response-story.patch`。32 项回放/真实 React DOM 交互检查和生产构建通过。现有 8080 静态页面已更新为 `index-ZomAvV8M.js`；实际 HTTP 读取确认新回放的 1001 帧和设计记录。身体网格、姿态及神经曲线的 CPU 科学图片已检查，不能替代浏览器或 GPU worker 渲染验收。新后端和远端部署仍未完成。
 
 研究证据：`var/research/contact-latency/gain-comparison.json`、`slow-latency.json`、`contact-latency.png`、`slow-body.png`；产品交付证据：`var/research/response-story/implementation.json`、`http-replay.json`。下一项根据实际残余运动驱动与步态停止行为改善停留及后续探索，不重复启动已完成实验；完整 Goal 保持 active。
 
@@ -897,7 +897,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 研究干预复用 288 条已有受控全脑活动样本，把味觉停止目标从 0 改为 -0.3，仍只用下行神经活动解码动作，矩阵增益保持 0.55。与上一份同条件 10 秒运行相比，唯一 runtime 差异是动作读出矩阵；摄取从 4.9416 变为 10.056。第一处食物全部消耗，但后续仍失败；第二处食物只记录了 0.056 的短时摄取，没有第二次 10 ms 采样接触或味觉响应，不能补写不存在的神经解释。6.87 秒翻倒的原因及后续避障仍待改善。
 
-实现快照 `/private/tmp/fly-arena-brain-neighborhood`，可恢复增量补丁 `var/research/brain-neighborhood/brain-neighborhood.patch`。36 项相关 DOM/组件检查与构建通过；本地前端和冻结脑图 HTTP 读取已确认。实际身体姿态与神经曲线已用 CPU 绘制并检查，仍不是浏览器或 4060 验收。研究证据见 `var/research/feeding-hold/comparison.json`、`latency.json`、`body-observation.png`；实验会话 79751 已正常终止，不再重启。完整 Goal 继续 active。
+实现快照 `<workspace-root>/brain-neighborhood`，可恢复增量补丁 `var/research/brain-neighborhood/brain-neighborhood.patch`。36 项相关 DOM/组件检查与构建通过；本地前端和冻结脑图 HTTP 读取已确认。实际身体姿态与神经曲线已用 CPU 绘制并检查，仍不是浏览器或 GPU worker 验收。研究证据见 `var/research/feeding-hold/comparison.json`、`latency.json`、`body-observation.png`；实验会话 79751 已正常终止，不再重启。完整 Goal 继续 active。
 
 
 ## 最新研究记录：共享食物竞争与换位对照
@@ -911,7 +911,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 两场均为右侧先摄取且获胜，Nectar 与 WT 合计摄取差只有 0.0032；这是出生位置敏感的单种子样本，不构成设计优越性证据。两场 4 秒内没有观察到翻倒，但后续均越界，因此不算持续稳定行为成功。数据见 `var/research/shared-food-duel/comparison.json`。
 
-每位参赛者均绑定自己的真实编译脑图。最新前端增加共享食物余量、双方累计摄取、资源耗尽时间跳转；选择观察 WT 时，场景和记分牌的选中状态与脑图同步，设计编辑器选择独立保留。实现快照为 `/private/tmp/fly-arena-shared-food`，可恢复补丁为 `var/research/shared-food-duel/shared-food-ui.patch`。54 项相关检查及生产构建通过，构建 `index-3JD3tATX.js` 已复制到现有服务目录；本版本 HTTP、浏览器视觉与远端验收仍待完成。CPU 科学图片导出尚有地面数组类型问题待修复，不能声称已经完成新的渲染验收。
+每位参赛者均绑定自己的真实编译脑图。最新前端增加共享食物余量、双方累计摄取、资源耗尽时间跳转；选择观察 WT 时，场景和记分牌的选中状态与脑图同步，设计编辑器选择独立保留。实现快照为 `<workspace-root>/shared-food`，可恢复补丁为 `var/research/shared-food-duel/shared-food-ui.patch`。54 项相关检查及生产构建通过，构建 `index-3JD3tATX.js` 已复制到现有服务目录；本版本 HTTP、浏览器视觉与远端验收仍待完成。CPU 科学图片导出尚有地面数组类型问题待修复，不能声称已经完成新的渲染验收。
 
 已有本地回放入口（服务可用性待本轮复查）：
 
@@ -931,7 +931,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 `POST /api/v1/flies/preview` 的新版源码返回 `neural-design-preview/v2`，同时记录提交设计、WT 参数和配对时间线。三个后端测试覆盖 LIF、连续率模型、相同 canonical 设计与 WT 的逐样本一致性。25 项 DOM 流程及 17 项组件检查通过；前端将已计算样本、当前提交与修改后的草稿明确区分，旧版响应也明确标注缺少 WT/时间线，不补造结果。新版后台尚未部署，因此当前可直接使用的是公开样本与现有比赛；不能把代码实现写成任意草稿配对预览已上线。
 
-源码快照 `/private/tmp/fly-arena-stimulus-preview`，相对上一版的完整补丁 `var/research/stimulus-preview/stimulus-preview.patch`。现有本地服务提供新静态构建 `index-CJEmY0P6.js`，已确认公开 JSON 与实际计算结果完全一致。证据见 `implementation.json` 与 `http-publication.json`。双体身体观察图见 `var/research/shared-food-duel/duel-observation.png`；该图已检查，但不是浏览器或 4060 渲染验收。总 Goal 保持 active。
+源码快照 `<workspace-root>/stimulus-preview`，相对上一版的完整补丁 `var/research/stimulus-preview/stimulus-preview.patch`。现有本地服务提供新静态构建 `index-CJEmY0P6.js`，已确认公开 JSON 与实际计算结果完全一致。证据见 `implementation.json` 与 `http-publication.json`。双体身体观察图见 `var/research/shared-food-duel/duel-observation.png`；该图已检查，但不是浏览器或 GPU worker 渲染验收。总 Goal 保持 active。
 
 
 ## 最新生命行为增量：足部支撑分类后，10秒内保持直立
@@ -949,9 +949,9 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 两次运行保持Nectar设计、动作读出、地图、seed42与10秒窗口一致。首个支撑采样为6.37秒；首个不同的记录驱动和身体姿态均为6.4秒。新模式有35个支撑采样，其中23个没有其余侧向接触。摄取量未增加，最后摄取仍为3.55秒，因此这是单样本身体稳定性的改善，不是持续觅食完成或普遍优越性的结论。原记录没有支撑分类，其支撑计数必须记为缺失，不能填零。
 
-实际实验会话53529已正常结束，约301秒本机CPU时间，1001帧回放通过记录检查并发布；不应重跑该10秒实验。相关13项物理/编码记录测试、44项界面测试和生产构建通过。HTTP检查确认支撑分类与实际送入大脑的输入一致、资源守恒、参赛脑图身份及最新前端。实际身体图片和对照曲线用CPU绘制；这些不代替浏览器或4060验收。
+实际实验会话53529已正常结束，约301秒本机CPU时间，1001帧回放通过记录检查并发布；不应重跑该10秒实验。相关13项物理/编码记录测试、44项界面测试和生产构建通过。HTTP检查确认支撑分类与实际送入大脑的输入一致、资源守恒、参赛脑图身份及最新前端。实际身体图片和对照曲线用CPU绘制；这些不代替浏览器或GPU worker验收。
 
-源码快照`/private/tmp/fly-arena-support-contact`，增量补丁`var/research/support-contact/support-contact.patch`。研究与发布证据包括`recorded-geometry.json`、`comparison.json`、`body-observation.png`、`comparison.png`、`implementation.json`和`http-publication.json`。新版后端尚未部署，当前发布的是实际研究回放与前端观察功能。
+源码快照`<workspace-root>/support-contact`，增量补丁`var/research/support-contact/support-contact.patch`。研究与发布证据包括`recorded-geometry.json`、`comparison.json`、`body-observation.png`、`comparison.png`、`implementation.json`和`http-publication.json`。新版后端尚未部署，当前发布的是实际研究回放与前端观察功能。
 
 下一步需要更长窗口或未参与调整的种子，判断继续移动后是否能再次有效觅食，并继续贯通设计、预览、演化后代与比赛。不可由这个10秒样本宣告完整Goal完成；沿用active任务。
 
@@ -971,7 +971,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 这是从相同初态重置的30秒运行，保持Nectar基因、动作读出、场景、seed42和支撑分类感觉模式一致，仅延长观察时间；前1001帧与已完成10秒样本完全一致。实际本机CPU运行约1586.7秒，原进程正常结束，不应重跑。不能把本次延长观察称为进化出的新后代。
 
-64项相关前端检查及生产构建通过；现有8080静态页面使用 `index-_P9HxdpF.js` / `index-hPs03a2g.css`。HTTP实际读取的新比赛、3001帧、场景和receipt与发布文件一致，参赛脑图绑定同一完整FlySpec和artifact。实际网格姿态在18.46、18.80、30秒的CPU科学图片和神经/倾角曲线已检查；仍不等于浏览器或4060渲染验收。新后端与远端部署没有完成。
+64项相关前端检查及生产构建通过；现有8080静态页面使用 `index-_P9HxdpF.js` / `index-hPs03a2g.css`。HTTP实际读取的新比赛、3001帧、场景和receipt与发布文件一致，参赛脑图绑定同一完整FlySpec和artifact。实际网格姿态在18.46、18.80、30秒的CPU科学图片和神经/倾角曲线已检查；仍不等于浏览器或GPU worker渲染验收。新后端与远端部署没有完成。
 
 证据目录：`var/research/continuous-foraging/`，包括 `behavior-summary.json`、`implementation.json`、`http-publication.json`、`frontend-tests.log`、`frontend-build.log`、`body-observation.png`。本轮完成可见回放增量；完整Goal继续active，下一步贯通设计、预览、演化后代与竞技用户流程，并验证跨种子行为。
 
@@ -982,7 +982,7 @@ HTTP 实际读取了公开训练、参赛设计以及 301 帧身体/神经记录
 
 “下载草稿给AI”导出同样可编辑的FlySpec，不含账号信息或比赛包装结构；缺少参赛设计快照时不使用同名库中个体猜测来源。感觉配置和动作读出属于实验条件，不随神经设计复制。登录返回时保留草稿来源；切换其他设计或新建canonical草稿会清除旧来源提示。
 
-实现直接延续`/private/tmp/fly-arena-feeding-history`，本轮增量补丁`var/research/replay-design/replay-design.patch`应应用在此前feeding-history增量之后。30项DOM用户流程与76项兼容性检查通过，生产构建及HTTP验证完成。现有本地服务构建为`index-CK37sDsW.js` / `index-DjFiwVFL.css`。实际Nectar回放经生产TypeScript函数生成的草稿位于`var/research/replay-design/nectar-child.flyspec.json`，通过Python模型格式验证；神经字段与现有亲代完全相同。保存到新个体再进入训练的接线使用真实React组件和模拟API进行了测试，不能据此声称全套在线训练比赛已经验收。
+实现直接延续`<workspace-root>/feeding-history`，本轮增量补丁`var/research/replay-design/replay-design.patch`应应用在此前feeding-history增量之后。30项DOM用户流程与76项兼容性检查通过，生产构建及HTTP验证完成。现有本地服务构建为`index-CK37sDsW.js` / `index-DjFiwVFL.css`。实际Nectar回放经生产TypeScript函数生成的草稿位于`var/research/replay-design/nectar-child.flyspec.json`，通过Python模型格式验证；神经字段与现有亲代完全相同。保存到新个体再进入训练的接线使用真实React组件和模拟API进行了测试，不能据此声称全套在线训练比赛已经验收。
 
 证据：`var/research/replay-design/implementation.json`、`real-draft-validation.json`、`http-publication.json`及测试构建日志。本轮没有启动新的科学计算、后端服务或远端发布；完整Goal保持active。
 
@@ -1005,7 +1005,7 @@ Nectar保留嗅觉×1.18、投射×1.10的设计；WT神经参数为canonical。
 
 这组结果证明当前模型和固定实验条件下存在设计相关的行为差异，不证明真实生物等价、跨种子优势或演化学习成功。共享动作读出此前用Nectar活动校准，必须保留这个选择偏差；两次分别运行的观察也不是同场竞争。后续仍需未参与调整的种子，以及在改善后的感觉/读出配置下进行同场竞技。
 
-新WT实验实际在本机arm64 CPU串行运行约512.18秒，会话50530已正常结束。3001帧、资源记账、参赛图谱身份、双向对照链接及HTTP数据已核对；身体姿态（4.90、12.30、30秒）、路径、摄取及味觉对照图已CPU绘制并检查。本轮未改动前端逻辑，不重复运行已通过的前端测试；仍无新后端/远端部署、浏览器或4060视觉验收。证据见`var/research/wt-foraging/comparison.json`、`implementation.json`、`http-publication.json`、`comparison.png`和`body-observation.png`。完整Goal保持active。
+新WT实验实际在本机arm64 CPU串行运行约512.18秒，会话50530已正常结束。3001帧、资源记账、参赛图谱身份、双向对照链接及HTTP数据已核对；身体姿态（4.90、12.30、30秒）、路径、摄取及味觉对照图已CPU绘制并检查。本轮未改动前端逻辑，不重复运行已通过的前端测试；仍无新后端/远端部署、浏览器或GPU worker视觉验收。证据见`var/research/wt-foraging/comparison.json`、`implementation.json`、`http-publication.json`、`comparison.png`和`body-observation.png`。完整Goal保持active。
 
 ## 单个神经元的活动时间线
 

@@ -1,8 +1,9 @@
 // Read-only real HTTP evidence. No fixtures, auth injection, or server mutations.
 import assert from 'node:assert/strict'
 import {mkdir,writeFile} from 'node:fs/promises'
-const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'/tmp/fly-arena-browser-qa/node_modules/playwright/index.mjs');
-const out=process.env.QA_OUTPUT||'/tmp/fly-arena-browser-qa/integration-ui';await mkdir(out,{recursive:true});
+const playwrightModule=process.env.PLAYWRIGHT_MODULE;if(!playwrightModule)throw new Error('Set PLAYWRIGHT_MODULE to the installed Playwright module');
+const {chromium}=await import(playwrightModule);
+const out=process.env.QA_OUTPUT||`${(await import('node:os')).tmpdir()}/fly-arena-browser-qa/integration-ui`;await mkdir(out,{recursive:true});
 const base=process.env.QA_BASE_URL||'http://127.0.0.1:5174';const experimentId=process.env.QA_EXPERIMENT_ID||'9320e8fad58f4e59bf50b91f1ff4e38b';
 const browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1440,height:1100}});const page=await context.newPage();const errors=[],consoleErrors=[],failures=[],mutations=[],checks=[];
 page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text())});page.on('requestfailed',r=>{if(!r.failure()?.errorText.includes('ERR_ABORTED'))failures.push({url:r.url(),error:r.failure()})});

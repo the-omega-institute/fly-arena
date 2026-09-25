@@ -1,16 +1,16 @@
 # 计算资源与排队
 
-优先使用 4060 节点执行离线实验，Mac Studio 承担网页、API 和现有比赛服务。同一节点一次运行一个重型实验；按任务实测选择 CPU 或 GPU。网页预览与回放由浏览器 Three.js 渲染，不占服务端 GPU。
+优先使用配置的 GPU worker node 执行离线实验，部署主机承担网页、API 和现有比赛服务。同一节点一次运行一个重型实验；按任务实测选择 CPU 或 GPU。网页预览与回放由浏览器 Three.js 渲染，不占服务端 GPU。
 
 ## 已有节点
 
-- NyxID SSH 服务：`deepevo-4060-ssh`，principal `root`。
-- GPU：RTX 4060 Laptop，8188 MiB；完整 MaleCNS 数据保存在 `/tmp/fly-arena-data`。
-- 现有 Python：`/tmp/fly-arena-cuda-device-v1/venv/bin/python`。
-- 共享锁：`/tmp/fly-arena-gpu.lock`。所有本项目重型任务共用此锁，包括 CPU/GPU 对照任务，避免彼此影响。
-- 当前任务目录：`/tmp/fly-arena-jobs/`。状态、日志和结果保存在各自目录；目录位于 `/tmp`，重要结果应及时取回长期保存。
+- NyxID SSH 服务：`ARENA_DEPLOY_HOST`，principal `ARENA_DEPLOY_PRINCIPAL`。
+- GPU worker node 的硬件与数据位置由部署配置提供；完整 MaleCNS 数据使用 `ARENA_DATA`。
+- Python 环境使用 `ARENA_DEPLOY_PYTHON`，未设置时使用部署根目录下的 `.venv/bin/python`。
+- 共享锁使用 `${ARENA_VAR}/gpu.lock`。所有本项目重型任务共用此锁，包括 CPU/GPU 对照任务，避免彼此影响。
+- 当前任务目录使用 `${ARENA_VAR}/node-jobs/`。状态、日志和结果保存在各自目录；重要结果应及时取回长期保存。
 
-提交命令使用 `flock /tmp/fly-arena-gpu.lock timeout 900 <command>`。锁被占用时等待；取得锁后才启动超时计时。用独立进程运行，使 SSH 断开不终止任务。排队记录只表示已提交；完成状态以实际进程结果和实验的 `status.json` 为准。
+提交命令使用 `flock "${ARENA_VAR:?Set ARENA_VAR}/gpu.lock" timeout 900 <command>`。锁被占用时等待；取得锁后才启动超时计时。用独立进程运行，使 SSH 断开不终止任务。排队记录只表示已提交；完成状态以实际进程结果和实验的 `status.json` 为准。
 
 ## 2026-09-17 实测
 
@@ -20,9 +20,9 @@
 | --- | ---: | ---: |
 | 累计 advance 用时，排除构建和预热 | 0.8522 s | 2.1554 s |
 
-这次短测的脉冲计数和检查点状态一致，最大浮点绝对差为 0。当前 CUDA 实现比 CPU 慢约 2.53 倍；因此同类离线神经任务先使用 4060 节点的 CPU。这个结果只说明该实现与该短时输入，不能外推所有任务，也不说明具身比赛或步态效果。
+这次短测的脉冲计数和检查点状态一致，最大浮点绝对差为 0。当前 CUDA 实现比 CPU 慢约 2.53 倍；因此同类离线神经任务先使用 GPU worker node 的 CPU。这个结果只说明该实现与该短时输入，不能外推所有任务，也不说明具身比赛或步态效果。
 
-原始结果：节点 `/tmp/fly-arena-jobs/fullgraph-20260917/status.json`。此处复用了已有实验性 CUDA 模块，没有把它接入默认比赛后端。
+原始结果：节点 `${ARENA_VAR}/node-jobs/fullgraph-20260917/status.json`。此处复用了已有实验性 CUDA 模块，没有把它接入默认比赛后端。
 
 ## 有预算的权重实验
 
@@ -30,7 +30,7 @@
 
 ```sh
 PYTHONPATH=src OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 NUMBA_NUM_THREADS=1 \
-  flock /tmp/fly-arena-gpu.lock timeout 900 .venv/bin/python \
+  flock "${ARENA_VAR:?Set ARENA_VAR}/gpu.lock" timeout 900 "${ARENA_DEPLOY_PYTHON:-.venv/bin/python}" \
   scripts/run_neural_sweep.py --data data --output var/sweeps/olfactory-01 --duration 3
 ```
 
@@ -54,11 +54,11 @@ Install the same released source and locked Python environment on the node, with
 
 ```json
 {
-  "service": "deepevo-4060-ssh",
-  "principal": "root",
-  "root": "/tmp/fly-arena-embodied-v020",
-  "data": "/tmp/fly-arena-data",
-  "nyxid": "/absolute/path/to/nyxid"
+  "service": "${ARENA_DEPLOY_HOST}",
+  "principal": "${ARENA_DEPLOY_PRINCIPAL}",
+  "root": "${ARENA_DEPLOY_PATH}",
+  "data": "${ARENA_DATA}",
+  "nyxid": "${ARENA_NYXID_CLI}"
 }
 ```
 
@@ -66,7 +66,7 @@ Start the app with `ARENA_NODE_CONFIG=/absolute/path/to/node.json`. The app host
 
 Admission checks that scientific sources, dependency lock, graph, readout and rules agree, then records the **node's actual runtime**, including its platform and Python/MuJoCo versions. The node recompiles each submitted FlySpec and checks the artifact identity. Results return to the originating app for ordinary evidence verification and replay. An unavailable configured node returns 503 at admission rather than silently changing the execution environment. Already admitted jobs keep observing the same remote job during a temporary transport outage.
 
-Each remote match uses its existing match ID as the node job ID. Repeated submission attaches to the same process/result. A retry never restarts a simulation just because an SSH response was lost. Heavy runs acquire `/tmp/fly-arena-gpu.lock`, shared with operator experiments; queued jobs wait for it. Current execution uses CPU/Numba because the measured ordered CUDA implementation is slower for this workload. The node records progress, errors and retained evidence under `var/node-jobs/JOB_ID/`.
+Each remote match uses its existing match ID as the node job ID. Repeated submission attaches to the same process/result. A retry never restarts a simulation just because an SSH response was lost. Heavy runs acquire `${ARENA_VAR}/gpu.lock`, shared with operator experiments; queued jobs wait for it. Current execution uses CPU/Numba because the measured ordered CUDA implementation is slower for this workload. The node records progress, errors and retained evidence under `var/node-jobs/JOB_ID/`.
 
 Keep the node source and data in place while jobs are active. Update or disable routing after queues drain; changing execution configuration is an operator action, not a player's setting. Completed jobs retain their evidence for reconnects. As in the existing queue, a process that actually disappears without a result is reported as failed.
 
@@ -88,4 +88,4 @@ change routing only after existing queues drain. Research-v2 remains local.
 The local node-protocol smoke recorded in
 `docs/evidence/multimodal-node-smoke.json` exercises the actual node CLI,
 detached worker, recompilation, full MaleCNS simulation, archive transfer and
-judge on this Mac. It is not evidence of SSH connectivity or RTX 4060 execution.
+judge on this Mac. It is not evidence of SSH connectivity or a specific GPU worker's execution.

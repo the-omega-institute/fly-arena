@@ -43,6 +43,9 @@ from .services import observation_series
 from .services.observation_series import ObservationSeriesRequest
 
 
+MAX_REQUEST_BYTES = 8_000_000
+
+
 def create_app(*, with_worker: bool = True, store: Store | None = None, auth_config: AuthConfig | None = None, oidc_client: NyxIDClient | None = None, research_service: ResearchService | None = None) -> FastAPI:
     store = store or Store()
     auth = AuthBoundary(store, auth_config or AuthConfig.from_env(), oidc_client)
@@ -101,11 +104,20 @@ def create_app(*, with_worker: bool = True, store: Store | None = None, auth_con
     async def limits(request: Request, call_next):
         if request.url.path.startswith("/api") and request.method in {"POST", "PUT", "PATCH"}:
             size = request.headers.get("content-length")
-            if size and (not size.isdigit() or int(size) > 8_000_000):
+            if size and (not size.isdigit() or int(size) > MAX_REQUEST_BYTES):
                 return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
-            body = await request.body()
-            if len(body) > 8_000_000:
+            # Read at most one bounded stream before handing the body to FastAPI. A
+            # missing or false Content-Length must not turn into an unbounded body().
+            body = bytearray()
+            received = 0
+            async for chunk in request.stream():
+                received += len(chunk)
+                if received > MAX_REQUEST_BYTES:
+                    return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
+                body.extend(chunk)
+            if size and received != int(size):
                 return JSONResponse({"detail": "Request exceeds 8 MB limit"}, status_code=413)
+            request._body = bytes(body)
         response = await call_next(request)
         if request.url.path.startswith("/api/v1/auth") or request.url.path == "/api/v1/me":
             response.headers["Cache-Control"] = "no-store"

@@ -26,7 +26,8 @@ Arena 的 HttpOnly 会话默认有效 30 天，刷新和重新打开网页通过
 
 ## 调研结论及源代码依据
 
-调研对象为本地 NyxID checkout `96bfadf48e2140e27a081c834402164c8d2c0bd5`，未声称已验证生产实例行为。
+调研对象为 NyxID 官方公开仓库的固定 revision
+`96bfadf48e2140e27a081c834402164c8d2c0bd5`，未声称已验证生产实例行为。
 
 - [OIDC discovery 实现](https://github.com/ChronoAIProject/NyxID/blob/96bfadf48e2140e27a081c834402164c8d2c0bd5/backend/src/handlers/oidc_discovery.rs)：支持 authorization code、PKCE S256、RS256 ID token、JWKS、`client_secret_basic`；`issuer` 来自独立的 `jwt_issuer`，端点 URL 来自 `base_url`。
 - [授权与已有 consent 复用](https://github.com/ChronoAIProject/NyxID/blob/96bfadf48e2140e27a081c834402164c8d2c0bd5/backend/src/handlers/oauth.rs)：浏览器模式认证成功后，检查同用户/client/scope 的 consent；已有授权且未强制 consent 时直接签发 code。

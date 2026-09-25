@@ -1,4 +1,4 @@
-{
+{"note":"Local provenance paths were normalized to <workspace-root>; measured values, hashes, and receipt contents were not changed.",
   "date": "2026-09-24",
   "checked_at_utc": "2026-09-24T14:43:44.499117+00:00",
   "branch": "fix/predeploy-qa",
@@ -12,21 +12,21 @@
       "status": "passed",
       "passed": 259,
       "failed": 0,
-      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/node26-final.log"
+      "log": "<workspace-root>/var/research/predeploy-20260924/node26-final.log"
     },
     {
       "runtime": "Node v22.23.3",
       "status": "passed",
       "passed": 259,
       "failed": 0,
-      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/node22-final.log"
+      "log": "<workspace-root>/var/research/predeploy-20260924/node22-final.log"
     },
     {
       "runtime": "Node v26.3.0 / JSDOM",
       "status": "passed",
       "passed": 74,
       "failed": 0,
-      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/journeys-final.log"
+      "log": "<workspace-root>/var/research/predeploy-20260924/journeys-final.log"
     },
     {
       "command": "npm run build",
@@ -40,7 +40,7 @@
       "skipped": 11,
       "deselected": 3,
       "failed": 0,
-      "log": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/backend-final.log"
+      "log": "<workspace-root>/var/research/predeploy-20260924/backend-final.log"
     }
   ],
   "product_defects": [
@@ -729,7 +729,7 @@
         "bytes": 104018
       }
     },
-    "artifact_directory": "/Users/lexa/Desktop/lexa/omega/fly-arena/var/research/predeploy-20260924/browser",
+    "artifact_directory": "<workspace-root>/var/research/predeploy-20260924/browser",
     "limitations": "Chromium coverage; not Safari/Firefox or physical phone hardware. No local simulations were run or fabricated; queued records and existing recorded runs were used."
   },
   "historical_incidents": [

@@ -9,12 +9,12 @@
 | [#4](https://github.com/the-omega-institute/fly-arena/pull/4) Add frozen DN observability diagnostics and independent verification | DN观测和读出候选未达到目标，保留负结果和数据。 |
 | [#5](https://github.com/the-omega-institute/fly-arena/pull/5) Add stopped anatomical contact-to-motor research candidate | 解剖触觉到运动候选未通过神经前提，停止该候选。 |
 | [#7](https://github.com/the-omega-institute/fly-arena/pull/7) Record real knee transduction and failed closed-loop contact causality | 膝关节神经驱动部分成立，触觉闭环因果效果未成立。 |
-| [#8](https://github.com/the-omega-institute/fly-arena/pull/8) Record real RTX 4060 tiny CUDA differential validation | 实际4060微型神经测试有价值，但不能外推全图性能；合并进研究总结。 |
+| [#8](https://github.com/the-omega-institute/fly-arena/pull/8) Record real GPU worker tiny CUDA differential validation | 实际GPU worker微型神经测试有价值，但不能外推全图性能；合并进研究总结。 |
 | [#9](https://github.com/the-omega-institute/fly-arena/pull/9) Research: tethered contact-presence responses and matched fly comparisons | 系留触觉实验保留为研究记录，不作为自由竞争产品实现。 |
 | [#13](https://github.com/the-omega-institute/fly-arena/pull/13) Record gait commissioning and fail-stop evidence retention | 早期步态试验和停止记录归档。 |
 | [#15](https://github.com/the-omega-institute/fly-arena/pull/15) Diagnose distal-foot scuffing from retained physics evidence | 足部拖地诊断结论保留，不继续独立诊断PR。 |
 | [#16](https://github.com/the-omega-institute/fly-arena/pull/16) Measure v16 unloading gains and unresolved support regressions | v16改善卸载却损害支撑/滑移，候选未通过；保留负结果。 |
-| [#17](https://github.com/the-omega-institute/fly-arena/pull/17) Document verified Mac Studio and RTX 4060 node access | 节点访问信息已确认，过时的堆叠文档分支归档。 |
+| [#17](https://github.com/the-omega-institute/fly-arena/pull/17) Document verified configured deployment host and GPU worker node access | 节点访问信息已确认，过时的堆叠文档分支归档。 |
 | [#18](https://github.com/the-omega-institute/fly-arena/pull/18) Add guarded fullgraph CUDA runner and independent verification | 全图运行/验证框架尚无全图实际结果，不继续扩展基础设施。 |
 | [#19](https://github.com/the-omega-institute/fly-arena/pull/19) Add research contracts for richer sensory and motor channels | 更丰富的感觉/运动接口尚无实际闭环效果；未来按产品需要重用。 |
 | [#20](https://github.com/the-omega-institute/fly-arena/pull/20) Add experimental contact-aware gait realization controller | 接触控制候选未完成有效步态验证，停止堆叠。 |

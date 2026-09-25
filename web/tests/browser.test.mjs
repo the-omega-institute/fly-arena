@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict'
 import {mkdir,writeFile} from 'node:fs/promises'
+import {tmpdir} from 'node:os'
 import {flies,spec,validation,experiment,cases,catalog} from './ui-fixtures.mjs'
-const {chromium}=await import(process.env.PLAYWRIGHT_MODULE||'/tmp/fly-arena-browser-qa/node_modules/playwright/index.mjs');
-const output=process.env.QA_OUTPUT||'/tmp/fly-ui-qa';await mkdir(output,{recursive:true});
+const playwrightModule=process.env.PLAYWRIGHT_MODULE;if(!playwrightModule)throw new Error('Set PLAYWRIGHT_MODULE to the installed Playwright module');
+const {chromium}=await import(playwrightModule);
+const output=process.env.QA_OUTPUT||`${tmpdir()}/fly-ui-qa`;await mkdir(output,{recursive:true});
 const browser=await chromium.launch({headless:true});const context=await browser.newContext({viewport:{width:1440,height:1100},locale:'en-US',colorScheme:'light'});const page=await context.newPage();const errors=[];const calls=[];const checks=[];page.on('pageerror',e=>errors.push(e.message));let rejectMatch=false;let authMode='nyxid';let saved=null;let matchRequest=null;let tournamentRequest=null;let annotations=[];let list=[...cases];
 const replay={id:'TEST-replay',status:'verified',progress:1,attempt:1,created:0,error:null,request:{fly_ids:['TEST-wt','TEST-design'],map_id:'TEST-arena',mode:'contest',seed:42,duration_seconds:3},result:{winner_slot:null,scores:[0,0],outcome:'draw',receipt_sha256:'TEST-replay-receipt'}};
 const replayScene={body:{meshes:{},geoms:[]},size:12,obstacles:[],food:[],flies:[{id:'TEST-wt',name:'TEST Wild Type',color:'mint'},{id:'TEST-design',name:'TEST Design',color:'mint'}]};

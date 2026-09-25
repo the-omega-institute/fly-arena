@@ -1,6 +1,10 @@
 # MVP delivery audit
 
-Verified 2026-09-16 against the requested first usable version. The complete scientific and production programme in ROADMAP.md remains a future plan; its unpassed gates are recorded in VALIDATION.md. This delivery is a usable research MVP, not a claim of biological fidelity or production readiness.
+Verified 2026-09-25 against the requested first usable version. The public
+preview exists at <https://fly.omega.gift>; the complete scientific and
+production programme in ROADMAP.md remains a future plan, and its unpassed
+gates are recorded in VALIDATION.md. This delivery is a usable research MVP,
+not a claim of biological fidelity or production readiness.
 
 | User requirement | Delivered behavior | Evidence |
 |---|---|---|
@@ -12,9 +16,11 @@ Verified 2026-09-16 against the requested first usable version. The complete sci
 | Usable results and replay | Async queue, independent verdict, scores, leaderboard, anatomical playback and neural traces | Safari replay screenshot and workflow in `VALIDATION.md`; latest remote match verified with 41 frames |
 | Architecture and trureturing research | Scientific core separated from platform identities; immutable inputs, fenced worker execution and independently checked evidence | `ARCHITECTURE.md`, `RESEARCH.md` with pinned upstream sources |
 | Decide whether to start in C++ | Python orchestration plus native Numba and MuJoCo; defer a C++/CUDA backend until profiling and numerical comparison justify it | Actual Mac timings in `evidence/remote-runtime.json`; language decision in `ARCHITECTURE.md` |
-| Find Mac Studio and 4060 resources; keep remote synchronized | Mac Studio runs the private service; 4060 Laptop 8 GB discovered through NyxID. Browser GPU renders meshes; no server GPU backend is required for this MVP | Node observations in `RESEARCH.md`, operational paths in `OPERATIONS.md`; latest source/build/runtime synchronization in `evidence/auth-release-check.json` |
-| Prepare simple NyxID login interfaces; actual integration later | Single-button login, code + PKCE, server sessions, draft restoration and separate revocable agent tokens. Disabled until configured by the owner | `NYXID_LOGIN.md`, `.env.example`, 18 offline auth tests; all 30 tests pass locally and on Mac Studio |
+| Find configured deployment host and GPU worker resources; keep remote synchronized | The configured deployment host runs the private service; a GPU worker with 8 GB was observed through NyxID. Browser GPU renders meshes; no server GPU backend is required for this MVP | Node observations in `RESEARCH.md`, deployment configuration in `OPERATIONS.md`; latest source/build/runtime synchronization in `evidence/auth-release-check.json` |
+| Prepare simple NyxID login interfaces; actual integration later | Single-button login, code + PKCE, server sessions, draft restoration and separate revocable agent tokens. Disabled until configured by the owner | `NYXID_LOGIN.md`, `.env.example`, 18 offline auth tests; all 30 tests pass locally and on configured deployment host |
 
-Local entry: `http://127.0.0.1:8080`; API explorer: `/docs`. The remote app runs at Mac Studio loopback under `institute.omega.fly-arena-alpha`. Public hosting is not enabled: the previous automatic approval review rejected exposing the app, designs, replays and registration/match APIs without explicit exposure approval. There is no public URL to claim.
+Local entry: `http://127.0.0.1:8080`; API explorer: `/docs`. The public
+preview exists at <https://fly.omega.gift>. Its API and simulation deployment
+remain separately configured and are not evidence of production readiness.
 
 Known limits remain visible in the product: engineered odor encoder and motor readout, simplified LIF dynamics, primitive navigation, no vision, online plasticity, natural aggression or CUDA neural backend. These do not prevent the implemented weight-design → embodied match → verdict → replay workflow. Full biological/strategic validation, production abuse protection, upstream session-revocation integration and the later ROADMAP gates are not represented as complete.

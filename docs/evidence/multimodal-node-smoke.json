@@ -9,7 +9,7 @@
     5000
   ],
   "neural_input_frames": 100,
-  "scope": "local node protocol, not SSH or 4060",
+  "scope": "local node protocol, not remote transport or a named GPU",
   "sensory_profile": "engineered-multimodal-v1",
   "verdict": {
     "final_tick": 10000,

@@ -2,7 +2,7 @@
 
 This implementation uses a modular monolith with provider-independent contracts, SQLite research admission, local whole-trial execution, and immutable artifact storage. It activates no external service or credentials. Integration fixtures use `httpx.MockTransport`; passing those tests establishes wire handling, not a working production account or a live service qualification.
 
-The source snapshots inspected for this slice are under `/tmp/fly-chrono-research`. Each source link below is pinned rather than referring to a changing branch.
+The source snapshots inspected for this slice are under `<workspace-root>/chrono-research`. Each source link below is pinned rather than referring to a changing branch.
 
 | Component | Inspected source pin | Reuse boundary |
 |---|---|---|

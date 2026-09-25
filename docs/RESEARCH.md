@@ -8,7 +8,7 @@
 
 实际阅读了 PR 描述、`docs/IMPLEMENTATION.md` 和 `docs/SOURCES.md`。PR 提供实验与实施规格，未实现网站、物理仿真或完整 SDK。其边界是玩家自行运行任意 controller，平台提供身体、场景和网络比赛协议；真实 connectome 和脑图编辑不在首版范围。
 
-本轮用户需求明确改为：真实图谱是核心，网页和 AI 都修改神经网络，平台执行可验证参赛产物。因此保留 PR 中的同一物理世界、地图共同数据源、整数时钟、租约 fencing、失败分类和回放证据设计；替换远程 arbitrary controller 作为正式排名核心的选择。PR 的 4090 假设不沿用，按当前 Mac Studio 与 4060 资源设计。
+本轮用户需求明确改为：真实图谱是核心，网页和 AI 都修改神经网络，平台执行可验证参赛产物。因此保留 PR 中的同一物理世界、地图共同数据源、整数时钟、租约 fencing、失败分类和回放证据设计；替换远程 arbitrary controller 作为正式排名核心的选择。PR 的 4090 假设不沿用，按当前部署主机与 GPU worker 资源设计。
 
 PR 自报的旧测试结果不作为本轮实现证据；没有合并该 PR。
 
@@ -109,7 +109,10 @@ Arena 应学其版本化裁决、artifact custody、可复现证据和分离的�
 
 ## 6. NyxID / Heca / Ornn
 
-NyxID：读取本地 [官方仓库](https://github.com/ChronoAIProject/NyxID) checkout 的 `skills/nyxid/SKILL.md`、相关 node/service CLI 参考；使用已安装 CLI 做服务发现和只读 SSH 查询。确认可以提供节点代理和凭据注入；Arena 的业务权限、排名、quota 与仿真仍需自己的实现。
+NyxID：读取 [官方仓库](https://github.com/ChronoAIProject/NyxID) 的公开
+`skills/nyxid/SKILL.md` 和相关 node/service CLI 参考；使用已安装 CLI 做
+服务发现和只读 SSH 查询。确认可以提供节点代理和凭据注入；Arena 的业务
+权限、排名、quota 与仿真仍需自己的实现。
 
 Heca：读取 [heca-artifacts README](https://github.com/getheca/heca-artifacts)，该公开仓库是 release mirror，源码在私库。文档声明 host 通过 desktop app/headless daemon 运行，可由 Web app 经 NyxID 登录访问。没有把它当 GPU 集群调度器，也没有安装/升级 daemon。
 
@@ -123,12 +126,12 @@ Ornn 的合适位置是分发 `fruit-fly-designer` 能力；用户自带任意 a
 
 | 节点/服务 | 观察 | 尚未证明 |
 |---|---|---|
-| `macstudio` / `macstudio-ssh` | NyxID online，SSH principal `macstudio` 可执行只读命令 | 可用算力余量、FlyGym/Eon 依赖、长期负载 |
-| `deepevo-4060-1-local` / local bridge | NyxID online/dispatchable | 显存、驱动、GPU 运算与渲染可用性 |
-| `local-gpu-4060-wsl` | offline | 是否旧部署/同一物理机器 |
-| `deepevo-4060-1` | offline | 是否旧部署/同一物理机器 |
+| `ARENA_DEPLOY_HOST` / `ARENA_DEPLOY_PRINCIPAL` 配置的部署节点 | NyxID online，可执行只读命令 | 可用算力余量、FlyGym/Eon 依赖、长期负载 |
+| 配置的 GPU worker node / local bridge | NyxID online/dispatchable | 显存、驱动、GPU 运算与渲染可用性 |
+| 旧 GPU worker 配置 | offline | 是否旧部署/同一物理机器 |
+| 备用 GPU worker 配置 | offline | 是否旧部署/同一物理机器 |
 
-Mac Studio 实际执行：
+configured deployment host 实际执行：
 
 ```text
 uname -sm                              → Darwin arm64
@@ -137,15 +140,19 @@ sysctl -n hw.memsize                    → 103079215104 bytes = 96 GiB
 sysctl -n hw.ncpu                       → 28
 ```
 
-远端非交互 PATH 找不到 `heca`；检查常见安装位置后，使用 `/Users/macstudio/.local/bin/heca --json daemon status` 确认 daemon 运行，版本 `0.1.0-nightly-20260914-1`、mode `standalone`、agent_count `0`。`daemon relay-status` 返回 enabled=true、state=connected。未据此推断 GPU 或 Arena worker 已部署。本机工作区的 Heca daemon 未运行，与远端 Mac Studio 区分。
+配置的部署环境非交互 PATH 当时找不到可选的 Heca CLI；通过该环境提供的
+只读 daemon status 查询确认版本 `0.1.0-nightly-20260914-1`、mode
+`standalone`、agent_count `0`。`daemon relay-status` 返回
+enabled=true、state=connected。未据此推断 GPU 或 Arena worker 已部署，
+也不记录安装目录或本机工作区路径。
 
-4060 的 `deepevo-4060-ssh` 服务声明 online；分别用它允许的 `zwlexa`、`lexa`、`ubuntu` principal 尝试 `uname` 和 `nvidia-smi` 查询，均在执行前返回 `ssh_node_key_missing`（404，error code 1011）。没有成功运行 GPU 命令，没有修改 SSH 绑定，也没有把“节点在线”记为“GPU 已验证”。local HTTP bridge 存在，但本轮未获得其已声明的硬件查询 API，因此没有猜测并调用执行端点。
+配置的 GPU worker SSH service 声明 online；使用其允许的已配置部署角色尝试 `uname` 和 `nvidia-smi` 查询，均在执行前返回 `ssh_node_key_missing`（404，error code 1011）。没有成功运行 GPU 命令，没有修改 SSH 绑定，也没有把“节点在线”记为“GPU 已验证”。local HTTP bridge 存在，但本轮未获得其已声明的硬件查询 API，因此没有猜测并调用执行端点。
 
 此问题不阻塞架构交付；GPU 实验前需使一个已有授权 principal 的 SSH node-key 绑定可用，或提供 bridge 的受支持只读状态接口。通过标准 NyxID 管理流程处理，不需要在聊天里粘贴密钥。
 
 ## 8. 本次交付的验证边界
 
-已完成：用户指定仓库和 PR 阅读、最新来源定位、核心源码核对、节点发现、Mac Studio 硬件及 Heca 状态只读查询、架构/路线/来源文档编写。
+已完成：用户指定仓库和 PR 阅读、最新来源定位、核心源码核对、节点发现、configured deployment host 硬件及 Heca 状态只读查询、架构/路线/来源文档编写。
 
 尚未完成：真实 connectome 下载与导入、编译器实现、权重验证器、神经模型运行、身体闭环、双蝇碰撞、网页实现、API/worker 实现、GPU benchmark、自动 agent 设计、部署或上线。任何性能数字、预算范围和排期均是待验证设计，不能引用为运行结果。
 

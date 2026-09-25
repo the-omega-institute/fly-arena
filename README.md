@@ -8,7 +8,7 @@ The current graph retains **165,122 Traced neurons, 25,563,197 directed neuron-p
 
 ## Current shipped scope (rounds 1–2)
 
-The current product increment ships the first two rounds of the research preview: the Phenotype Lab has recorded 3D scene inspection; the map registry labels observation-only mazes and keeps them out of competitive/training eligibility; Arena setup is shared across preview and match flows; and the science guide explains what is modeled, recorded and still unavailable. Round 2 adds the recorded life lineage tree, receipt-backed replay inspection, the `arena-geometry-v1` geometry contract, and the issue-82 phase-1 maze diagnosis with the preregistered phase-2 study runner. The phase-2 harness has a verified short smoke run; the complete five-seed 180-second study remains an explicit queued study operation.
+The current product increment ships the first two rounds of the research preview: the Phenotype Lab has recorded 3D scene inspection; the map registry labels observation-only mazes and keeps them out of competitive/training eligibility; Arena setup is shared across preview and match flows; and the science guide explains what is modeled, recorded and still unavailable. Round 2 adds the recorded life lineage tree, receipt-backed replay inspection, the `arena-geometry-v1` geometry contract, and the issue-82 phase-1 maze diagnosis with the preregistered phase-2 study runner. The complete five-seed 180-second phase-2 study is now recorded with a negative verdict: seeds 42, 45 and 46 were negative, seeds 43 and 44 improved, and the candidate is not promoted. See [the retained analysis](docs/MAZE_LOCOMOTION.md#completed-phase-2-study-2026-09-24).
 
 These surfaces expose recorded evidence and modeled mechanisms separately. A replay or comparison can describe the supplied conditions and observations; it cannot by itself establish biological validity, causal effects or generalization.
 
@@ -16,7 +16,7 @@ These surfaces expose recorded evidence and modeled mechanisms separately. A rep
 
 ## Run locally
 
-Requires Python 3.12, Node 22+ and at least 8 GB free memory for preparation and two-fly experiments; allow several GB of disk. Mac Studio is the primary deployment target. Linux CPU also supports the simulation; browser rendering uses the viewer's GPU.
+Requires Python 3.12, Node 22+ and at least 8 GB free memory for preparation and two-fly experiments; allow several GB of disk. configured deployment host is the primary deployment target. Linux CPU also supports the simulation; browser rendering uses the viewer's GPU.
 
 ```sh
 uv sync --python 3.12
@@ -64,6 +64,28 @@ uv run python scripts/ai_designer.py
 Advanced interventions support exact pre/post **class, type, side (`L`/`R`) and canonical neuron ID** selectors against pinned graph metadata. The editor offers real annotation suggestions, counts and the metadata digest; unsupported ROI, regex, unknown annotations and empty matches are rejected. Overlapping changes combine before final multiplier and budget checks. Preview reports distinguish structural and effective changes. A child's complete spec is absolute relative to the canonical graph; its parent records lineage, not another weight multiplier. Exploratory vision/memory/motor edits do not add sensory modalities, learning or action channels. See [UI_RESEARCH](docs/UI_RESEARCH.md) and [RESEARCH_API](docs/RESEARCH_API.md).
 
 The MVP workspace publishes designs, research reports and verified replays. Authentication ships with local designer bearer mode and a live NyxID OIDC mode, including the same-origin Pages entry added in PR #84; the selected deployment reports its active mode from `/auth/config`. Static Pages mode uses the local bearer flow when no same-origin application origin is configured. Optional local registration gating uses `ARENA_INVITE_CODE`. Per designer there are limits of 100 designs, 12 pending matches and 12 unfinished research experiments. These are beta controls, not a complete production anti-abuse system.
+
+## License and attribution
+
+Project-authored code is released under the MIT license in [LICENSE](LICENSE).
+MaleCNS data, FlyGym/NeuroMechFly assets, MuJoCo, fonts, generated examples,
+and Python/npm dependencies are separate materials with their own terms; see
+[NOTICE](NOTICE.md) and [ATTRIBUTION](docs/ATTRIBUTION.md). The code license
+does not grant rights to redistribute third-party datasets or assets.
+
+## Privacy and data retention
+
+The read APIs are public by design for published designs (`GET /api/v1/flies`),
+matches and replay artifacts (`GET /api/v1/matches` and its replay routes), and
+research experiments (`GET /api/v1/experiments` and
+`GET /api/v1/experiments/{id}`). Public life, catalog, leaderboard and
+connectome metadata reads support the same preview. Bearer tokens, NyxID
+sessions, owner-only saved views, and write operations are not public reads.
+The service stores published records, replay evidence, and research reports in
+its configured SQLite/object roots; there is no automatic deletion or
+user-facing retention schedule in this preview, so operators must define and
+apply retention before treating it as a production data service. Do not submit
+personal data or secrets as design names, descriptions, or experiment fields.
 
 ## Inspect your fly’s brain during replay
 
@@ -124,6 +146,7 @@ Python orchestrates the system; Numba compiles the sparse neural loop to native 
 - [Validation evidence and limitations](docs/VALIDATION.md)
 - [MVP delivery audit](docs/MVP_ACCEPTANCE.md)
 - [Data and software attribution](docs/ATTRIBUTION.md)
+- [License](LICENSE) and [third-party notices](NOTICE.md)
 
 ```sh
 uv run pytest -q

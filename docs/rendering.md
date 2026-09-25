@@ -19,22 +19,22 @@ dependency version associated with the recording. The exporter checks geometry
 names and pose counts before drawing. The current FlyGym dependency provides
 MuJoCo, Pillow, PyOpenGL, imageio and imageio-ffmpeg.
 
-## Verified RTX 4060 node
+## Verified GPU worker rendering
 
-On `deepevo-4060-ssh`, the default EGL context reports **llvmpipe**, a CPU software
-renderer. Finding a GPU with `nvidia-smi` does not establish GPU rasterization.
-The WSLg D3D12 route below reports
-`D3D12 (NVIDIA GeForce RTX 4060 Laptop GPU)`:
+On the configured GPU worker node, the default EGL context reports **llvmpipe**, a
+CPU software renderer. Finding a GPU with `nvidia-smi` does not establish GPU
+rasterization.
+The configured accelerated graphics route below reports
+`D3D12 (the configured NVIDIA GPU)`:
 
 ```sh
-cd /tmp/fly-arena-embodied-v020
+cd "${ARENA_DEPLOY_PATH:?Set ARENA_DEPLOY_PATH}"
 DISPLAY=:0 MUJOCO_GL=glfw GALLIUM_DRIVER=d3d12 \
-LD_LIBRARY_PATH=/usr/lib/wsl/lib \
 MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA \
-flock -w 30 /tmp/fly-arena-gpu.lock \
+flock -w 30 "${ARENA_VAR:?Set ARENA_VAR}/gpu.lock" \
   .venv/bin/python scripts/render_replay.py \
   --maps --replay var/node-jobs/MATCH_ID/evidence \
-  --output var/renders/MATCH_ID --require-renderer 'RTX 4060'
+  --output var/renders/MATCH_ID --require-renderer 'configured GPU'
 ```
 
 This creates an invisible graphics context; it does not automate a browser.
