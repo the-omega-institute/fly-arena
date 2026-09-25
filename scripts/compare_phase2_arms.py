@@ -59,22 +59,30 @@ def _run_root(seed_directory: Path, arm: str) -> Path:
     replay = root / "replay"
     if replay.is_dir():
         root = replay
-    required = ("frames.json", "events.json", "receipt.json")
+    required = ("scene.json", "frames.json", "events.json", "receipt.json")
     missing = [name for name in required if not (root / name).is_file()]
     if missing:
         raise FileNotFoundError(f"{arm} is missing {', '.join(missing)}")
     return root
 
 
-def _verify_receipt(root: Path) -> tuple[dict, dict]:
+def _verify_receipt(root: Path) -> tuple[dict, dict, dict]:
     receipt = _json(root / "receipt.json")
     if not isinstance(receipt, dict):
         raise ValueError(f"{root}: receipt.json must contain an object")
+    canonical_sha = receipt.get("sha256")
+    if not isinstance(canonical_sha, str) or re.fullmatch(r"[0-9a-f]{64}", canonical_sha) is None:
+        raise ValueError(f"{root}: receipt must contain a canonical sha256 digest")
+    if _digest({key: value for key, value in receipt.items() if key != "sha256"}) != canonical_sha:
+        raise ValueError(f"{root}: receipt canonical digest mismatch")
     files = receipt.get("files")
     if not isinstance(files, dict):
         raise ValueError(f"{root}: receipt has no file bindings")
+    scene = _json(root / "scene.json")
+    if not isinstance(scene, dict):
+        raise ValueError(f"{root}: scene.json must contain an object")
     hashes = {}
-    for name in ("frames.json", "events.json"):
+    for name in ("scene.json", "frames.json", "events.json"):
         expected = files.get(name)
         if not isinstance(expected, str):
             raise ValueError(f"{root}: receipt does not bind {name}")
@@ -82,12 +90,8 @@ def _verify_receipt(root: Path) -> tuple[dict, dict]:
         if actual != expected:
             raise ValueError(f"{root}: receipt hash mismatch: {name}")
         hashes[name] = actual
-    if "sha256" in receipt:
-        actual_digest = _digest({key: value for key, value in receipt.items() if key != "sha256"})
-        if receipt["sha256"] != actual_digest:
-            raise ValueError(f"{root}: receipt canonical digest mismatch")
     return receipt, {"status": "verified", "files": hashes,
-                     "receipt_sha256": receipt.get("sha256")}
+                     "receipt_sha256": canonical_sha}, scene
 
 
 def _physics_dt(receipt: dict) -> float:
@@ -138,8 +142,6 @@ def _quaternion(frame: dict, slot: int, pose_index: int) -> np.ndarray | None:
     if isinstance(poses, list):
         if pose_index < len(poses):
             candidates.append(poses[pose_index])
-        if slot < len(poses):
-            candidates.append(poses[slot])
     for value in candidates:
         if isinstance(value, list) and len(value) == 4:
             quaternion = np.asarray([_finite(item, "recorded quaternion") for item in value], dtype=float)
@@ -201,11 +203,23 @@ def _recorded_support(sense: dict) -> tuple[float, float] | None:
                 return len(left) / 3.0, len(right) / 3.0
             return _finite(left, "recorded left support"), _finite(right, "recorded right support")
     if isinstance(value, list):
-        names = [str(name).rsplit("/", 1)[-1] for name in value]
-        left = sum(name.startswith(("lf", "lm", "lh")) for name in names) / 3.0
-        right = sum(name.startswith(("rf", "rm", "rh")) for name in names) / 3.0
-        return float(left), float(right)
+        # The production runner records qualifying obstacle target IDs here;
+        # target IDs do not encode which leg supplied the support.
+        return None
     return None
+
+
+def _thorax_pose_index(scene: dict, slot: int) -> int:
+    body = scene.get("body")
+    geoms = body.get("geoms") if isinstance(body, dict) else None
+    if not isinstance(geoms, list):
+        raise ValueError("scene body manifest has no geometry list")
+    indices = [index for index, geom in enumerate(geoms)
+               if isinstance(geom, dict) and geom.get("slot") == slot and
+               isinstance(geom.get("name"), str) and geom["name"].endswith("/c_thorax")]
+    if len(indices) != 1:
+        raise ValueError(f"scene body manifest must contain one thorax geometry for slot {slot}")
+    return indices[0]
 
 
 def _correction_series(frames: list[dict], times: np.ndarray, slot: int, pose_index: int) -> dict:
@@ -435,7 +449,7 @@ def _trajectory_divergence(arm_data: dict, threshold: float) -> dict:
 
 
 def _arm_report(root: Path, slot: int, pose_index: int, drive_window: float) -> tuple[dict, dict]:
-    receipt, verification = _verify_receipt(root)
+    receipt, verification, scene = _verify_receipt(root)
     frames = _json(root / "frames.json")
     events = _json(root / "events.json")
     if not isinstance(frames, list) or not all(isinstance(frame, dict) for frame in frames):
@@ -444,7 +458,7 @@ def _arm_report(root: Path, slot: int, pose_index: int, drive_window: float) -> 
         raise ValueError(f"{root}: events.json must contain a list of objects")
     dt = _physics_dt(receipt)
     times = _frame_times(frames, dt)
-    correction = _correction_series(frames, times, slot, pose_index)
+    correction = _correction_series(frames, times, slot, _thorax_pose_index(scene, slot))
     upright = [sample["pose_upright_z"] for sample in correction["samples"]]
     inversions = _inversions(times, upright)
     drives = [_drive(frame, slot) for frame in frames]

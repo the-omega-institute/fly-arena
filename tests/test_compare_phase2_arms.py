@@ -27,21 +27,30 @@ def _write_json(path, value):
 
 def _fixture(tmp_path):
     seed = tmp_path / "seed-42"
-    times = list(range(7))
-    baseline_quaternions = [[1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0],
-                            [0, 1, 0, 0], [0, 1, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]]
-    candidate_quaternions = [[1, 0, 0, 0], [1, 0, 0, 0], [0, 1, 0, 0],
-                             [0, 1, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0], [1, 0, 0, 0]]
+    ticks = [index * 10_000 for index in range(7)]
+    half_turn = 2 ** -.5
+    initial = [half_turn, 0, 0, half_turn]
+    inverted = [0, half_turn, -half_turn, 0]
+    baseline_quaternions = [initial, initial, initial, inverted, inverted, initial, initial]
+    candidate_quaternions = [initial, initial, inverted, inverted, initial, initial, initial]
+    scene = {"body": {"geoms": [
+        {"id": 11, "slot": 0, "name": "fly-0/lf_tarsus", "mesh": "0"},
+        {"id": 12, "slot": 0, "name": "fly-0/c_thorax", "mesh": "1"},
+    ]}}
 
     def frames(quaternions, offset, body_state=None, missing_sense=False):
         rows = []
-        for index, (time, quaternion) in enumerate(zip(times, quaternions)):
-            sense = {} if missing_sense else {"contact_environment": ["obstacle-0"] if time == 1 else []}
+        for index, (tick, quaternion) in enumerate(zip(ticks, quaternions)):
+            sense = {} if missing_sense else {
+                "contact_environment": ["obstacle-0"] if index == 1 else [],
+                "contact_support": ["obstacle-0", "obstacle-2"] if index == 1 else [],
+            }
             if body_state is not None:
                 sense["motor_body_state"] = body_state[index]
-            rows.append({"time": float(time), "quaternions": [quaternion],
-                         "positions": [[float(time + offset), float(time * (0.3 if offset else 0.0)), 1.0]],
-                         "drives": [[0.1 + time / 10, 0.4 - time / 20]], "senses": [sense]})
+            rows.append({"tick": tick,
+                         "poses": [[0, 0, 0, 1, 0, 0, 0], [0, 0, 0, *quaternion]],
+                         "positions": [[float(index + offset), float(index * (0.3 if offset else 0.0)), 1.0]],
+                         "drives": [[0.1 + index / 10, 0.4 - index / 20]], "senses": [sense]})
         return rows
 
     candidate_state = [
@@ -62,10 +71,12 @@ def _fixture(tmp_path):
         root = seed / arm
         root.mkdir(parents=True)
         frame_data = frames(quaternion_data, offset, state, missing_sense=arm == "baseline")
+        _write_json(root / "scene.json", scene)
         _write_json(root / "frames.json", frame_data)
         _write_json(root / "events.json", events)
         receipt = {"runtime": {"rules": {"physics_dt": .0001}},
-                   "files": {"frames.json": _COMPARE._file_sha(root / "frames.json"),
+                   "files": {"scene.json": _COMPARE._file_sha(root / "scene.json"),
+                             "frames.json": _COMPARE._file_sha(root / "frames.json"),
                              "events.json": _COMPARE._file_sha(root / "events.json")}}
         if arm == "candidate":
             receipt["observation_motor"] = {"configuration": config}
@@ -82,6 +93,16 @@ def test_compare_reports_recorded_candidate_inputs_and_proxy_baseline(tmp_path):
     assert baseline["correction_inputs"]["samples"][1]["sources"]["upright_z"] == "pose_derived_proxy"
     assert baseline["correction_inputs"]["samples"][1]["sources"]["support_left"] == "unavailable"
     assert candidate["correction_inputs"]["availability"]["upright_z"]["recorded"] == 7
+
+
+def test_production_contact_support_targets_do_not_become_leg_fractions(tmp_path):
+    report = _COMPARE.compare(_fixture(tmp_path))
+    baseline = report["arms"]["baseline"]["correction_inputs"]["samples"]
+    candidate = report["arms"]["candidate"]["correction_inputs"]["samples"]
+    assert _COMPARE._recorded_support({"contact_support": ["obstacle-0", "obstacle-2"]}) is None
+    assert baseline[1]["sources"]["support_left"] == "unavailable"
+    assert candidate[1]["sources"]["support_left"] == "recorded_motor_body_state"
+    assert report["arms"]["candidate"]["inversions"][0]["start_s"] == pytest.approx(2.0)
 
 
 def test_compare_reports_attenuation_wall_onsets_context_and_divergence(tmp_path):
@@ -119,6 +140,36 @@ def test_compare_rejects_tampered_recorded_frame(tmp_path):
     frames[0]["positions"][0][0] = 99
     path.write_text(json.dumps(frames))
     with pytest.raises(ValueError, match="hash mismatch"):
+        _COMPARE.compare(seed)
+
+
+def test_compare_requires_canonical_receipt_digest(tmp_path):
+    seed = _fixture(tmp_path)
+    path = seed / "candidate" / "receipt.json"
+    receipt = json.loads(path.read_text())
+    del receipt["sha256"]
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError, match="canonical sha256 digest"):
+        _COMPARE.compare(seed)
+
+
+def test_compare_rejects_tampered_canonical_receipt_digest(tmp_path):
+    seed = _fixture(tmp_path)
+    path = seed / "candidate" / "receipt.json"
+    receipt = json.loads(path.read_text())
+    receipt["observation_motor"]["configuration"]["tilt_gain"] = .99
+    path.write_text(json.dumps(receipt))
+    with pytest.raises(ValueError, match="canonical digest mismatch"):
+        _COMPARE.compare(seed)
+
+
+def test_compare_rejects_tampered_scene_before_receipt_configuration(tmp_path):
+    seed = _fixture(tmp_path)
+    path = seed / "candidate" / "scene.json"
+    scene = json.loads(path.read_text())
+    scene["body"]["geoms"][1]["name"] = "fly-0/not-the-thorax"
+    path.write_text(json.dumps(scene))
+    with pytest.raises(ValueError, match="hash mismatch: scene.json"):
         _COMPARE.compare(seed)
 
 

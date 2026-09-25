@@ -3,7 +3,7 @@
   "study": "issue82-phase2/study-20260924",
   "comparison_script": {
     "path": "scripts/compare_phase2_arms.py",
-    "sha256": "82d56191f0555190a3b3e55c52ea1df34ce8c7d973d671788783ec0ce8d86351"
+    "sha256": "f7dc3acbb5c432d433f157d0b61bb0d18c48c5de6ba2fc21bd47009ce6aa4963"
   },
   "condensation_note": "Source reports were condensed before review: correction_inputs time series were dropped and replaced by their key list; long propulsion_attenuation lists were truncated to count plus their first 40 entries; trajectory samples were decimated every 100th sample. This evidence file retains only fields cited in docs/MAZE_LOCOMOTION.md.",
   "analysis_policy": {

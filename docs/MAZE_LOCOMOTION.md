@@ -224,7 +224,7 @@ the candidate's counterfactual response nor a paired candidate evaluation.
 
 This section reports a recording-only comparison of the five receipt-bound
 phase-2 pairs. It uses the comparison script at
-`82d56191f0555190a3b3e55c52ea1df34ce8c7d973d671788783ec0ce8d86351` and the
+`f7dc3acbb5c432d433f157d0b61bb0d18c48c5de6ba2fc21bd47009ce6aa4963` and the
 compact [arm-comparison evidence](evidence/maze-phase2-20260924-arm-comparison.json).
 The source files were not rerun or modified. Recorded candidate
 `motor_body_state` values are labeled as recorded. The `upright_z`, roll-rate
