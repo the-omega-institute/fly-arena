@@ -11,5 +11,5 @@ export function wildTypeChallenge(flies:Fly[], selected:string) {
   const subject=flies.find(f=>f.id===selected)
   const reference=matchingWildType(flies,subject)
   if(!subject||!reference||subject.id===reference.id)return null
-  return {subject,reference,map_id:'orchard',mode:'contest',duration_seconds:2,seed:42} as const
+  return {subject,reference,map_id:'orchard',mode:'contest',duration_seconds:10,seed:42} as const
 }

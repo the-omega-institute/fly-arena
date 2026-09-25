@@ -10,6 +10,6 @@ export function WildTypeChallenge({flies,selected,onPrepare}:{flies:Fly[];select
     <p>{t('WT is the unmodified simulated baseline. Compete against it to see what your design changes.')}</p>
     {plan?<p className="wt-participants"><b>{plan.subject.name}</b> vs <b>{plan.reference.name}</b></p>:<p>{t('Choose a different saved fly. The WT reference must use the same connectome and neural model.')}</p>}
     <button className="secondary wide" disabled={!plan} onClick={()=>{if(plan)onPrepare(plan)}}><Leaf size={15}/>{t('Prepare WT challenge')}<ArrowRight size={15}/></button>
-    <small>{t('Preset: orchard · seed 42 · 2 seconds per match. Review the plan, then create the paired series: two swapped matches, 4 simulated seconds total.')}</small>
+    <small>{t('Preset: orchard · seed 42 · 10 seconds per match. Review the plan, then create the paired series: two swapped matches, 20 simulated seconds total.')}</small>
   </section>
 }

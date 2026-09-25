@@ -116,7 +116,7 @@ test('question controls only prefill editable conditions and never submit withou
  await question('maze')
  assert.equal(submitted.length,0);assert.equal(document.querySelector('#experiment-intent').value,'forage')
  assert.equal(document.querySelector('#experiment-opponent'),null)
- const duration=document.querySelector('select[aria-label="Duration"]')
+ const duration=document.querySelector('select[aria-label="Observation time per match"]')
  assert.ok(duration)
  await act(async()=>{duration.value='60';duration.dispatchEvent(new window.Event('change',{bubbles:true}))})
  await click('Run my simulation')

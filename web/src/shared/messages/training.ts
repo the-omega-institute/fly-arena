@@ -34,7 +34,7 @@ export const trainingMessages = {
   "training.first.saved":{"en": "Selected saved fly. Saving did not start an evaluation.", "zh-CN": "当前选中的已保存果蝇。保存不会启动评估。"},
   "training.first.choose":{"en": "Select a saved fly to prepare a comparison or configure a finite search.", "zh-CN": "选择已保存的果蝇，准备对照或配置有限搜索。"},
   "training.first.compare":{"en": "1 · Inspect a WT baseline comparison", "zh-CN": "1 · 检查 WT 基线对照"},
-  "training.first.baseline":{"en": "WT is the unmodified simulated reference, not automatically your training founder. Prepare two orchard matches with swapped positions, seed 42 and 2 seconds each; inspect scores, recorded behavior and neural traces. This short preset checks the workflow, not reliable feeding.", "zh-CN": "WT 是未修改的模拟参考，训练起点不自动等于 WT。准备两场交换出生位置的果园对照，种子 42，每场 2 秒；检查得分、记录的行为和神经曲线。此短程预设用于试通流程，不足以检验可靠觅食。"},
+  "training.first.baseline":{"en": "WT is the unmodified simulated reference, not automatically your training founder. Prepare two orchard matches with swapped positions, seed 42 and 10 seconds each; inspect scores, recorded behavior and neural traces. Choose the observation time before submitting; a short comparison does not establish reliable feeding.", "zh-CN": "WT 是未修改的模拟参考，训练起点不自动等于 WT。准备两场交换出生位置的果园对照，种子 42，每场 10 秒；检查得分、记录的行为和神经曲线。提交前可选择观察时长；一次短程对比不足以检验可靠觅食。"},
   "training.first.inspect":{"en": "Inspect recorded WT comparison", "zh-CN": "查看已记录的 WT 对照"},
   "training.first.prepare":{"en": "Prepare WT comparison", "zh-CN": "准备 WT 对照"},
   "training.first.unavailable":{"en": "No verified paired WT comparison or compatible ready preset is available for this fly.", "zh-CN": "此果蝇尚无已验证的配对 WT 对照，也无兼容且就绪的预设。"},
